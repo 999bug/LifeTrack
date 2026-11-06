@@ -169,6 +169,10 @@ Windows 使用 `gradlew.bat`。
 - 检查 APK Manifest 确认没有 `android.permission.INTERNET`。
 - 在 Android 12+ 设备上验证云备份与设备迁移都不会带走业务数据库。
 
+## 相关文档
+
+- [本地验证与在线升级方案](docs/local-verification-and-upgrade.md)：改完代码怎么在模拟器上验证、装到手机后怎么升级。
+
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)。可以自由使用、修改、分发，包括商业用途，但需保留版权与许可声明。

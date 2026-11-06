@@ -1,0 +1,16 @@
+# 仓库内统一保存 LF，检出时按平台转换；避免 Windows 上 core.autocrlf 把
+# shell 脚本写成 CRLF 导致 Linux/macOS 无法执行。
+* text=auto
+
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.jar binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.jks binary
+*.keystore binary

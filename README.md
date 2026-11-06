@@ -20,21 +20,25 @@
 
 | 组件 | 工程版本 | 说明 |
 |---|---:|---|
-| Android Gradle Plugin | 8.13.2 | 稳定版兼容路线 |
-| Gradle | 8.13 | 与 AGP 8.13 系列匹配 |
-| JDK | 17 | AGP 要求的最低/默认 JDK 线 |
-| Kotlin | 2.4.21 | 2026-10-08 发布的稳定补丁版 |
+| Android Gradle Plugin | 9.3.1 | 满足 AndroidX 依赖要求的 AGP ≥ 9.1；仍在 Kotlin 2.4.21 官方兼容表（AGP 上限 9.3.1）之内 |
+| Gradle | 9.6.1 | AGP 9.3.1 要求 Gradle ≥ 9.5.0；官方 Wrapper JAR |
+| JDK | 17 | AGP 要求的最低/默认 JDK 线（本机实测用 JDK 21 运行 Gradle 亦可） |
+| Kotlin | 2.4.21 | 2026-10-08 发布的稳定补丁版；AGP 9 内置 Kotlin，版本经 buildscript classpath 覆盖 |
 | Compose Compiler Gradle Plugin | 2.4.21 | 与 Kotlin 插件版本对齐 |
 | Compose BOM | 2026.09.00 | 使用稳定 BOM，不单独锁 Compose UI 子库版本 |
 | Room | 2.8.5 | 使用 KSP 生成代码 |
-| KSP | 2.3.10 | Kotlin 官方 KSP 快速开始示例使用的版本 |
+| KSP | 2.3.13 | AGP 9 内置 Kotlin 需要 KSP ≥ 2.3.1 |
 | DataStore Preferences | 1.2.1 | 官方发布页列出的稳定版本 |
 | Navigation Compose | 2.10.2 | 稳定版本 |
 | Lifecycle | 2.11.0 | 稳定版本 |
 | Activity Compose | 1.13.0 | 稳定版本 |
-| compileSdk / targetSdk | 36.1 / 36 | minSdk 26 |
+| compileSdk / targetSdk | 37 / 36 | minSdk 26；Compose BOM 2026.09.00、Lifecycle 2.11.0、Navigation 2.10.2 均要求 compileSdk ≥ 37 |
 
-为什么没有采用当前最新 AGP 9.4.x：AGP 9 引入 built-in Kotlin，Kotlin/KSP 插件应用方式与 AGP 8.x 有差异。首版以减少构建链复杂度为优先，选用仍处于官方兼容范围的 AGP 8.13.2，并配合 Kotlin 2.4.21。Kotlin 官方兼容表说明 Kotlin 2.4 字节码需要 AGP 8.5.2 或更高；本工程选择的 AGP 8.13.2 高于该下限。后续可以单独升级 AGP 9，不建议在第一次导入工程时同时升级构建链。
+为什么最终采用 AGP 9：初版曾按「减少构建链复杂度」的思路固定 AGP 8.13.2 + compileSdk 36.1，但当前 AndroidX 全线（Compose BOM 2026.09.00 解析出 compose-ui 1.12.1、Lifecycle 2.11.0 的 `*-compose` 构件、Navigation Compose 2.10.2）的 AAR 元数据明确要求 **AGP ≥ 9.1.0 且 compileSdk ≥ 37**，`:app:checkDebugAarMetadata` 会因此失败。因此改为 AGP 9.3.1 + compileSdk 37，并完成 built-in Kotlin 迁移：
+
+- 移除 `org.jetbrains.kotlin.android` 插件（AGP 9 重复应用会直接报错），保留 `org.jetbrains.kotlin.plugin.compose`。
+- AGP 9 自带的 KGP 版本低于工程目标，故在根 `build.gradle.kts` 的 `buildscript` classpath 中显式指定 `kotlin-gradle-plugin:2.4.21`。
+- targetSdk 保持 36，不与 compileSdk 一起跳，避免提前引入运行时行为变更。
 
 官方核对入口：
 
@@ -86,13 +90,12 @@ LifeTrack/
 
 ## 导入和运行
 
-1. 安装 Android Studio 稳定版，并安装 JDK 17、Android SDK Platform 36.1（Android 16 QPR2）和 Build Tools 36。
-2. 解压本项目 ZIP，在项目根目录先运行一次 `./gradlew wrapper --gradle-version 8.13`（Windows：`gradlew.bat wrapper --gradle-version 8.13`）。本压缩包内的脚本会引导下载 Gradle 8.13，并生成标准 Gradle Wrapper 文件（包括官方 wrapper JAR）。
-3. 在 Android Studio 中选择 **Open**，打开包含 `settings.gradle.kts` 的项目根目录，等待 Gradle Sync。首次同步需要从 Google Maven 和 Maven Central 下载依赖。
-4. 连接 Android 8.0（API 26）或更高版本的设备，打开 USB 调试。
-5. 选择 `app` 运行配置，点击 Run。
+1. 安装 Android Studio 稳定版，并安装 JDK 17、Android SDK Platform 37.0 和 Build Tools 36。
+2. 在 Android Studio 中选择 **Open**，打开包含 `settings.gradle.kts` 的项目根目录，等待 Gradle Sync。首次同步需要从 Google Maven 和 Maven Central 下载依赖。
+3. 连接 Android 8.0（API 26）或更高版本的设备，打开 USB 调试。
+4. 选择 `app` 运行配置，点击 Run。
 
-命令行构建（首次运行需要下载 Gradle 8.13）：
+命令行构建（首次运行需要下载 Gradle 9.6.1）：
 
 ```bash
 ./gradlew :app:assembleDebug
@@ -102,7 +105,12 @@ LifeTrack/
 
 Windows 使用 `gradlew.bat`。
 
-说明：此压缩包为源码工程。由于生成环境没有 Android SDK、没有可用的 Gradle 安装且无法联网下载构建依赖，**本次未实际执行 Android Gradle 构建或设备运行**。包内 `gradlew` / `gradlew.bat` 是轻量引导脚本，会在首次执行时下载固定版本 Gradle 8.13；它们不是官方 wrapper JAR 版本。若企业环境不允许脚本下载，请在本机安装 Gradle 8.13 后执行构建，或在 Android Studio 中重新生成官方 Gradle Wrapper。
+说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
+
+- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/app-debug.apk`（约 20 MB）。
+- `./gradlew :app:testDebugUnitTest` 通过，`RecordTimeMapperTest` 3 个用例全绿。
+
+未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。
 
 ## 数据模型
 

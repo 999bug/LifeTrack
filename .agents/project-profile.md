@@ -35,16 +35,16 @@ languages:                         # 只填实际用到的，版本写实际值
   java: 17                         # 仅 JVM target / compileOptions 版本
 framework: Android (Jetpack Compose + Material 3)   # Room 2.8.5 + KSP、DataStore、Navigation Compose
 package_manager: gradle
-build_command: 未定                # 候选 ./gradlew :app:assembleDebug；当前构建失败，见 §9
-test_command: 未定                 # 候选 ./gradlew :app:testDebugUnitTest；当前失败，见 §9
-dev_command: 未定                  # 候选 ./gradlew :app:installDebug；需先构建通过并连接 API 26+ 设备
+build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-06，产物 app/build/outputs/apk/debug/app-debug.apk）
+test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（RecordTimeMapperTest 3 例）
+dev_command: ./gradlew :app:installDebug        # 未验证，需连接 API 26+ 设备
 ```
 
 ## 3. 提交与推送
 
 ```yaml
 git_user_name: saul
-git_user_email: 91404048+999bug@users.noreply.github.com
+git_user_email: 57277097+999bug@users.noreply.github.com
 commit_style: conventional         # feat: / fix: / chore:
 issue_tracker: GitHub Issues
 auto_commit: true                  # 改完自动提交，不必每次问
@@ -109,8 +109,8 @@ overrides:
 
 ## 9. 已知的雷区
 
-- **构建与单测当前失败**：`:app:checkDebugAarMetadata` 报 28 项 AAR 元数据错误。Compose BOM 2026.09.00（compose-ui 1.12.1）、Navigation Compose 2.10.2、Lifecycle 2.11.0 等要求 **AGP ≥ 9.1.0 且 compileSdk ≥ 37**，工程固定 AGP 8.13.2 / compileSdk 36.1。README 中「AGP 8.13.2 与这些依赖兼容」的结论与实际解析结果不符。修复方向二选一：升级到 AGP 9.x + compileSdk 37（同时评估 built-in Kotlin 迁移），或降级这批 AndroidX 依赖。
-- **`gradlew` / `gradlew.bat` 是引导脚本，不是官方 wrapper JAR**：首次运行会从 services.gradle.org 下载 Gradle 8.13；本机实测该下载曾被连接重置（`curl: (56) Recv failure: Connection was reset`）。本机 `~/.gradle/wrapper/dists` 已有完整的 Gradle 8.13 缓存，但引导脚本只认 `~/.gradle/life-track-bootstrap/`。构建前可先用缓存里的 `gradle-8.13/bin/gradle`，或在 Android Studio 重新生成官方 Wrapper。
+- **构建工具链已升级到 AGP 9（2026-11-06 修复，勿回退）**：现象 → `:app:checkDebugAarMetadata` 报 28 项 AAR 元数据错误，Compose BOM 2026.09.00（compose-ui 1.12.1）、Navigation 2.10.2、Lifecycle 2.11.0 要求 AGP ≥ 9.1.0 且 compileSdk ≥ 37。根因 → 工程原先固定 AGP 8.13.2 / compileSdk 36.1，与当前 AndroidX 依赖的元数据要求不匹配。修复 → AGP 9.3.1 + Gradle 9.6.1 + compileSdk 37，移除 `org.jetbrains.kotlin.android`（AGP 9 内置 Kotlin），Kotlin 2.4.21 通过根 `buildscript` classpath 覆盖，KSP 升到 2.3.13。教训 → AGP 9.3.1 硬性要求 Gradle ≥ 9.5.0（9.4.1 会直接失败）；KSP 必须 ≥ 2.3.1 才能配合 built-in Kotlin；升级这批依赖时先看 AAR 元数据里的 AGP/compileSdk 下限。
+- **`gradle/wrapper/` 已是官方 Wrapper（含 `gradle-wrapper.jar`）**：旧的 `gradlew` / `gradlew.bat` 是自制下载引导脚本，硬编码 Gradle 8.13 且只认 `~/.gradle/life-track-bootstrap/`，升级版本时必须同步改脚本里的 `VERSION`。现已替换为官方脚本，改版本只改 `gradle-wrapper.properties` 的 `distributionUrl`。
 - **数据库未加密**：不得声称 Room 已加密；应用私有目录只是沙箱隔离。面向真实用户发布前必须先完成加密选型、Android Keystore 密钥管理、导出文件加密与备份/迁移评审（见 README「安全边界」）。
 - **Manifest 不申请 INTERNET**：这是 Local First 的硬约束，新增网络能力必须先改 README 并评审隐私影响。
 - **`allowBackup=false` 且尚未实现主动导出/恢复**：卸载、清除数据或丢机即可能永久丢数据；设置页已有提示。

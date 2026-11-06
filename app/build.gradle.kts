@@ -1,6 +1,6 @@
 plugins {
+    // AGP 9 内置 Kotlin 编译，不再应用 org.jetbrains.kotlin.android
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
@@ -8,9 +8,7 @@ plugins {
 android {
     namespace = "com.example.lifetrack"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {

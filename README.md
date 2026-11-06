@@ -107,7 +107,7 @@ Windows 使用 `gradlew.bat`。
 
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
 
-- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/app-debug.apk`（约 20 MB）。
+- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
 - `./gradlew :app:testDebugUnitTest` 通过，`RecordTimeMapperTest` 3 个用例全绿。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。

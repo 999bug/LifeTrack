@@ -35,7 +35,7 @@ languages:                         # 只填实际用到的，版本写实际值
   java: 17                         # 仅 JVM target / compileOptions 版本
 framework: Android (Jetpack Compose + Material 3)   # Room 2.8.5 + KSP、DataStore、Navigation Compose
 package_manager: gradle
-build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-06，产物 app/build/outputs/apk/debug/app-debug.apk）
+build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-06，产物 app/build/outputs/apk/debug/LifeTrack-<version>-debug.apk）
 test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（RecordTimeMapperTest 3 例）
 dev_command: ./gradlew :app:installDebug        # 未验证，需连接 API 26+ 设备
 ```

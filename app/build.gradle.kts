@@ -42,6 +42,18 @@ android {
     }
 }
 
+// APK 命名：LifeTrack-<版本名>-<buildType>.apk
+// AGP 9 已移除 applicationVariants 等旧 Variant API，只能用 androidComponents。
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val versionName = output.versionName.orNull ?: "0.0.0"
+            val buildType = variant.buildType ?: "unknown"
+            output.outputFileName.set("LifeTrack-$versionName-$buildType.apk")
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

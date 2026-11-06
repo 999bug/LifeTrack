@@ -45,6 +45,7 @@ dev_command: ./gradlew :app:installDebug        # 未验证，需连接 API 26+ 
 ```yaml
 git_user_name: saul
 git_user_email: 57277097+999bug@users.noreply.github.com
+remote: https://github.com/999bug/LifeTrack   # origin，main 为默认分支
 commit_style: conventional         # feat: / fix: / chore:
 issue_tracker: GitHub Issues
 auto_commit: true                  # 改完自动提交，不必每次问

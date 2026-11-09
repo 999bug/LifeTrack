@@ -1,6 +1,6 @@
 # 生活记（LifeTrack）Android 工程骨架
 
-> 版本：0.1.0 · 文档核对日期：2026-11-09 · 许可证：MIT
+> 版本：0.2.0 · 文档核对日期：2026-11-09 · 许可证：MIT
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水与咖啡 / 茶三类事件：排便走专用 `poop_detail` 表，饮水与咖啡 / 茶走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续运动、月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
 
@@ -10,7 +10,7 @@ Release 页面：https://github.com/999bug/LifeTrack/releases
 
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
-- 当前版本 `0.1.0`（versionCode 1）。校验示例：`Get-FileHash .\LifeTrack-0.1.0-release.apk -Algorithm SHA256`。
+- 当前版本 `0.2.0`（versionCode 2）。校验示例：`Get-FileHash .\LifeTrack-0.2.0-release.apk -Algorithm SHA256`。
 
 Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"`，应用内提供 JSON 备份导出 / 恢复（设置页「备份与恢复」）；**升级时不要卸载旧版本**——卸载会永久丢失本地记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
 
@@ -121,9 +121,9 @@ LifeTrack/
 
 Windows 使用 `gradlew.bat`。
 
-说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
+说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
-- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
+- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk`（约 21 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
 - `./gradlew :app:testDebugUnitTest` 通过，共 103 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`DetailSpecTest` 7、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。

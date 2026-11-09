@@ -57,7 +57,7 @@ push_policy: on-request            # 只提交，push 等用户授权
 ```yaml
 deploy_target: GitHub Releases      # 通过 Release 分发签名 APK，无服务端
 release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
-version_scheme: 语义化 semver       # versionName 0.1.0，尚无 tag
+version_scheme: 语义化 semver       # versionName 0.2.0 / versionCode 2，已发布 v0.1.0、v0.2.0
 registry: none
 pages: no
 ```

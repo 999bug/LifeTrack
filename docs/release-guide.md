@@ -1,6 +1,6 @@
 # 发布与签名指南
 
-> 适用版本 0.1.0 · 分发渠道：GitHub Releases · 流水线：`.github/workflows/release.yml`
+> 适用版本 0.2.0 · 分发渠道：GitHub Releases · 流水线：`.github/workflows/release.yml`
 
 这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases，以及为什么签名密钥一旦丢失就无法挽回。
 
@@ -71,9 +71,9 @@ gh secret set SIGNING_KEY_ALIAS --repo $repo --body "lifetrack"
 
 ### 1.3 校验本地 keystore 与已发布包是否同一把密钥
 
-签名证书一旦变化，Android 拒绝覆盖安装；本项目 `allowBackup=false` 且尚无导出/恢复，等于用户记录永久丢失。所以**每次发版前、每次备份恢复后**都要核一次证书指纹。指纹是公开信息（随 APK 一起分发），可以写进文档。
+签名证书一旦变化，Android 拒绝覆盖安装；本项目 `allowBackup=false`，用户只能卸载重装再手工恢复备份，等于把丢数据的风险直接推给用户。所以**每次发版前、每次备份恢复后**都要核一次证书指纹。指纹是公开信息（随 APK 一起分发），可以写进文档。
 
-v0.1.0 已发布包的签名证书 SHA-256（用 `apksigner verify --print-certs <apk>` 可查）：
+v0.1.0 起所有已发布包的签名证书 SHA-256（用 `apksigner verify --print-certs <apk>` 可查）：
 
 ```text
 6A6CC4C13B5055E505DCF9BC2F6ACD213A6B87AC45BC7039E1252627B51459D9
@@ -96,7 +96,7 @@ if ($ok -ne 0) {
   $line = $info | Select-String "SHA256:" | Select-Object -First 1
   if ($line) {
     $got = (($line.ToString() -split 'SHA256:\s*', 2)[1] -replace '[^0-9A-Fa-f]', '').ToUpper()
-    if ($got -eq $expected) { "MATCH: 与已发布 v0.1.0 APK 是同一把密钥" } else { "MISMATCH: $got" }
+    if ($got -eq $expected) { "MATCH: 与已发布版本（v0.1.0 起）是同一把密钥" } else { "MISMATCH: $got" }
   } else { "FAILED: 没找到 SHA256 指纹" }
 }
 ```
@@ -145,7 +145,7 @@ Release 页面：https://github.com/999bug/LifeTrack/releases
 Windows 校验：
 
 ```powershell
-Get-FileHash .\LifeTrack-0.1.0-release.apk -Algorithm SHA256
+Get-FileHash .\LifeTrack-0.2.0-release.apk -Algorithm SHA256
 ```
 
 把输出与 `.sha256` 文件内容比对。`sha256` 只证明下载完整，安装包身份由系统在校验 APK 签名时保证。

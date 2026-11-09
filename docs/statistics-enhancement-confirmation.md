@@ -3,7 +3,7 @@
 - 版本：v0.1（待确认）
 - 日期：2026-11-09
 - 范围：README「当前尚未实现 / 下一阶段清单」中的「月历视图、形态分布图、时间段分析」
-- 状态：**未动手写代码**，勾选后开工
+- 状态：**已实施**（2026-11-09，用户「安全先不考虑，最后解决。接着开搞」，按第 9 节全部推荐值落地）
 - 上一包：记录体验包（`2b30495`）；本包之后的排序为安全加固包
 
 ---
@@ -16,21 +16,21 @@
 
 ## 1. 现状基线（已核对代码，不是推测）
 
-| 项 | 现状 | 出处 |
-| --- | --- | --- |
-| 历史页 | `LazyColumn` 按 `localDate` 倒序分组列表；有范围筛选与「加载更早 30 天」，无日历 | `HistoryScreen.kt:57-119` |
-| 历史查询 | `historyExtraPages` / `historyFilter` 驱动，默认最近 30 天，筛选区间可任意 | `MainViewModel.kt:45-67` |
-| 统计页 | 周/月/年胶囊 + Pager、Hero、Canvas 柱图、2×2 指标、洞察卡、免责 | `StatisticsScreen.kt:78-282` |
-| 统计聚合 | 纯函数 `StatsAggregator.build(window, today, dailyCounts, timestamps)`，输出总数/环比/日均/峰值/连续/常见时段/柱图 | `StatsAggregator.kt:48-112` |
-| 常见时段 | 滑动 2 小时窗口 `hourly[h] + hourly[h+1]` 取 argmax，并列时优先起始小时有记录的窗口 | `StatsAggregator.kt:170-199` |
-| 按天计数 | `observeDailyCounts(start, end)` 已支持任意区间 `GROUP BY localDate` | `TrackEventDao.kt:52-57` |
-| 时刻投影 | `observeEventTimestamps(start, end)` 只取 `occurredAtEpochMillis` + `zoneId` | `TrackEventDao.kt:75-83` |
-| 详情字段 | `bristolType` / `amountCode` / `effortCode` / `urgency` / `abdominalDiscomfort` / `incompleteEvacuation`，**全部可空** | `PoopDetailEntity.kt:18-28` |
-| 详情参与统计 | 否。统计链路从未读 `poop_detail` | `TrackRepository.kt:10-26` |
-| 数据库 | `version = 1`，`exportSchema = true`，`app/schemas/` 只有 `1.json` | `AppDatabase.kt:13-17` |
-| 主题 | 深/浅两套薄荷绿，22 个 M3 角色已补齐；统计页另有 `StatsColors` 暗夜仪表盘色板 | `Theme.kt:13-59`、`StatisticsScreen.kt:583-620` |
-| 依赖 | 只有 Compose BOM + material3 + Room + DataStore + serialization，**无图表库** | `app/build.gradle.kts` |
-| 现有单测 | 33 项；`StatsAggregatorTest` 11 项含「07:30 单条 → 07:00–09:00」时区用例 | `StatsAggregatorTest.kt:118-139` |
+| 项      | 现状                                                                                                                | 出处                                             |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 历史页    | `LazyColumn` 按 `localDate` 倒序分组列表；有范围筛选与「加载更早 30 天」，无日历                                                           | `HistoryScreen.kt:57-119`                      |
+| 历史查询   | `historyExtraPages` / `historyFilter` 驱动，默认最近 30 天，筛选区间可任意                                                        | `MainViewModel.kt:45-67`                       |
+| 统计页    | 周/月/年胶囊 + Pager、Hero、Canvas 柱图、2×2 指标、洞察卡、免责                                                                      | `StatisticsScreen.kt:78-282`                   |
+| 统计聚合   | 纯函数 `StatsAggregator.build(window, today, dailyCounts, timestamps)`，输出总数/环比/日均/峰值/连续/常见时段/柱图                      | `StatsAggregator.kt:48-112`                    |
+| 常见时段   | 滑动 2 小时窗口 `hourly[h] + hourly[h+1]` 取 argmax，并列时优先起始小时有记录的窗口                                                      | `StatsAggregator.kt:170-199`                   |
+| 按天计数   | `observeDailyCounts(start, end)` 已支持任意区间 `GROUP BY localDate`                                                     | `TrackEventDao.kt:52-57`                       |
+| 时刻投影   | `observeEventTimestamps(start, end)` 只取 `occurredAtEpochMillis` + `zoneId`                                        | `TrackEventDao.kt:75-83`                       |
+| 详情字段   | `bristolType` / `amountCode` / `effortCode` / `urgency` / `abdominalDiscomfort` / `incompleteEvacuation`，**全部可空** | `PoopDetailEntity.kt:18-28`                    |
+| 详情参与统计 | 否。统计链路从未读 `poop_detail`                                                                                           | `TrackRepository.kt:10-26`                     |
+| 数据库    | `version = 1`，`exportSchema = true`，`app/schemas/` 只有 `1.json`                                                    | `AppDatabase.kt:13-17`                         |
+| 主题     | 深/浅两套薄荷绿，22 个 M3 角色已补齐；统计页另有 `StatsColors` 暗夜仪表盘色板                                                                | `Theme.kt:13-59`、`StatisticsScreen.kt:583-620` |
+| 依赖     | 只有 Compose BOM + material3 + Room + DataStore + serialization，**无图表库**                                            | `app/build.gradle.kts`                         |
+| 现有单测   | 33 项；`StatsAggregatorTest` 11 项含「07:30 单条 → 07:00–09:00」时区用例                                                      | `StatsAggregatorTest.kt:118-139`               |
 
 **关键结论：三块功能都只需要新增查询与纯函数，不需要迁移、不需要新表、不需要第三方库。**
 
@@ -51,11 +51,11 @@
 
 ### D1 · 月历放在哪
 
-| 方案 | 说明 | 取舍 |
-| --- | --- | --- |
+| 方案                      | 说明                                                | 取舍                     |
+| ----------------------- | ------------------------------------------------- | ---------------------- |
 | **历史页加「列表 / 月历」切换（推荐）** | 月历是浏览记录的方式，点某天直接复用已有 `setHistoryFilter(day, day)` | 与现有筛选链路自洽；需处理两个视图的状态切换 |
-| 统计页新增月历卡片 | 和周/月/年柱图放一起 | 与月视图柱图信息重复，且统计页已经很长 |
-| 新建独立 tab | 导航从 4 个变 5 个 | 改动面最大，收益不明确 |
+| 统计页新增月历卡片               | 和周/月/年柱图放一起                                       | 与月视图柱图信息重复，且统计页已经很长    |
+| 新建独立 tab                | 导航从 4 个变 5 个                                      | 改动面最大，收益不明确            |
 
 ### D2 · 形态分布的分母（最容易出「数字对不上」的地方）
 
@@ -113,23 +113,23 @@
 
 ### 5.1 数据层（只加查询，不改 schema）
 
-| 新增 | 作用 |
-| --- | --- |
-| `core/database/model/StatDetailProjection.kt` | 轻投影：`bristolType` / `amountCode` / `effortCode` / 三个 `Boolean?` |
-| `TrackEventDao.observeStatDetails(start, end)` | `track_event LEFT JOIN poop_detail`，按 `localDate` 区间过滤；无 detail 的行字段全为 NULL |
-| `TrackRepository` / `RoomTrackRepository` | 各加 1 个转发方法 |
-| `MainViewModel.statistics` | `combine` 由两路变三路（dailyCounts + timestamps + details），查询区间沿用现有「最远上一周期 → 最远本周期」，不新增 Flow |
-| `MainViewModel.calendarMonth` / `calendarCounts` | 月份绝对偏移（0 = 本月），`calendarCounts` 复用已有 `observeDailyCounts(monthStart, monthEnd)` |
+| 新增                                               | 作用                                                                                     |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `core/database/model/StatDetailProjection.kt`    | 轻投影：`bristolType` / `amountCode` / `effortCode` / 三个 `Boolean?`                        |
+| `TrackEventDao.observeStatDetails(start, end)`   | `track_event LEFT JOIN poop_detail`，按 `localDate` 区间过滤；无 detail 的行字段全为 NULL            |
+| `TrackRepository` / `RoomTrackRepository`        | 各加 1 个转发方法                                                                             |
+| `MainViewModel.statistics`                       | `combine` 由两路变三路（dailyCounts + timestamps + details），查询区间沿用现有「最远上一周期 → 最远本周期」，不新增 Flow |
+| `MainViewModel.calendarMonth` / `calendarCounts` | 月份绝对偏移（0 = 本月），`calendarCounts` 复用已有 `observeDailyCounts(monthStart, monthEnd)`        |
 
 `LEFT JOIN` 后个人数据量级（一年数百到数千条）全表扫可接受；`track_event.localDate` 无索引，本包不加索引——加索引要改 schema，收益暂不值得。
 
 ### 5.2 纯函数层（新增单测的主要落点）
 
-| 新增 | 作用 |
-| --- | --- |
-| `core/model/CalendarMonth.kt` | `CalendarMonth.of(anchor, offset)`：周一为首的 6×7 格子、`leadingBlank` / `trailingBlank`、月初月末、`label`；`offset > 0` 拒绝 |
+| 新增                                         | 作用                                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `core/model/CalendarMonth.kt`              | `CalendarMonth.of(anchor, offset)`：周一为首的 6×7 格子、`leadingBlank` / `trailingBlank`、月初月末、`label`；`offset > 0` 拒绝                      |
 | `feature/statistics/DetailDistribution.kt` | `from(details, total)`：`bristolCounts[7]` / `amountCounts[3]` / `effortCounts[3]` / 三个感受计数 + 各自 `filled` 数；非法值（如 bristol 9）忽略而不是崩溃 |
-| `StatsAggregator.build` | 增加 `details` 参数；`PeriodStats` 增加 `hourlyCounts: List<Int>` 与 `distribution: DetailDistribution` |
+| `StatsAggregator.build`                    | 增加 `details` 参数；`PeriodStats` 增加 `hourlyCounts: List<Int>` 与 `distribution: DetailDistribution`                                    |
 
 ### 5.3 UI 层
 
@@ -141,14 +141,14 @@
 
 ### 5.4 兼容与边界
 
-| 项 | 处理 |
-| --- | --- |
-| 200% 字体 | 月历 7 列在 360dp 窄屏每格约 48dp，日期数字改为 `maxLines=1` + 按 fontScale 降字号；统计页沿用现有 `fontScale > 1.3f` 分支 |
-| 横屏 / 平板宽屏 | 月历格高度固定 44dp，宽度按 `weight(1f)` 自适应，不写死 dp |
-| 读屏 | 月历格 `contentDescription = "11月9日，2 次"`；分布卡 `contentDescription` 给出汇总句 |
-| 时区 | 时段柱用记录自身的 `zoneId` 还原小时，不用 SQLite `localtime`（现有逻辑已如此） |
-| 空周期 | 分布卡显示「这个周期还没有记录」，不画一排 0 柱 |
-| 动画 | 系统「移除动画」时跳过入场动画（沿用统计页现有约定） |
+| 项         | 处理                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------- |
+| 200% 字体   | 月历 7 列在 360dp 窄屏每格约 48dp，日期数字改为 `maxLines=1` + 按 fontScale 降字号；统计页沿用现有 `fontScale > 1.3f` 分支 |
+| 横屏 / 平板宽屏 | 月历格高度固定 44dp，宽度按 `weight(1f)` 自适应，不写死 dp                                                     |
+| 读屏        | 月历格 `contentDescription = "11月9日，2 次"`；分布卡 `contentDescription` 给出汇总句                        |
+| 时区        | 时段柱用记录自身的 `zoneId` 还原小时，不用 SQLite `localtime`（现有逻辑已如此）                                       |
+| 空周期       | 分布卡显示「这个周期还没有记录」，不画一排 0 柱                                                                    |
+| 动画        | 系统「移除动画」时跳过入场动画（沿用统计页现有约定）                                                                   |
 
 ---
 
@@ -195,14 +195,14 @@
 
 ## 8. 风险
 
-| 编号 | 风险 | 应对 |
-| --- | --- | --- |
-| R1 | 月历的「月」与统计月视图的「月」翻页状态独立，用户可能以为联动 | 月历明确放在「记录」tab，卡内独立显示月份；不声称联动 |
-| R2 | 详情字段全可空，分母口径不统一会出现「分布合计 5 但总数 12」的观感矛盾 | 每张卡显式标注「已填写 N / 共 M 条」，并写「未填写不计入」 |
-| R3 | 滑动 2 小时窗口与固定桶混淆 | 采用 §3 D3 推荐方案，柱图按逐小时、高亮按滑动窗口，单测锁死等式 |
-| R4 | 200% 字体 + 360dp 下月历 7 列挤压 | 降字号 + 固定行高 + `maxLines=1`，实测截图验收 |
-| R5 | 统计查询区间最长覆盖 2 年，新增 LEFT JOIN 可能拖慢切页 | 单条 Flow 复用既有区间；若实测卡顿再考虑索引（需单独批准改 schema） |
-| R6 | 统计页继续变长 | 两张卡可折叠或置于指标网格之后；v1 先不折叠，实测滚动手感再定 |
+| 编号 | 风险                                     | 应对                                       |
+| -- | -------------------------------------- | ---------------------------------------- |
+| R1 | 月历的「月」与统计月视图的「月」翻页状态独立，用户可能以为联动        | 月历明确放在「记录」tab，卡内独立显示月份；不声称联动             |
+| R2 | 详情字段全可空，分母口径不统一会出现「分布合计 5 但总数 12」的观感矛盾 | 每张卡显式标注「已填写 N / 共 M 条」，并写「未填写不计入」        |
+| R3 | 滑动 2 小时窗口与固定桶混淆                        | 采用 §3 D3 推荐方案，柱图按逐小时、高亮按滑动窗口，单测锁死等式      |
+| R4 | 200% 字体 + 360dp 下月历 7 列挤压              | 降字号 + 固定行高 + `maxLines=1`，实测截图验收         |
+| R5 | 统计查询区间最长覆盖 2 年，新增 LEFT JOIN 可能拖慢切页     | 单条 Flow 复用既有区间；若实测卡顿再考虑索引（需单独批准改 schema） |
+| R6 | 统计页继续变长                                | 两张卡可折叠或置于指标网格之后；v1 先不折叠，实测滚动手感再定         |
 
 ---
 
@@ -220,6 +220,44 @@
 
 ---
 
-## 10. 实施记录
+## 10. 实施记录（2026-11-09）
 
-待开工后填写。
+按第 9 节推荐值落地（Q1 历史页切换 / Q2 点按筛选并切回列表 / Q3 禁止翻到未来 / Q4 六个字段全做 / Q5 独立分母 / Q6 24 小时柱不改算法 / Q7 跟随周期 / Q8 暗夜仪表盘 / Q9 不夹带）。**未改 Room schema（version 仍为 1）、未加依赖、未改备份格式、未改导航结构。**
+
+落地内容：
+
+| 文件 | 作用 |
+| --- | --- |
+| `core/model/CalendarMonth.kt` | 周一为首的 6×7 网格，绝对偏移、补白格、`withCounts()` |
+| `core/database/model/StatDetailProjection.kt` | 详情轻投影；三个身体感受用 `Int?` 承接 SQLite 的 0/1 |
+| `core/database/dao/TrackEventDao.observeStatDetails()` | `track_event LEFT JOIN poop_detail`，无详情的行以 NULL 出现 |
+| `feature/statistics/DetailDistribution.kt` | 纯函数聚合，各字段独立分母，非法值整条忽略 |
+| `feature/statistics/StatsAggregator.kt` | 拆出 `hourlyCounts()` 并公开 `hourlyCounts` / `distribution`；滑动窗口算法原样保留 |
+| `feature/statistics/StatsColors.kt` | 把原 `StatisticsScreen` 私有的 `StatsColors` / `CardShape` / `MetricShape` 抽成共用色板 |
+| `feature/statistics/DistributionCards.kt` | 时段分布卡（Canvas 24 柱）+ 形态分布卡（Bristol 柱图、堆叠条、身体感受） |
+| `feature/history/CalendarMonthView.kt` | 月历 Composable，四级透明度、今日描边、读屏描述 |
+| `feature/history/HistoryScreen.kt` | 「列表 / 月历」切换、翻月、点按日期复用 `setHistoryFilter` |
+| `feature/home/MainViewModel.kt` | `calendar` StateFlow + `shiftCalendarMonth()`；统计 `combine` 由两路变三路 |
+
+相对原设计的修正（均不扩大范围）：
+
+1. **新增 `StatsColors.kt`**：原色板是 `StatisticsScreen.kt` 的 private，历史页要用同一套深/浅配色必须抽公共文件；否则两个页面会各写一套。
+2. **`StatDetailProjection` 增加 `localDate`**：查询区间同时覆盖多个周期，聚合层必须按当前 window 过滤，否则月视图会把年的详情算进来。
+3. **`StatsAggregator.build` 的 `details` 带默认值**：现有 11 项统计单测一条都不用改，只在文件末尾新增 3 项；`commonBandStartHour` 算法与 `07:30 → 07:00–09:00` 的既有预期完全不变。
+4. **新卡 `internal` 可见性**：`StatsColors` 是 internal，public Composable 不能以它为参数类型，编译器会报 `EXPOSED_PARAMETER_TYPE`。
+5. **大字体适配**（实测发现，见下）：两张卡的标题行在 `fontScale > 1.3f` 时改上下两行；Bristol 图高度与最大柱高按字号分档；Canvas 轴标签 gutter 按 `10.sp.toPx() * 2.2f` 计算；`DistributionRow` / `SensationRows` 同样改为堆叠布局。
+
+实测发现的坑（已修）：200% 字体下月历有次数的格子只显示底色、不显示次数数字。根因是 `sp` 会随 `fontScale` 放大，而 `Modifier.height(48.dp)` 里的 `dp` 不会，两行文字超出固定格高后被 `clip` 裁掉。加大到 72dp 仍会裁，最终改为 `heightIn(min = …)` 让内容自己撑高，并给无次数的格子补一行透明占位以保证同一周等高。
+
+验收：
+
+- `./gradlew :app:testDebugUnitTest` 48 项全绿（原 33 + 新增 15）；`./gradlew :app:assembleDebug` 通过。
+- 首轮测试有 2 项失败，是**测试断言写错**（把「分箱里的条数」写成了「字段取值」，如 Bristol 4 型 1 条记录却断言 `bristolCounts[3] == 4`），已修断言并补充分箱位置断言；实现代码未改。
+- 模拟器 `emulator-5556` 实测：深/浅色、周/月/年切换、翻月到 10 月再翻回、点按 11/6 筛选当天并清除、月视图下有详情时 Bristol 柱图与堆叠条、200% 字体、1200×800 宽屏。截图验证后已删除，模拟器分辨率、字号、深色模式均已还原。
+- 跨面板自洽实测：月视图共 3 条、Bristol 已填写 1、合计 1 ≤ 3；常见时段 `03:00–05:00` 与时段卡高亮、指标卡、洞察卡一致。
+
+未验证 / 遗留：
+
+- 真机 SAF 行为与本包无关；`connectedDebugAndroidTest`（Room 集成测试）仍未跑，需连接设备。
+- **既有问题，非本包引入**：200% 字体下统计页 `PeriodSwitcher` 的选中指示块会压住「周 / 月 / 年」文字。属于 README 清单里「无障碍与字体缩放完整回归」的范围，留到质量收尾包处理。
+- 千条数据下三路查询的滚动帧率未压测；`track_event.localDate` 仍无索引（加索引需改 schema，按非目标不夹带）。

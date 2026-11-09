@@ -51,8 +51,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,9 +69,6 @@ import com.example.lifetrack.feature.home.MainViewModel
 import java.time.LocalDate
 import java.util.Locale
 import kotlinx.coroutines.launch
-
-private val CardShape = RoundedCornerShape(18.dp)
-private val MetricShape = RoundedCornerShape(14.dp)
 
 @Composable
 fun StatisticsScreen(viewModel: MainViewModel) {
@@ -270,6 +265,10 @@ private fun StatsPage(stats: PeriodStats, today: LocalDate, colors: StatsColors)
         ChartCard(stats = stats, today = today, colors = colors)
         Spacer(Modifier.height(12.dp))
         MetricGrid(stats = stats, colors = colors)
+        Spacer(Modifier.height(12.dp))
+        TimeOfDayCard(stats = stats, colors = colors)
+        Spacer(Modifier.height(12.dp))
+        DetailDistributionCard(stats = stats, colors = colors)
         Spacer(Modifier.height(12.dp))
         InsightCard(stats = stats, colors = colors)
         Spacer(Modifier.height(14.dp))
@@ -575,45 +574,6 @@ private fun InsightCard(stats: PeriodStats, colors: StatsColors) {
                 text = detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-private data class StatsColors(
-    val accent: Color,
-    val onAccent: Color,
-    val barIdle: Color,
-    val grid: Color,
-    val label: Color,
-    val surface: Color,
-    val border: Color
-)
-
-@Composable
-private fun rememberStatsColors(): StatsColors {
-    val scheme = MaterialTheme.colorScheme
-    val isDark = scheme.background.luminance() < 0.5f
-    return remember(scheme, isDark) {
-        if (isDark) {
-            StatsColors(
-                accent = scheme.primary,
-                onAccent = Color(0xFF0E1510),
-                barIdle = scheme.primary.copy(alpha = 0.30f),
-                grid = Color.White.copy(alpha = 0.07f),
-                label = scheme.onSurfaceVariant.copy(alpha = 0.85f),
-                surface = scheme.surface,
-                border = Color.White.copy(alpha = 0.08f)
-            )
-        } else {
-            StatsColors(
-                accent = scheme.primary,
-                onAccent = scheme.onPrimary,
-                barIdle = scheme.primary.copy(alpha = 0.22f),
-                grid = scheme.onSurface.copy(alpha = 0.08f),
-                label = scheme.onSurfaceVariant,
-                surface = scheme.surface,
-                border = scheme.onSurface.copy(alpha = 0.10f)
             )
         }
     }

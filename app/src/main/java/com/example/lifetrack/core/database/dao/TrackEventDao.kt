@@ -11,6 +11,7 @@ import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.database.model.StatDetailProjection
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -81,4 +82,21 @@ interface TrackEventDao {
         startDate: String,
         endDate: String
     ): Flow<List<EventTimestamp>>
+
+    /**
+     * 形态分布：只取详情字段与本地日期，LEFT JOIN 让没有详情的快速打卡记录仍以 NULL 出现。
+     * 不查备注与事件 ID，也不改 Room schema。
+     */
+    @Query(
+        "SELECT e.localDate AS localDate, d.bristolType AS bristolType, d.amountCode AS amountCode, " +
+            "d.effortCode AS effortCode, d.urgency AS urgency, " +
+            "d.abdominalDiscomfort AS abdominalDiscomfort, " +
+            "d.incompleteEvacuation AS incompleteEvacuation " +
+            "FROM track_event e LEFT JOIN poop_detail d ON d.eventId = e.id " +
+            "WHERE e.typeCode = 'poop' AND e.localDate BETWEEN :startDate AND :endDate"
+    )
+    fun observeStatDetails(
+        startDate: String,
+        endDate: String
+    ): Flow<List<StatDetailProjection>>
 }

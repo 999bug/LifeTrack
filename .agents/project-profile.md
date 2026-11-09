@@ -120,6 +120,9 @@ overrides:
 - **compileSdk 37 的 sdkmanager 包名不是 `platforms;android-37`（2026-11-09 修复）**：现象 → `sdkmanager "platforms;android-37"` 报 `Failed to find package`。根因 → 官方主清单 `repository2-1.xml` 最高只到 `android-36`；API 37 在分片 `repository2-3.xml` 中，包名是 `platforms;android-37.0`（另有 37.1 / 37.2），本机 SDK 目录同样是 `platforms/android-37.0`。修复 → 从 `sdkmanager --list` 动态取最低的 `platforms;android-37.x` 安装，并用解析出的包名校验目录。教训 → compileSdk 的数字不等于 sdkmanager 包名；新平台先在 `--list` 里核对再写死。
 - **PowerShell 下不要给 `keytool` 传 `-J-Duser.language=en`（2026-11-09）**：现象 → 证书指纹自校验脚本在 PowerShell 里输出 `FAILED: 打不开 keystore，检查口令`，实际 `keytool` exit=1 且捕获到的输出全是 `非法选项:  .language=en`；同一命令在 Git Bash 下正常。根因 → PowerShell 对原生命令的参数传递把该选项拆坏，Java 收到非法参数后只输出错误文本，脚本匹配不到 `SHA256:` 却误判成口令错误。修复 → 去掉 `-J` 选项；中文 JDK 输出里 `SHA256:` 标签仍是英文，脚本改做中英兼容并显式检查 `$LASTEXITCODE`、失败时打印真实报错。教训 → 给用户 PowerShell 命令必须在 PowerShell 里实测，不能用 bash 的结果代替；捕获原生命令输出时先看 exit code 和原始文本，别把命令失败当成凭据错误。校验命令已写进 `docs/release-guide.md` §1.3。
 
+- **Compose 固定 dp 高度会在 200% 字体下裁掉第二行文字（2026-11-09 修复）**：现象 → 月历有次数的格子只显示底色不显示次数数字，统计卡标题两栏挤成一行。根因 → `sp` 随系统 `fontScale` 放大而 `Modifier.height(N.dp)` 的 dp 不变，两行文字超出固定高度后被 `clip` 裁掉；单纯把 48dp 加到 72dp 仍会裁。修复 → 格子改 `heightIn(min = …)` 让内容自己撑高，并给无次数的格子补一行透明占位保证等高；标题 / 分组行在 `fontScale > 1.3f` 时由 `Row(SpaceBetween)` 改上下堆叠；Canvas 轴标签的 gutter 按 `10.sp.toPx() * 2.2f` 计算而不是写死 dp。教训 → 凡是「文字行数 × 字体缩放」的容器都不要用固定 `height`，用 `heightIn` 或按 `LocalDensity.fontScale` 分档；改完必须在 200% 字体下截图，常规字号看不出这类裁切。
+- **Kotlin `internal` 类型不能出现在 `public` 函数签名里（2026-11-09 修复）**：现象 → `compileDebugKotlin` 报 `EXPOSED_PARAMETER_TYPE`，"'public' function exposes its 'internal' parameter type 'StatsColors'"。根因 → 抽出共用色板时把 `StatsColors` 标成 internal，但 `TimeOfDayCard` / `DetailDistributionCard` 仍是 public。修复 → 把只在模块内调用的 Composable 一并标为 internal（比把色板改成 public 更收口）。教训 → 抽公共 UI 组件时，可见性要连调用方一起过一遍。
+
 ## 10. 附：从 /init 产物抽取的原文（可选）
 
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

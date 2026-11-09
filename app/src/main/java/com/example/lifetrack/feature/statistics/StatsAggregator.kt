@@ -2,6 +2,7 @@ package com.example.lifetrack.feature.statistics
 
 import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
+import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.StatsWindow
 import java.time.Instant
@@ -27,7 +28,10 @@ data class PeriodStats(
     val longestStreak: Int,
     val commonBandStartHour: Int?,
     val bars: List<StatBar>,
-    val maxBarValue: Int
+    val maxBarValue: Int,
+    /** 24 根逐小时柱的原始计数，供时段分布图复用；与 [commonBandStartHour] 出自同一份数据。 */
+    val hourlyCounts: List<Int>,
+    val distribution: DetailDistribution
 ) {
     val hasData: Boolean get() = total > 0
     val delta: Int get() = total - previousTotal
@@ -42,8 +46,11 @@ data class PeriodStats(
 }
 
 /**
- * 纯函数聚合：输入一段连续日期的按天计数 + 区间内的时间戳，输出页面要的全部数字。
+ * 纯函数聚合：输入一段连续日期的按天计数 + 区间内的时间戳与详情投影，输出页面要的全部数字。
  * 没有 Android 依赖，可以直接单测。
+ *
+ * [details] 带默认值是为了不打扰既有调用方；查询区间可能同时覆盖多个周期，
+ * 因此这里必须按当前 [window] 过滤，不能把整个区间的详情都算进来。
  */
 object StatsAggregator {
 
@@ -54,7 +61,8 @@ object StatsAggregator {
         today: LocalDate,
         dailyCounts: List<DailyCountProjection>,
         timestamps: List<EventTimestamp>,
-        zoneFallback: ZoneId = ZoneId.systemDefault()
+        zoneFallback: ZoneId = ZoneId.systemDefault(),
+        details: List<StatDetailProjection> = emptyList()
     ): PeriodStats {
         val countByDate = HashMap<String, Int>(dailyCounts.size)
         for (row in dailyCounts) countByDate[row.localDate] = row.count
@@ -97,6 +105,11 @@ object StatsAggregator {
         val bars = buildBars(window, days, dailyValues, today, containsToday)
         val maxBarValue = (bars.maxOfOrNull { it.value } ?: 0).coerceAtLeast(1)
 
+        val hourly = hourlyCounts(window, timestamps, zoneFallback)
+        val windowDetails = details.filter { row ->
+            runCatching { window.contains(LocalDate.parse(row.localDate)) }.getOrDefault(false)
+        }
+
         return PeriodStats(
             window = window,
             total = total,
@@ -105,9 +118,11 @@ object StatsAggregator {
             peakValue = peakValue,
             peakDate = peakDate,
             longestStreak = longestStreak,
-            commonBandStartHour = commonBandStartHour(window, timestamps, zoneFallback),
+            commonBandStartHour = commonBandStartHour(hourly),
             bars = bars,
-            maxBarValue = maxBarValue
+            maxBarValue = maxBarValue,
+            hourlyCounts = hourly.toList(),
+            distribution = DetailDistribution.from(windowDetails, total)
         )
     }
 
@@ -164,15 +179,14 @@ object StatsAggregator {
     }
 
     /**
-     * 最常见的 2 小时时段。时区取自记录本身，而不是设备当前时区——
+     * 逐小时计数。时区取自记录本身，而不是设备当前时区——
      * 记录里存的是当时所在地的 zoneId，跨时区旅行后仍然算得对。
      */
-    private fun commonBandStartHour(
+    private fun hourlyCounts(
         window: StatsWindow,
         timestamps: List<EventTimestamp>,
         zoneFallback: ZoneId
-    ): Int? {
-        if (timestamps.isEmpty()) return null
+    ): IntArray {
         val hourly = IntArray(24)
         for (stamp in timestamps) {
             val zone = runCatching { ZoneId.of(stamp.zoneId) }.getOrDefault(zoneFallback)
@@ -180,6 +194,11 @@ object StatsAggregator {
             if (!window.contains(local.toLocalDate())) continue
             hourly[local.hour] += 1
         }
+        return hourly
+    }
+
+    /** 最常见的 2 小时时段：滑动窗口取相邻两小时之和的最大值。 */
+    private fun commonBandStartHour(hourly: IntArray): Int? {
         var bestStart = -1
         var bestScore = 0
         var bestHead = 0

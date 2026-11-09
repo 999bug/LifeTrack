@@ -8,6 +8,7 @@ import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.datastore.SettingsRepository
+import com.example.lifetrack.core.model.CalendarMonth
 import com.example.lifetrack.core.model.HistoryFilter
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.StatsPeriod
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -66,12 +68,31 @@ class MainViewModel(
         .flatMapLatest { repository.observePoopRecordsInRange(it.start.toString(), it.end.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 月历的绝对偏移：0 = 本月，-1 = 上月；正数视为未来，直接钳回 0。 */
+    private val calendarOffset = MutableStateFlow(0)
+
+    /**
+     * 月历格子。翻月后重新查该自然月的按天计数，
+     * 复用已有的 observeDailyCounts，不新增统计区间。
+     */
+    val calendar: StateFlow<CalendarMonth> = combine(todayDate, calendarOffset) { today, offset ->
+        CalendarMonth.of(today, offset)
+    }.flatMapLatest { month ->
+        repository
+            .observeDailyCounts(month.start.toString(), month.last.toString())
+            .map { counts -> month.withCounts(counts.associate { it.localDate to it.count }) }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        CalendarMonth.of(LocalDate.now(ZoneId.systemDefault()), 0)
+    )
+
     /** 每个周期各自的翻页偏移：0 = 当前周期，-1 = 上一周期。 */
     private val statsOffsets = MutableStateFlow(StatsPeriod.entries.associateWith { 0 })
 
     /**
      * 三个周期的统计一次算完。
-     * 查询区间覆盖「最远的上一周期起点 → 最远的本周期终点」，只用两次查询，
+     * 查询区间覆盖「最远的上一周期起点 → 最远的本周期终点」，只用三次查询，
      * 避免每切一次周期就重新查库、出现两段加载态。
      */
     val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> = combine(todayDate, statsOffsets) { today, offsets ->
@@ -83,10 +104,17 @@ class MainViewModel(
         val rangeEnd = windows.values.maxOf { it.lastDate }.toString()
         combine(
             repository.observeDailyCounts(rangeStart, rangeEnd),
-            repository.observeEventTimestamps(rangeStart, rangeEnd)
-        ) { dailyCounts, timestamps ->
+            repository.observeEventTimestamps(rangeStart, rangeEnd),
+            repository.observeStatDetails(rangeStart, rangeEnd)
+        ) { dailyCounts, timestamps, details ->
             windows.mapValues { (_, window) ->
-                StatsAggregator.build(window, today, dailyCounts, timestamps)
+                StatsAggregator.build(
+                    window = window,
+                    today = today,
+                    dailyCounts = dailyCounts,
+                    timestamps = timestamps,
+                    details = details
+                )
             }
         }
     }.stateIn(
@@ -108,6 +136,10 @@ class MainViewModel(
             val next = (currentOffset + steps).coerceAtMost(0)
             if (next == currentOffset) current else current + (period to next)
         }
+    }
+
+    fun shiftCalendarMonth(steps: Int) {
+        calendarOffset.update { (it + steps).coerceAtMost(0) }
     }
 
     fun loadEarlierHistory() {

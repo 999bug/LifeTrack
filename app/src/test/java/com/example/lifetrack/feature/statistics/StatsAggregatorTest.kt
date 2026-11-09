@@ -2,6 +2,7 @@ package com.example.lifetrack.feature.statistics
 
 import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
+import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
 import java.time.Instant
@@ -149,5 +150,73 @@ class StatsAggregatorTest {
         assertNull(stats.commonBand)
         assertEquals(0.0, stats.dailyAverage, 0.001)
         assertFalse(stats.hasData)
+    }
+
+    @Test
+    fun `hourly counts are consistent with the common band`() {
+        val window = statsWindow(StatsPeriod.WEEK, 0, today)
+        val zone = ZoneId.of("Asia/Tokyo")
+        val stamps = listOf(
+            EventTimestamp(Instant.parse("2026-11-08T22:30:00Z").toEpochMilli(), zone.id),
+            EventTimestamp(Instant.parse("2026-11-08T23:30:00Z").toEpochMilli(), zone.id),
+            EventTimestamp(Instant.parse("2026-11-09T12:30:00Z").toEpochMilli(), zone.id)
+        )
+
+        val stats = StatsAggregator.build(
+            window = window,
+            today = today,
+            dailyCounts = emptyList(),
+            timestamps = stamps,
+            zoneFallback = zone
+        )
+
+        assertEquals(24, stats.hourlyCounts.size)
+        assertEquals(3, stats.hourlyCounts.sum())
+        assertEquals(1, stats.hourlyCounts[7])
+        assertEquals(1, stats.hourlyCounts[8])
+        assertEquals(1, stats.hourlyCounts[21])
+        assertEquals(7, stats.commonBandStartHour)
+        assertEquals("07:00–09:00", stats.commonBand)
+        val start = stats.commonBandStartHour!!
+        val best = stats.hourlyCounts[start] + stats.hourlyCounts[start + 1]
+        assertTrue((0..22).all { stats.hourlyCounts[it] + stats.hourlyCounts[it + 1] <= best })
+    }
+
+    @Test
+    fun `detail distribution is scoped to the current window`() {
+        val window = statsWindow(StatsPeriod.WEEK, 0, today)
+        val counts = listOf(DailyCountProjection("2026-11-09", 1))
+        val details = listOf(
+            StatDetailProjection("2026-11-09", 4, 2, 1, 1, 0, 0),
+            StatDetailProjection("2026-11-02", 5, 1, 2, 0, 1, 1)
+        )
+
+        val stats = StatsAggregator.build(
+            window = window,
+            today = today,
+            dailyCounts = counts,
+            timestamps = emptyList(),
+            details = details
+        )
+
+        assertEquals(1, stats.total)
+        assertEquals(1, stats.distribution.totalRecords)
+        assertEquals(1, stats.distribution.filledBristol)
+        assertEquals(1, stats.distribution.bristolCounts.sum())
+        assertEquals(1, stats.distribution.bristolCounts[3])
+        assertEquals(1, stats.distribution.amountCounts[1])
+    }
+
+    @Test
+    fun `quick records without details still expose a zero filled distribution`() {
+        val window = statsWindow(StatsPeriod.WEEK, 0, today)
+        val counts = listOf(DailyCountProjection("2026-11-09", 3))
+
+        val stats = StatsAggregator.build(window, today, counts, emptyList())
+
+        assertEquals(3, stats.total)
+        assertEquals(3, stats.distribution.totalRecords)
+        assertEquals(0, stats.distribution.filledBristol)
+        assertFalse(stats.distribution.anyFilled)
     }
 }

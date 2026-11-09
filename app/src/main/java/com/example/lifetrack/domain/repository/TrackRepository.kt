@@ -4,6 +4,7 @@ import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import kotlinx.coroutines.flow.Flow
 
@@ -12,6 +13,7 @@ interface TrackRepository {
     fun observePoopRecordsInRange(startDate: String, endDate: String): Flow<List<PoopRecordRelation>>
     fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
     fun observeEventTimestamps(startDate: String, endDate: String): Flow<List<EventTimestamp>>
+    fun observeStatDetails(startDate: String, endDate: String): Flow<List<StatDetailProjection>>
     suspend fun addPoopRecord(draft: PoopRecordDraft): String
     suspend fun updatePoopRecord(eventId: String, draft: PoopRecordDraft)
     suspend fun deletePoopRecord(eventId: String)

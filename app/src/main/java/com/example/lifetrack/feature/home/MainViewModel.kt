@@ -8,6 +8,8 @@ import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.datastore.SettingsRepository
+import com.example.lifetrack.core.model.HistoryFilter
+import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.domain.model.PoopRecordDraft
@@ -40,9 +42,28 @@ class MainViewModel(
         .flatMapLatest { repository.observePoopRecordsForDate(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val historyEnd = LocalDate.now(ZoneId.systemDefault())
-    val historyRecords: StateFlow<List<PoopRecordRelation>> = repository
-        .observePoopRecordsInRange(historyEnd.minusDays(29).toString(), historyEnd.toString())
+    /** 0 = 最近 30 天；每加载一页再往前多取 30 天。 */
+    private val historyExtraPages = MutableStateFlow(0)
+    private val historyFilter = MutableStateFlow<HistoryFilter?>(null)
+
+    val historyQuery: StateFlow<HistoryQuery> = combine(
+        historyFilter,
+        historyExtraPages,
+        todayDate
+    ) { filter, extraPages, today ->
+        if (filter != null) {
+            HistoryQuery(filter.start, filter.end, filtered = true)
+        } else {
+            HistoryQuery(today.minusDays(29L + extraPages * 30L), today, filtered = false)
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        initialHistoryQuery()
+    )
+
+    val historyRecords: StateFlow<List<PoopRecordRelation>> = historyQuery
+        .flatMapLatest { repository.observePoopRecordsInRange(it.start.toString(), it.end.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 每个周期各自的翻页偏移：0 = 当前周期，-1 = 上一周期。 */
@@ -87,6 +108,18 @@ class MainViewModel(
             val next = (currentOffset + steps).coerceAtMost(0)
             if (next == currentOffset) current else current + (period to next)
         }
+    }
+
+    fun loadEarlierHistory() {
+        historyExtraPages.update { it + 1 }
+    }
+
+    fun setHistoryFilter(start: LocalDate, end: LocalDate) {
+        historyFilter.value = HistoryFilter(minOf(start, end), maxOf(start, end))
+    }
+
+    fun clearHistoryFilter() {
+        historyFilter.value = null
     }
 
     suspend fun buildBackupJson(): String = withContext(Dispatchers.IO) {
@@ -144,6 +177,11 @@ class MainViewModel(
         return StatsPeriod.entries.associateWith { period ->
             StatsAggregator.build(statsWindow(period, 0, today), today, emptyList(), emptyList())
         }
+    }
+
+    private fun initialHistoryQuery(): HistoryQuery {
+        val today = LocalDate.now(ZoneId.systemDefault())
+        return HistoryQuery(today.minusDays(29), today, filtered = false)
     }
 
     class Factory(

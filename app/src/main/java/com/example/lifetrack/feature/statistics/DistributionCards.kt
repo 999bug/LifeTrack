@@ -28,8 +28,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -86,7 +86,7 @@ internal fun TimeOfDayCard(stats: PeriodStats, colors: StatsColors, modifier: Mo
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
+                .clearAndSetSemantics {
                     contentDescription = stats.commonBand?.let {
                         "逐小时分布，共 ${stats.total} 次，最常见时段 $it"
                     } ?: "逐小时分布，暂无记录"
@@ -180,6 +180,20 @@ private fun HourlyChart(stats: PeriodStats, colors: StatsColors) {
 internal fun DetailDistributionCard(stats: PeriodStats, colors: StatsColors, modifier: Modifier = Modifier) {
     val distribution = stats.distribution
     val stacked = LocalDensity.current.fontScale > 1.3f
+    // 图表对读屏没有意义，收敛成一句汇总：整体分母 + 是否有详情 + 两组主要分箱
+    val summary = buildString {
+        append("形态分布，已填写 ${distribution.filledBristol} / 共 ${stats.total} 条")
+        when {
+            !stats.hasData -> append("，这个周期还没有记录")
+            !distribution.anyFilled -> append("，本周期的记录都还没填详情")
+            else -> {
+                append("；布里斯托 1–7 型 ")
+                append(distribution.bristolCounts.joinToString("、"))
+                append("；排便量 ")
+                append(distribution.amountCounts.joinToString("、"))
+            }
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -187,6 +201,7 @@ internal fun DetailDistributionCard(stats: PeriodStats, colors: StatsColors, mod
             .background(colors.surface)
             .border(1.dp, colors.border, CardShape)
             .padding(16.dp)
+            .clearAndSetSemantics { contentDescription = summary }
     ) {
         if (stacked) {
             Text(

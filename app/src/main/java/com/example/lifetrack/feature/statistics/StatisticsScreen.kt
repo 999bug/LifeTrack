@@ -10,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -55,8 +55,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -251,9 +252,9 @@ private fun PeriodSwitcher(
     onSelect: (StatsPeriod) -> Unit,
     colors: StatsColors
 ) {
-    // 大字号下 38dp 装不下 26sp 的「周 / 月 / 年」，选中块会压住文字；按字号抬高整条。
+    // 分段控件整条按 48dp 触摸目标给高度；两档字号各留余量，避免 200% 字体压字。
     val fontScale = LocalDensity.current.fontScale
-    val barHeight = if (fontScale > 1.3f) 52.dp else 38.dp
+    val barHeight = if (fontScale > 1.3f) 56.dp else 48.dp
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -284,10 +285,14 @@ private fun PeriodSwitcher(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable(
+                        // selectable 会带上 selected 状态与 Tab 角色，读屏能听出当前选中档位
+                        .selectable(
+                            selected = item == selected,
+                            role = Role.Tab,
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onSelect(item) },
+                            indication = null,
+                            onClick = { onSelect(item) }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -446,7 +451,7 @@ private fun ChartCard(stats: PeriodStats, today: LocalDate, colors: StatsColors)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
+                .clearAndSetSemantics {
                     contentDescription = "共 ${stats.total} 次，单日最高 ${stats.peakValue} 次"
                 }
         ) {

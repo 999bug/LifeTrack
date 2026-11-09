@@ -2,7 +2,6 @@ package com.example.lifetrack.feature.history
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -218,8 +219,8 @@ private fun ViewSwitcher(
     onChange: (Boolean) -> Unit,
     colors: StatsColors
 ) {
-    // 与统计页周期切换同构：大字号抬高整条，避免 13sp → 26sp 后被裁掉。
-    val barHeight = if (LocalDensity.current.fontScale > 1.3f) 52.dp else 38.dp
+    // 与统计页周期切换同构：48dp 触摸目标，大字号抬到 56dp。
+    val barHeight = if (LocalDensity.current.fontScale > 1.3f) 56.dp else 48.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -237,10 +238,13 @@ private fun ViewSwitcher(
                     .padding(3.dp)
                     .clip(RoundedCornerShape((barHeight - 6.dp) / 2))
                     .background(if (selected) colors.accent else Color.Transparent)
-                    .clickable(
+                    .selectable(
+                        selected = selected,
+                        role = Role.Tab,
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onChange(mode) },
+                        indication = null,
+                        onClick = { onChange(mode) }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

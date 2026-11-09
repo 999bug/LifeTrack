@@ -59,8 +59,9 @@ fun CalendarMonthView(
 ) {
     val colors = rememberStatsColors()
     val fontScale = LocalDensity.current.fontScale
-    // 用最小高度而不是固定高度：大字号下「日期 + 次数」两行可以自己把格子撑高，不会被 clip 裁掉
-    val minCellHeight = if (fontScale > 1.3f) 64.dp else 44.dp
+    // 用最小高度而不是固定高度：大字号下「日期 + 次数」两行可以自己把格子撑高，不会被 clip 裁掉；
+    // 常规字号也保到 48dp，满足最小触摸目标。
+    val minCellHeight = if (fontScale > 1.3f) 72.dp else 48.dp
 
     Column(
         modifier = modifier

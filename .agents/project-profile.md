@@ -149,5 +149,9 @@ overrides:
 - **`wm size` 改的是像素，不是 dp（2026-11-09 设置页重构）**：现象 → 用 `wm size 1200x800` 以为在测平板，结果 `widthIn(max = 640.dp)` 完全不生效，页面仍是全宽。根因 → 该设备 density 约 2.625，1200px 只有约 457dp，比 640dp 窄，约束自然不触发；要测平板得让「像素 ÷ density」超过目标 dp（如 2000px 宽 ≈ 762dp）。修复 → 改用 `wm size 2000x1200` 复测，正文正确居中限宽。教训 → 用 `wm size` 造尺寸前先 `wm density` 换算 dp；「看起来像平板」不等于 dp 宽度够。改完尺寸/字号一定 `wm size reset` + `settings put system font_scale 1.0` 还原。
 - **设置类页面要先定信息架构再写卡片（2026-11-09 设置页重构）**：现象 → 设置页六张卡片各写一套内边距，加一个模块就长一截，用户反馈「看着比较乱」。根因 → 每个设置项自己决定 Card 与排版，没有「分区 / 行 / 分隔线」的公共骨架，层级只能靠堆卡片表达。修复 → 抽出 `SettingsSection` / `SettingsRow` / `SettingsDivider` / `SettingsNote`，重活（记录项目管理）拆独立页，次要信息（隐私）折叠，状态类信息（更新）收成一行按需展开。教训 → 设置页先按「用户要完成什么」分组，再决定每项是行、是开关还是入口；任何「一个功能一张卡」的平铺都会随功能数量线性变乱。
 
+- **系统文件选择器的「Large files」筛选会把小文件藏起来（2026-11-09 B7 验收）**：现象 → 从备份恢复时打开 SAF，Downloads 里明明有刚导出的 1.8 KB JSON，界面却显示「No matches in Downloads」。根因 → 上一轮误点了筛选 chip「Large files」，该筛选会把小于阈值的文件过滤掉，且选中态只在 chip 上显示一个小勾。修复 → 取消筛选后文件立刻出现，正常选中即可；自动化时不要盲点卡片区域，先按文本定位。教训 → 系统选择器不是只读列表，顶部筛选/视图切换会改变可见文件；写 UI 走查脚本前先 dump 一遍节点，别假设列表结构。
+- **Compose 的 `clickable` 不携带选中态，分段控件要用 `selectable`（2026-11-09 B3）**：现象 → 自绘的周/月/年切换用 `Modifier.clickable` 实现，读屏无法知道哪一档被选中，uiautomator 里也看不到 `selected`。修复 → 改用 `Modifier.selectable(selected, role = Role.Tab)`，uiautomator 能读到 `selected="true"` 且随点击转移；同时把整条高度抬到 48dp 满足触摸目标。教训 → 任何「多选一」的控件都用 `selectable` / `toggleable`，不要用裸 `clickable` 自己维护状态。
+- **图表类 Composable 要给一句汇总语义（2026-11-09 B3）**：现象 → Canvas 画的分段柱图对读屏是一堆无意义节点，或逐个念出坐标轴标签。修复 → 外层用 `clearAndSetSemantics { contentDescription = "形态分布，已填写 N / 共 M 条；布里斯托 …" }` 包住，读屏只念一句。教训 → 图表先想「读屏用户需要知道什么结论」，再把它写成一句话；`clearAndSetSemantics` 比补 `contentDescription` 更干净，能避免子节点噪声。
+
 ## 10. 附：从 /init 产物抽取的原文（可选）
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

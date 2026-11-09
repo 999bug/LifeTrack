@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
@@ -61,7 +63,17 @@ fun TodayScreen(
             }
         }
         item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            // 读屏只念一句汇总，不逐个念「排便 0 次 / 饮水 0 次」四遍
+            val countSummary = buildString {
+                append("今日共 ${records.size} 次")
+                enabledTypes.forEach { append("，${it.name} ${countsByType[it.code] ?: 0} 次") }
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = countSummary
+                }
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)

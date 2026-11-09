@@ -51,6 +51,7 @@ fun UpdateCard(viewModel: MainViewModel) {
 
                 is UpdateRepository.Status.UpToDate -> {
                     Text("已是最新版本。", color = MaterialTheme.colorScheme.primary)
+                    OutlinedButton(onClick = { viewModel.checkForUpdate() }) { Text("检查更新") }
                 }
 
                 is UpdateRepository.Status.Available -> {

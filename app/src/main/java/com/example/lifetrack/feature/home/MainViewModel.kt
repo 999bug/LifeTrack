@@ -3,6 +3,9 @@ package com.example.lifetrack.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.lifetrack.core.backup.BackupCodec
+import com.example.lifetrack.core.backup.BackupDecodeResult
+import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.StatsPeriod
@@ -12,6 +15,7 @@ import com.example.lifetrack.domain.repository.TrackRepository
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.StatsAggregator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -82,6 +87,24 @@ class MainViewModel(
             val next = (currentOffset + steps).coerceAtMost(0)
             if (next == currentOffset) current else current + (period to next)
         }
+    }
+
+    suspend fun buildBackupJson(): String = withContext(Dispatchers.IO) {
+        val payload = repository.readBackup()
+        BackupCodec.encode(payload.types, payload.events)
+    }
+
+    suspend fun decodeBackupJson(text: String): BackupDecodeResult = withContext(Dispatchers.IO) {
+        BackupCodec.decode(text)
+    }
+
+    suspend fun restoreBackup(payload: BackupPayload) {
+        withContext(Dispatchers.IO) { repository.restoreBackup(payload) }
+        refreshToday()
+    }
+
+    suspend fun countAllRecords(): Int = withContext(Dispatchers.IO) {
+        repository.countAllRecords()
     }
 
     fun quickRecord() {

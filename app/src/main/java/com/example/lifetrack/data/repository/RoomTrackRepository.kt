@@ -1,7 +1,9 @@
 package com.example.lifetrack.data.repository
 
 import androidx.room.withTransaction
+import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.AppDatabase
+import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
@@ -83,6 +85,26 @@ class RoomTrackRepository(
     override suspend fun deletePoopRecord(eventId: String) {
         dao.deleteEvent(eventId)
     }
+
+    override suspend fun readBackup(): BackupPayload = BackupPayload(
+        types = database.trackTypeDao().getAll(),
+        events = dao.getAllPoopEvents()
+    )
+
+    override suspend fun restoreBackup(payload: BackupPayload) {
+        database.withTransaction {
+            // 先删事件（详情随外键级联），再重建类型，顺序反了会触发外键约束
+            dao.deleteAllEvents()
+            database.trackTypeDao().deleteAll()
+            val types = payload.types.toMutableList()
+            if (types.none { it.code == DEFAULT_POOP_TYPE.code }) types += DEFAULT_POOP_TYPE
+            database.trackTypeDao().insertAll(types)
+            dao.insertEvents(payload.events.map { it.event })
+            dao.putPoopDetails(payload.events.mapNotNull { it.detail })
+        }
+    }
+
+    override suspend fun countAllRecords(): Int = dao.countAllEvents()
 
     private fun PoopRecordDraft.toDetail(eventId: String) = PoopDetailEntity(
         eventId = eventId,

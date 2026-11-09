@@ -56,6 +56,22 @@ interface TrackEventDao {
     )
     fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
 
+    @Transaction
+    @Query("SELECT * FROM track_event WHERE typeCode = 'poop' ORDER BY occurredAtEpochMillis ASC")
+    suspend fun getAllPoopEvents(): List<PoopRecordRelation>
+
+    @Query("SELECT COUNT(*) FROM track_event")
+    suspend fun countAllEvents(): Int
+
+    @Query("DELETE FROM track_event")
+    suspend fun deleteAllEvents()
+
+    @Insert
+    suspend fun insertEvents(events: List<TrackEventEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putPoopDetails(details: List<PoopDetailEntity>)
+
     /** 统计时段分布只需要时刻与时区，不查 detail。 */
     @Query(
         "SELECT occurredAtEpochMillis AS occurredAtEpochMillis, zoneId AS zoneId FROM track_event " +

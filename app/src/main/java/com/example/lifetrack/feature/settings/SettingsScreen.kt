@@ -2,18 +2,22 @@ package com.example.lifetrack.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,8 +29,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.BuildConfig
@@ -43,8 +52,18 @@ import kotlinx.coroutines.withContext
 
 private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 
+/**
+ * 设置页：按「记录 / 数据 / 外观 / 关于」四段组织，每段一张卡片。
+ *
+ * 记录项目管理已拆到独立页面（[ModuleManagementScreen]），
+ * 更新与隐私收进「关于」，备份改成两行操作 + 一句风险提示，
+ * 避免之前六张卡片各写一套内边距、越加越长的问题。
+ */
 @Composable
-fun SettingsScreen(viewModel: MainViewModel) {
+fun SettingsScreen(
+    viewModel: MainViewModel,
+    onOpenModules: () -> Unit
+) {
     val darkTheme by viewModel.darkTheme.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -56,6 +75,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
     var pending by remember { mutableStateOf<BackupPayload?>(null) }
     var pendingCount by remember { mutableIntStateOf(0) }
     var currentCount by remember { mutableIntStateOf(0) }
+    var privacyExpanded by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -123,79 +143,128 @@ fun SettingsScreen(viewModel: MainViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // 平板 / 横屏下限制正文宽度并居中，避免一行文字横跨 1200dp
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = 640.dp)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Text("设置", style = MaterialTheme.typography.headlineMedium)
-        Card {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("深色模式", style = MaterialTheme.typography.titleMedium)
-                    Text("仅影响应用显示，不改变记录数据。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = darkTheme, onCheckedChange = viewModel::setDarkTheme)
-            }
+
+        SettingsSection(title = "记录") {
+            SettingsRow(
+                title = "记录项目",
+                subtitle = if (trackTypes.isEmpty()) {
+                    "正在载入…"
+                } else {
+                    "已启用 ${trackTypes.count { it.enabled }} / 共 ${trackTypes.size} 项 · 启用与排序"
+                },
+                onClick = onOpenModules,
+                trailing = { ChevronTrailing() }
+            )
         }
-        ModuleSettingsCard(
-            types = trackTypes,
-            onToggle = viewModel::setTypeEnabled,
-            onMove = viewModel::moveType
-        )
-        Card {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("备份与恢复", style = MaterialTheme.typography.titleMedium)
+
+        SettingsSection(title = "数据") {
+            SettingsRow(
+                title = "导出备份",
+                subtitle = "全部记录与详情，导出为单个 JSON 文件",
+                enabled = !busy,
+                onClick = {
+                    exportLauncher.launch(
+                        "LifeTrack-backup-${LocalDateTime.now().format(backupStampFormatter)}.json"
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                title = "从备份恢复",
+                subtitle = "会用备份替换当前全部记录，无法撤销",
+                titleColor = MaterialTheme.colorScheme.error,
+                enabled = !busy,
+                onClick = {
+                    importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                }
+            )
+            if (busy || status != null) {
+                SettingsDivider()
                 Text(
-                    "导出为单个 JSON 文件，包含全部记录与详情。恢复会用备份内容替换当前全部记录，且无法撤销。",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "备份文件不加密，能读到该文件的人就能查看全部记录，请自行妥善保管。",
+                    text = status ?: "处理中…",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = if (busy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            exportLauncher.launch(
-                                "LifeTrack-backup-${LocalDateTime.now().format(backupStampFormatter)}.json"
-                            )
-                        },
-                        enabled = !busy,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("导出备份") }
-                    OutlinedButton(
-                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
-                        enabled = !busy,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.weight(1f)
-                    ) { Text("从备份恢复") }
-                }
-                when {
-                    busy -> Text("处理中…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    status != null -> Text(status!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
             }
+            SettingsNote(
+                text = "备份文件不加密，能读到该文件的人就能查看全部记录，请自行妥善保管。",
+                isWarning = true
+            )
         }
-        Card {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("数据与隐私", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "记录仅保存在本应用的私有存储中，不上传任何服务器。为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限（REQUEST_INSTALL_PACKAGES），该权限仅用于查询 GitHub Releases 上的最新版本与下载本应用安装包，不收集、不上传任何用户数据、设备标识或遥测。",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text("系统自动云备份和设备迁移已通过 Manifest 与规则文件排除应用数据。卸载应用或清除应用数据仍可能造成记录丢失，建议定期导出备份。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+
+        SettingsSection(title = "外观") {
+            SettingsRow(
+                title = "深色模式",
+                subtitle = "仅影响应用显示，不改变记录数据",
+                role = Role.Switch,
+                onClick = { viewModel.setDarkTheme(!darkTheme) },
+                trailing = {
+                    Switch(checked = darkTheme, onCheckedChange = null)
+                }
+            )
         }
-        UpdateCard(viewModel = viewModel)
-        Card {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("关于生活记", style = MaterialTheme.typography.titleMedium)
-                Text("版本 ${BuildConfig.VERSION_NAME} · 本地生活记录工具")
-                Text("本产品用于个人记录与回顾，不提供医疗诊断。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        SettingsSection(title = "关于") {
+            SettingsRow(
+                title = "版本",
+                subtitle = "本地生活记录工具 · 不提供医疗诊断",
+                trailing = {
+                    Text(
+                        text = BuildConfig.VERSION_NAME,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+            SettingsDivider()
+            UpdateSection(viewModel = viewModel)
+            SettingsDivider()
+            SettingsRow(
+                title = "数据与隐私",
+                subtitle = "本地存储、网络权限与备份边界",
+                onClick = { privacyExpanded = !privacyExpanded },
+                trailing = {
+                    Icon(
+                        imageVector = if (privacyExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (privacyExpanded) "收起说明" else "展开说明",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+            AnimatedVisibility(visible = privacyExpanded) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "记录仅保存在本应用的私有存储中，不上传任何服务器。",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限" +
+                            "（REQUEST_INSTALL_PACKAGES）；该权限仅用于查询 GitHub Releases 上的最新版本与下载本应用" +
+                            "安装包，不收集、不上传任何用户数据、设备标识或遥测。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "系统自动云备份与设备迁移已通过 Manifest 与规则文件排除应用数据；卸载或清除数据仍可能丢失记录，建议定期导出备份。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

@@ -146,5 +146,8 @@ overrides:
 - **内存库测试插入子表前必须先有父表行（2026-11-09 B1/B2）**：现象 → `LocalDatabaseTest` 插入 `track_event` 报 `FOREIGN KEY constraint failed (code 787)`。根因 → `track_event.typeCode` 外键指向 `track_type.code`，测试只插事件没插类型。修复 → 先 `trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)`。教训 → 开外键的 Room 库里，测试夹具要按父表 → 子表顺序造数据；`insertEvents(list)` 是批量插入，不会逐行容错。
 - **`lintDebug` 是发布门禁的硬前置（2026-11-09 B11）**：现象 → 首次把 lint 接进 CI 时 `BUILD FAILED`，唯一 error 是 `android:windowLightNavigationBar requires API level 27 (current min is 26)`。根因 → 该主题属性 API 27 才有，minSdk 是 26。修复 → 在 `<item>` 上加 `tools:targetApi="27"`（系统在 26 上会忽略该属性，不必复制整份 `values-v27` 主题）。教训 → 新接 lint 前先本地跑一次 `:app:lintDebug`；历史工程接门禁时，先分清「新引入的 error」与「一直存在的 error」，后者单独修，别为了让门禁变绿而全局关规则。
 
+- **`wm size` 改的是像素，不是 dp（2026-11-09 设置页重构）**：现象 → 用 `wm size 1200x800` 以为在测平板，结果 `widthIn(max = 640.dp)` 完全不生效，页面仍是全宽。根因 → 该设备 density 约 2.625，1200px 只有约 457dp，比 640dp 窄，约束自然不触发；要测平板得让「像素 ÷ density」超过目标 dp（如 2000px 宽 ≈ 762dp）。修复 → 改用 `wm size 2000x1200` 复测，正文正确居中限宽。教训 → 用 `wm size` 造尺寸前先 `wm density` 换算 dp；「看起来像平板」不等于 dp 宽度够。改完尺寸/字号一定 `wm size reset` + `settings put system font_scale 1.0` 还原。
+- **设置类页面要先定信息架构再写卡片（2026-11-09 设置页重构）**：现象 → 设置页六张卡片各写一套内边距，加一个模块就长一截，用户反馈「看着比较乱」。根因 → 每个设置项自己决定 Card 与排版，没有「分区 / 行 / 分隔线」的公共骨架，层级只能靠堆卡片表达。修复 → 抽出 `SettingsSection` / `SettingsRow` / `SettingsDivider` / `SettingsNote`，重活（记录项目管理）拆独立页，次要信息（隐私）折叠，状态类信息（更新）收成一行按需展开。教训 → 设置页先按「用户要完成什么」分组，再决定每项是行、是开关还是入口；任何「一个功能一张卡」的平铺都会随功能数量线性变乱。
+
 ## 10. 附：从 /init 产物抽取的原文（可选）
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

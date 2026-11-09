@@ -37,6 +37,7 @@ import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
+import com.example.lifetrack.feature.settings.ModuleManagementScreen
 import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.sport.SportEditorDialog
 import com.example.lifetrack.feature.statistics.StatisticsScreen
@@ -82,22 +83,25 @@ fun LifeTrackApp(viewModel: MainViewModel) {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                destinations.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            // 记录项目是设置下的子页面，隐藏底部导航，避免「看似平级」的误解
+            if (destinations.any { it.route == currentRoute }) {
+                NavigationBar {
+                    destinations.forEach { destination ->
+                        NavigationBarItem(
+                            selected = currentRoute == destination.route,
+                            onClick = {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { androidx.compose.material3.Icon(destination.icon, contentDescription = destination.label) },
-                        label = { Text(destination.label) }
-                    )
+                            },
+                            icon = { androidx.compose.material3.Icon(destination.icon, contentDescription = destination.label) },
+                            label = { Text(destination.label) }
+                        )
+                    }
                 }
             }
         }
@@ -128,7 +132,18 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 )
             }
             composable("statistics") { StatisticsScreen(viewModel = viewModel) }
-            composable("settings") { SettingsScreen(viewModel = viewModel) }
+            composable("settings") {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onOpenModules = { navController.navigate("modules") }
+                )
+            }
+            composable("modules") {
+                ModuleManagementScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 

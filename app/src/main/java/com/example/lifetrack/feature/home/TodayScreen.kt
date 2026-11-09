@@ -46,11 +46,6 @@ fun TodayScreen(
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val enabledTypes = trackTypes.filter { it.enabled }
-    val enabled = enabledTypes.mapTo(HashSet()) { it.code }
-    val canRecordPoop = DEFAULT_POOP_TYPE.code in enabled
-    val canRecordWater = WaterFields.TYPE_CODE in enabled
-    val canRecordCoffee = CoffeeFields.TYPE_CODE in enabled
-    val canRecordSport = SportFields.TYPE_CODE in enabled
     // 首页、历史、月历与统计默认都按「全部类型」同一口径计数，这里不再只数排便。
     val countsByType = records.groupingBy { it.event.typeCode }.eachCount()
     val today = LocalDate.now().format(todayFormatter)
@@ -136,29 +131,32 @@ fun TodayScreen(
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (canRecordPoop) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            Button(onClick = onQuickRecord, modifier = Modifier.weight(1f)) { Text("快速打卡") }
-                            OutlinedButton(onClick = onDetailedRecord, modifier = Modifier.weight(1f)) { Text("详细记录") }
+                    // 按「记录项目」页设置的顺序渲染入口，排序才是真的生效
+                    enabledTypes.forEach { type ->
+                        when (type.code) {
+                            DEFAULT_POOP_TYPE.code -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Button(onClick = onQuickRecord, modifier = Modifier.weight(1f)) { Text("快速打卡") }
+                                OutlinedButton(onClick = onDetailedRecord, modifier = Modifier.weight(1f)) { Text("详细记录") }
+                            }
+
+                            WaterFields.TYPE_CODE -> OutlinedButton(
+                                onClick = onWaterRecord,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("记录饮水") }
+
+                            CoffeeFields.TYPE_CODE -> OutlinedButton(
+                                onClick = onCoffeeRecord,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("记录咖啡 / 茶") }
+
+                            SportFields.TYPE_CODE -> OutlinedButton(
+                                onClick = onSportRecord,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("记录运动") }
                         }
-                    }
-                    if (canRecordWater) {
-                        OutlinedButton(
-                            onClick = onWaterRecord,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("记录饮水") }
-                    }
-                    if (canRecordCoffee) {
-                        OutlinedButton(
-                            onClick = onCoffeeRecord,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("记录咖啡 / 茶") }
-                    }
-                    if (canRecordSport) {
-                        OutlinedButton(
-                            onClick = onSportRecord,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("记录运动") }
                     }
                     Text(
                         "快速打卡会立即保存当前时间；其余类型需填写各自必填项（饮水 / 咖啡的份量、运动的时长）。",

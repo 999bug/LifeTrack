@@ -107,6 +107,6 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | R10 | **A6 与更新功能混合提交** | `33ef32d` 同时含 A6 的 22 个代码/测试/schema 文件与更新功能，原因是共管文件交织、单独提交会让 HEAD 不可编译。按仓库 git 安全规则禁止历史改写，不拆分；今后按包回溯请用 `git log -- <路径>` 过滤，别依赖单提交边界。 |
 | R4 | 通用事件模型膨胀 | 每加一个类型都要动 DAO / Repository / 备份 / 统计四处，A3/A4 的抽象不做干净会返工。A8 实测只需加类型 + 规格 + 编辑器 + 分派，DAO/备份/统计已无需改动。 |
 | R5 | ~~200% 字体遗留~~ 已修复 | 统计页 `PeriodSwitcher` 与历史页 `ViewSwitcher` 改为按字号抬高的自适应切换条，类型筛选 chips 改 `FlowRow`；200% 字体实测首页、历史、统计、运动编辑器均无截断（B4）。 |
-| R11 | **CI 新工作流未在 GitHub 实跑** | `ci.yml` 与 `release.yml` 的 lint 步骤本地等价命令已全绿，但 Actions 上的模拟器任务、`reactivecircus/android-emulator-runner@v2` 与 API 36 镜像尚未实际执行过；首次触发后需核对 KVM 与镜像可用性。 |
+| R11 | **CI 的仪器测试任务未实跑** | `ci.yml` 的 build job 已在 `df10075`、`2fc7e5a` 两次 push 上 success（单测 + lint + assembleDebug）；instrumented job 按设计 skipped。`reactivecircus/android-emulator-runner@v2` + API 36 镜像 + KVM 这条链路仍未真正执行，需手动 dispatch 或给 PR 打 `run-instrumented` 标签验证。 |
 | R6 | 台账维护 | 中断恢复只认本文件；进度只在会话里说、不写进来，下次会话必然重议。 |
 | R7 | `track_type` 首次启动为空 | 初版只在第一次打卡时 `insertIgnore(DEFAULT_POOP_TYPE)`，模块管理页首次打开会是空列表。已用 `ensureDefaultTypes()` 在 ViewModel 初始化时补内置类型（`IGNORE` 不覆盖用户的启用/排序设置），恢复备份的兜底也改为补齐 `DEFAULT_TYPES`。 |

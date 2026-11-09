@@ -171,13 +171,11 @@ object BackupCodec {
         if (!DetailLimits.isStructuralValid(genericDto.fields)) {
             return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
         }
+        // 没有字段规格就不放行：宁可明确拒绝，也不让未经校验的字段落库。
         val spec = DetailSpecRegistry.specFor(genericDto.typeCode, options.detailSpecs)
-        if (spec != null) {
-            if (genericDto.fields.keys.any { it !in spec.allowedFields } ||
-                genericDto.fields.any { (key, value) -> spec.validators[key]?.invoke(value) == false }
-            ) {
-                return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
-            }
+            ?: return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
+        if (!spec.isFieldsValid(genericDto.fields)) {
+            return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
         }
         return DetailParse.Parsed(RecordDetail.Generic(genericDto.typeCode, genericDto.fields))
     }

@@ -4,17 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,21 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
-import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.core.model.toEntity
-import com.example.lifetrack.feature.coffee.CoffeeRecordItem
-import com.example.lifetrack.feature.poop.PoopRecordItem
-import com.example.lifetrack.feature.water.WaterRecordItem
-import java.time.Instant
+import com.example.lifetrack.feature.record.RecordRow
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE")
 
 @Composable
 fun TodayScreen(
@@ -47,19 +38,22 @@ fun TodayScreen(
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
+    onSportRecord: () -> Unit,
     onOpenSettings: () -> Unit,
     onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit
 ) {
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
-    val enabled = trackTypes.filter { it.enabled }.mapTo(HashSet()) { it.code }
+    val enabledTypes = trackTypes.filter { it.enabled }
+    val enabled = enabledTypes.mapTo(HashSet()) { it.code }
     val canRecordPoop = DEFAULT_POOP_TYPE.code in enabled
     val canRecordWater = WaterFields.TYPE_CODE in enabled
     val canRecordCoffee = CoffeeFields.TYPE_CODE in enabled
-    // 统计、历史、月历目前仍只统计排便，这里的次数卡必须同口径，不能把饮水或咖啡算进去。
-    val poopCount = records.count { it.event.typeCode == DEFAULT_POOP_TYPE.code }
-    val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE"))
+    val canRecordSport = SportFields.TYPE_CODE in enabled
+    // 首页、历史、月历与统计默认都按「全部类型」同一口径计数，这里不再只数排便。
+    val countsByType = records.groupingBy { it.event.typeCode }.eachCount()
+    val today = LocalDate.now().format(todayFormatter)
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -73,14 +67,59 @@ fun TodayScreen(
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("今日排便次数", style = MaterialTheme.typography.titleMedium)
-                    Text(poopCount.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("今日记录", style = MaterialTheme.typography.titleMedium)
+                    Row {
+                        Text(
+                            records.size.toString(),
+                            style = MaterialTheme.typography.displayMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            "次",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(start = 6.dp, top = 18.dp)
+                        )
+                    }
+                    if (enabledTypes.isEmpty()) {
+                        Text(
+                            "没有启用的记录项目",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    } else {
+                        enabledTypes.chunked(2).forEach { rowTypes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowTypes.forEach { type ->
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            type.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                                        )
+                                        Text(
+                                            "${countsByType[type.code] ?: 0} 次",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                                if (rowTypes.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
                 }
             }
         }
         item {
-            if (!canRecordPoop && !canRecordWater && !canRecordCoffee) {
+            if (enabledTypes.isEmpty()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -115,8 +154,14 @@ fun TodayScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("记录咖啡 / 茶") }
                     }
+                    if (canRecordSport) {
+                        OutlinedButton(
+                            onClick = onSportRecord,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("记录运动") }
+                    }
                     Text(
-                        "快速打卡会立即保存当前时间；详细记录可补形态与身体感受，饮水与咖啡 / 茶需填写份量。",
+                        "快速打卡会立即保存当前时间；其余类型需填写各自必填项（饮水 / 咖啡的份量、运动的时长）。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -130,64 +175,11 @@ fun TodayScreen(
             }
         } else {
             items(records, key = { it.event.id }) { record ->
-                when (record.event.typeCode) {
-                    DEFAULT_POOP_TYPE.code -> PoopRecordItem(
-                        record = PoopRecordRelation(
-                            event = record.event,
-                            detail = (record.detail as? RecordDetail.Poop)?.toEntity(record.event.id)
-                        ),
-                        onEdit = { onEdit(record) },
-                        onDelete = { onDelete(record.event.id) }
-                    )
-                    WaterFields.TYPE_CODE -> WaterRecordItem(
-                        record = record,
-                        onEdit = { onEdit(record) },
-                        onDelete = { onDelete(record.event.id) }
-                    )
-                    CoffeeFields.TYPE_CODE -> CoffeeRecordItem(
-                        record = record,
-                        onEdit = { onEdit(record) },
-                        onDelete = { onDelete(record.event.id) }
-                    )
-                    else -> UnknownRecordItem(
-                        record = record,
-                        onDelete = { onDelete(record.event.id) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 备份可能带入当前版本没有编辑器的类型：只读展示 + 允许删除，不假装能编辑。 */
-@Composable
-private fun UnknownRecordItem(record: BackupRecord, onDelete: () -> Unit) {
-    val timeLabel = runCatching {
-        Instant.ofEpochMilli(record.event.occurredAtEpochMillis)
-            .atZone(ZoneId.of(record.event.zoneId))
-            .format(timeFormatter)
-    }.getOrDefault("时间未知")
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(timeLabel, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    buildList {
-                        add(record.event.typeCode)
-                        if (record.event.note.isNotBlank()) add(record.event.note)
-                    }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                RecordRow(
+                    record = record,
+                    onEdit = { onEdit(record) },
+                    onDelete = { onDelete(record.event.id) }
                 )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.DeleteOutline, contentDescription = "删除记录")
             }
         }
     }

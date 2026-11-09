@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,9 +64,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.feature.home.MainViewModel
 import java.time.LocalDate
@@ -73,6 +79,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun StatisticsScreen(viewModel: MainViewModel) {
     val statsByPeriod by viewModel.statistics.collectAsStateWithLifecycle()
+    val statsScope by viewModel.statsScope.collectAsStateWithLifecycle()
+    val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { StatsPeriod.entries.size })
     val scope = rememberCoroutineScope()
     val today = remember { LocalDate.now() }
@@ -80,6 +88,8 @@ fun StatisticsScreen(viewModel: MainViewModel) {
     val period = StatsPeriod.entries[pagerState.currentPage]
     val current = statsByPeriod[period]
     val colors = rememberStatsColors()
+    // 形态分布只描述排便详情；其他口径（含全部类型）不展示，避免分母与字段错位。
+    val showDistribution = statsScope == DEFAULT_POOP_TYPE.code
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -97,6 +107,14 @@ fun StatisticsScreen(viewModel: MainViewModel) {
                 onSelect = { target -> scope.launch { pagerState.animateScrollToPage(target.ordinal) } },
                 colors = colors
             )
+            if (trackTypes.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                TypeFilterRow(
+                    types = trackTypes,
+                    selected = statsScope,
+                    onSelect = viewModel::setStatsTypeFilter
+                )
+            }
             Spacer(Modifier.height(4.dp))
         }
         HorizontalPager(
@@ -106,10 +124,43 @@ fun StatisticsScreen(viewModel: MainViewModel) {
             val pagePeriod = StatsPeriod.entries[page]
             val stats = statsByPeriod[pagePeriod]
             if (stats != null) {
-                StatsPage(stats = stats, today = today, colors = colors)
+                StatsPage(
+                    stats = stats,
+                    today = today,
+                    colors = colors,
+                    showDistribution = showDistribution
+                )
             } else {
                 Box(Modifier.fillMaxSize())
             }
+        }
+    }
+}
+
+/** 统计口径筛选：全部类型 + 每个已注册类型；停用模块的历史记录仍可在这里回看。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TypeFilterRow(
+    types: List<TrackTypeEntity>,
+    selected: String?,
+    onSelect: (String?) -> Unit
+) {
+    // 大字号下横向滚动会把最后一个 chip 裁成半截，改成自动换行，保证每个口径都能点到。
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text("全部") }
+        )
+        types.forEach { type ->
+            FilterChip(
+                selected = selected == type.code,
+                onClick = { onSelect(type.code) },
+                label = { Text(type.name) }
+            )
         }
     }
 }
@@ -200,13 +251,16 @@ private fun PeriodSwitcher(
     onSelect: (StatsPeriod) -> Unit,
     colors: StatsColors
 ) {
+    // 大字号下 38dp 装不下 26sp 的「周 / 月 / 年」，选中块会压住文字；按字号抬高整条。
+    val fontScale = LocalDensity.current.fontScale
+    val barHeight = if (fontScale > 1.3f) 52.dp else 38.dp
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(19.dp))
+            .height(barHeight)
+            .clip(RoundedCornerShape(barHeight / 2))
             .background(colors.surface)
-            .border(1.dp, colors.border, RoundedCornerShape(19.dp))
+            .border(1.dp, colors.border, RoundedCornerShape(barHeight / 2))
     ) {
         val segmentWidth = maxWidth / StatsPeriod.entries.size
         val indicator by animateDpAsState(
@@ -216,11 +270,12 @@ private fun PeriodSwitcher(
         )
         Box(
             modifier = Modifier
-                .offset(x = indicator)
+                // 用 lambda 重载：指示器位置随动画每帧变化，避免整棵子树按状态值重组
+                .offset { IntOffset(indicator.roundToPx(), 0) }
                 .width(segmentWidth)
                 .fillMaxHeight()
                 .padding(3.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape((barHeight - 6.dp) / 2))
                 .background(colors.accent)
         )
         Row(modifier = Modifier.fillMaxSize()) {
@@ -238,6 +293,8 @@ private fun PeriodSwitcher(
                     Text(
                         text = item.label(),
                         fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false,
                         fontWeight = if (item == selected) FontWeight.Medium else FontWeight.Normal,
                         color = if (item == selected) {
                             colors.onAccent
@@ -252,7 +309,12 @@ private fun PeriodSwitcher(
 }
 
 @Composable
-private fun StatsPage(stats: PeriodStats, today: LocalDate, colors: StatsColors) {
+private fun StatsPage(
+    stats: PeriodStats,
+    today: LocalDate,
+    colors: StatsColors,
+    showDistribution: Boolean
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -267,8 +329,10 @@ private fun StatsPage(stats: PeriodStats, today: LocalDate, colors: StatsColors)
         MetricGrid(stats = stats, colors = colors)
         Spacer(Modifier.height(12.dp))
         TimeOfDayCard(stats = stats, colors = colors)
-        Spacer(Modifier.height(12.dp))
-        DetailDistributionCard(stats = stats, colors = colors)
+        if (showDistribution) {
+            Spacer(Modifier.height(12.dp))
+            DetailDistributionCard(stats = stats, colors = colors)
+        }
         Spacer(Modifier.height(12.dp))
         InsightCard(stats = stats, colors = colors)
         Spacer(Modifier.height(14.dp))

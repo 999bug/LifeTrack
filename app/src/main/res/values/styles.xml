@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      windowLightNavigationBar 是 API 27 才有的属性；minSdk 26 上系统会直接忽略它，
+      因此用 tools:targetApi 标注，而不是把整个主题复制成 values-v27 两份。
+    -->
     <style name="Theme.LifeTrack" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">#F7F8F5</item>
         <item name="android:statusBarColor">#F7F8F5</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>

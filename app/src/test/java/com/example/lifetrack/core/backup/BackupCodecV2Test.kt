@@ -37,8 +37,8 @@ class BackupCodecV2Test {
             """{"code":"water","name":"饮水","iconKey":"water","category":"intake",""" +
             """"trackingMode":"EVENT","enabled":true,"sortOrder":20,"schemaVersion":1}]"""
 
-    private val sportTypesJson = waterTypesJson.trimEnd(']') +
-        """,{"code":"sport","name":"运动","iconKey":"sport","category":"activity",""" +
+    private val unregisteredTypesJson = waterTypesJson.trimEnd(']') +
+        """,{"code":"mood","name":"情绪","iconKey":"mood","category":"mind",""" +
         """"trackingMode":"EVENT","enabled":true,"sortOrder":30,"schemaVersion":1}]"""
 
     private val waterOptions = BackupDecodeOptions(
@@ -96,10 +96,10 @@ class BackupCodecV2Test {
 
     @Test
     fun `production defaults still reject unregistered detail types`() {
-        val detail = """{"typeCode":"sport","fields":{"minutes":"30"}}"""
+        val detail = """{"typeCode":"mood","fields":{"score":"3"}}"""
         val text = backupJson(
-            typesJson = sportTypesJson,
-            events = waterEvent(typeCode = "sport", detail = detail)
+            typesJson = unregisteredTypesJson,
+            events = waterEvent(typeCode = "mood", detail = detail)
         )
         val result = BackupCodec.decode(text, fixedNow)
 

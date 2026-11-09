@@ -1,6 +1,7 @@
 package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,27 +43,54 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `registry has builtin water and coffee specs and falls back to injected specs`() {
+    fun `registry has builtin water coffee and sport specs and falls back to injected specs`() {
         assertNotNull(DetailSpecRegistry.specFor(WaterFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE))
-        assertNull(DetailSpecRegistry.specFor("sport"))
-        val sport = DetailSpec("sport", allowedFields = setOf("minutes"))
-        assertEquals(sport, DetailSpecRegistry.specFor("sport", mapOf("sport" to sport)))
+        assertNotNull(DetailSpecRegistry.specFor(SportFields.TYPE_CODE))
+        assertNull(DetailSpecRegistry.specFor("mood"))
+        val mood = DetailSpec("mood", allowedFields = setOf("score"), validators = mapOf("score" to { it == "3" }))
+        assertEquals(mood, DetailSpecRegistry.specFor("mood", mapOf("mood" to mood)))
         val override = DetailSpec("water", allowedFields = emptySet())
         assertEquals(override, DetailSpecRegistry.specFor("water", mapOf("water" to override)))
     }
 
     @Test
     fun `production decode options only allow registered types`() {
-        assertEquals(
-            setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE),
-            BackupDecodeOptions.Default.supportedDetailTypes
-        )
-        assertEquals(
-            setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE),
-            SUPPORTED_DETAIL_TYPES
-        )
+        val expected = setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE, SportFields.TYPE_CODE)
+        assertEquals(expected, BackupDecodeOptions.Default.supportedDetailTypes)
+        assertEquals(expected, SUPPORTED_DETAIL_TYPES)
         assertTrue(BackupDecodeOptions.Default.detailSpecs.isEmpty())
+    }
+
+    @Test
+    fun `every builtin spec validates all of its declared fields`() {
+        DetailSpecRegistry.builtIn.values.forEach { spec ->
+            assertTrue(
+                "${spec.typeCode} 缺少约束",
+                spec.allowedFields.isNotEmpty()
+            )
+            assertEquals(
+                "${spec.typeCode} 的字段与校验器必须一一对应",
+                spec.allowedFields,
+                spec.validators.keys
+            )
+        }
+    }
+
+    @Test
+    fun `spec rejects both unknown fields and invalid values`() {
+        val spec = DetailSpecRegistry.specFor(WaterFields.TYPE_CODE)!!
+        assertTrue(spec.isFieldsValid(mapOf(WaterFields.AMOUNT to "250")))
+        assertFalse(spec.isFieldsValid(mapOf(WaterFields.AMOUNT to "250", "caffeine" to "yes")))
+        assertFalse(spec.isFieldsValid(mapOf(WaterFields.AMOUNT to "99999")))
+    }
+
+    @Test
+    fun `declaring a field without a validator fails fast`() {
+        val error = runCatching {
+            DetailSpec("mood", allowedFields = setOf("score"))
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
     }
 
     @Test
@@ -99,5 +127,23 @@ class DetailSpecTest {
         assertFalse(spec.validators[CoffeeFields.CAFFEINE]!!("high"))
         assertTrue(spec.validators[CoffeeFields.UNIT]!!("cup"))
         assertFalse(spec.validators[CoffeeFields.UNIT]!!("litre"))
+    }
+
+    @Test
+    fun `sport spec enforces sport enum and duration range`() {
+        val spec = DetailSpecRegistry.specFor(SportFields.TYPE_CODE)!!
+        assertEquals(
+            setOf(SportFields.SPORT, SportFields.DURATION, SportFields.INTENSITY),
+            spec.allowedFields
+        )
+        assertTrue(spec.validators[SportFields.DURATION]!!("45"))
+        assertTrue(spec.validators[SportFields.DURATION]!!("1440"))
+        assertFalse(spec.validators[SportFields.DURATION]!!("0"))
+        assertFalse(spec.validators[SportFields.DURATION]!!("1441"))
+        assertFalse(spec.validators[SportFields.DURATION]!!("abc"))
+        SportFields.SPORTS.forEach { assertTrue(it, spec.validators[SportFields.SPORT]!!(it)) }
+        assertFalse(spec.validators[SportFields.SPORT]!!("ski"))
+        SportFields.INTENSITIES.forEach { assertTrue(it, spec.validators[SportFields.INTENSITY]!!(it)) }
+        assertFalse(spec.validators[SportFields.INTENSITY]!!("extreme"))
     }
 }

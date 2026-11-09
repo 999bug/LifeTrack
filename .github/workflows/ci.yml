@@ -1,0 +1,125 @@
+name: CI
+
+# 日常门禁：每次推送到 main、以及每个 PR 都跑单测 + lint + assembleDebug。
+# 仪器测试默认不跑（模拟器启动慢、偶发不稳定），只在两种情况下触发：
+#   1. Actions 页面手动 workflow_dispatch；
+#   2. PR 上打 run-instrumented 标签。
+# 发布流水线（release.yml）保持独立，仍由手动触发并额外跑 lint。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unit tests and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 与 release.yml 同源：不用 setup-android action，改用镜像自带 sdkmanager。
+      - name: Install required SDK packages
+        run: |
+          ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found under $ANDROID_SDK/cmdline-tools"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          AVAILABLE=$("$SDKMANAGER" --list 2>/dev/null)
+          PLATFORM=$(printf '%s\n' "$AVAILABLE" | grep -oE 'platforms;android-37\.[0-9]+' | sort -uV | head -1)
+          if [ -z "$PLATFORM" ]; then
+            PLATFORM="platforms;android-37.0"
+          fi
+          "$SDKMANAGER" "$PLATFORM" "build-tools;36.0.0" > /dev/null
+          PLATFORM_DIR="${PLATFORM#platforms;}"
+          test -d "$ANDROID_SDK/platforms/$PLATFORM_DIR" || { echo "::error::$PLATFORM_DIR missing"; exit 1; }
+
+      - name: Unit tests, lint and debug build
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+
+      - name: Upload test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
+
+  instrumented:
+    name: Instrumented tests (emulator)
+    needs: build
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'run-instrumented')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install required SDK packages
+        run: |
+          ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          AVAILABLE=$("$SDKMANAGER" --list 2>/dev/null)
+          PLATFORM=$(printf '%s\n' "$AVAILABLE" | grep -oE 'platforms;android-37\.[0-9]+' | sort -uV | head -1)
+          if [ -z "$PLATFORM" ]; then
+            PLATFORM="platforms;android-37.0"
+          fi
+          "$SDKMANAGER" "$PLATFORM" "build-tools;36.0.0" > /dev/null
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
+
+      - name: Upload instrumented test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-reports
+          path: app/build/reports/androidTests
+          if-no-files-found: ignore

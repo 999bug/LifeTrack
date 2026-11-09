@@ -66,23 +66,31 @@ interface TrackEventDao {
     )
     fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>>
 
+    /** 历史列表：可按类型过滤（null = 全部类型），跨面板共用同一口径。 */
     @Transaction
     @Query(
         "SELECT * FROM track_event " +
-            "WHERE typeCode = 'poop' AND localDate BETWEEN :startDate AND :endDate " +
+            "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +
+            "AND localDate BETWEEN :startDate AND :endDate " +
             "ORDER BY occurredAtEpochMillis DESC"
     )
-    fun observePoopRecordsInRange(
+    fun observeRecordsInRange(
         startDate: String,
-        endDate: String
-    ): Flow<List<PoopRecordRelation>>
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<EventWithDetails>>
 
     @Query(
         "SELECT localDate AS localDate, COUNT(*) AS count FROM track_event " +
-            "WHERE typeCode = 'poop' AND localDate BETWEEN :startDate AND :endDate " +
+            "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +
+            "AND localDate BETWEEN :startDate AND :endDate " +
             "GROUP BY localDate ORDER BY localDate ASC"
     )
-    fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
+    fun observeDailyCounts(
+        startDate: String,
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<DailyCountProjection>>
 
     @Transaction
     @Query("SELECT * FROM track_event WHERE typeCode = 'poop' ORDER BY occurredAtEpochMillis ASC")
@@ -100,14 +108,16 @@ interface TrackEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putPoopDetails(details: List<PoopDetailEntity>)
 
-    /** 统计时段分布只需要时刻与时区，不查 detail。 */
+    /** 统计时段分布只需要时刻与时区，不查 detail；按类型过滤（null = 全部）。 */
     @Query(
         "SELECT occurredAtEpochMillis AS occurredAtEpochMillis, zoneId AS zoneId FROM track_event " +
-            "WHERE typeCode = 'poop' AND localDate BETWEEN :startDate AND :endDate"
+            "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +
+            "AND localDate BETWEEN :startDate AND :endDate"
     )
     fun observeEventTimestamps(
         startDate: String,
-        endDate: String
+        endDate: String,
+        typeCode: String?
     ): Flow<List<EventTimestamp>>
 
     /**

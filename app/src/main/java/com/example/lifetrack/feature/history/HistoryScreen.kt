@@ -37,16 +37,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.PickerDateMapper
 import com.example.lifetrack.feature.home.MainViewModel
-import com.example.lifetrack.feature.poop.PoopRecordItem
+import com.example.lifetrack.feature.record.RecordRow
 import com.example.lifetrack.feature.statistics.StatsColors
 import com.example.lifetrack.feature.statistics.rememberStatsColors
 import java.time.LocalDate
@@ -60,7 +61,7 @@ private val fullDateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", L
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
-    onEdit: (PoopRecordRelation) -> Unit,
+    onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit
 ) {
     val records by viewModel.historyRecords.collectAsStateWithLifecycle()
@@ -141,7 +142,7 @@ fun HistoryScreen(
                 Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             }
             items(dailyRecords, key = { it.event.id }) { record ->
-                PoopRecordItem(
+                RecordRow(
                     record = record,
                     onEdit = { onEdit(record) },
                     onDelete = { onDelete(record.event.id) }
@@ -217,13 +218,15 @@ private fun ViewSwitcher(
     onChange: (Boolean) -> Unit,
     colors: StatsColors
 ) {
+    // 与统计页周期切换同构：大字号抬高整条，避免 13sp → 26sp 后被裁掉。
+    val barHeight = if (LocalDensity.current.fontScale > 1.3f) 52.dp else 38.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(19.dp))
+            .height(barHeight)
+            .clip(RoundedCornerShape(barHeight / 2))
             .background(colors.surface)
-            .border(1.dp, colors.border, RoundedCornerShape(19.dp))
+            .border(1.dp, colors.border, RoundedCornerShape(barHeight / 2))
     ) {
         listOf(false to "列表", true to "月历").forEach { (mode, label) ->
             val selected = calendarMode == mode
@@ -232,7 +235,7 @@ private fun ViewSwitcher(
                     .weight(1f)
                     .fillMaxHeight()
                     .padding(3.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape((barHeight - 6.dp) / 2))
                     .background(if (selected) colors.accent else Color.Transparent)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -243,6 +246,8 @@ private fun ViewSwitcher(
                 Text(
                     text = label,
                     fontSize = 13.sp,
+                    maxLines = 1,
+                    softWrap = false,
                     color = if (selected) colors.onAccent else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

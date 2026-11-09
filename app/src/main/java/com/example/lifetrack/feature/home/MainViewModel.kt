@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
+import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
@@ -28,8 +28,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -79,8 +81,11 @@ class MainViewModel(
         initialHistoryQuery()
     )
 
-    val historyRecords: StateFlow<List<PoopRecordRelation>> = historyQuery
-        .flatMapLatest { repository.observePoopRecordsInRange(it.start.toString(), it.end.toString()) }
+    val historyRecords: StateFlow<List<BackupRecord>> = historyQuery
+        .flatMapLatest {
+            // 历史列表默认展示全部类型：停用模块只影响新增入口，不影响已有记录的回看。
+            repository.observeRecordsInRange(it.start.toString(), it.end.toString(), typeCode = null)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 月历的绝对偏移：0 = 本月，-1 = 上月；正数视为未来，直接钳回 0。 */
@@ -89,18 +94,23 @@ class MainViewModel(
     /**
      * 月历格子。翻月后重新查该自然月的按天计数，
      * 复用已有的 observeDailyCounts，不新增统计区间。
+     * 计数口径为全部类型，与历史列表保持一致。
      */
     val calendar: StateFlow<CalendarMonth> = combine(todayDate, calendarOffset) { today, offset ->
         CalendarMonth.of(today, offset)
     }.flatMapLatest { month ->
         repository
-            .observeDailyCounts(month.start.toString(), month.last.toString())
+            .observeDailyCounts(month.start.toString(), month.last.toString(), typeCode = null)
             .map { counts -> month.withCounts(counts.associate { it.localDate to it.count }) }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         CalendarMonth.of(LocalDate.now(ZoneId.systemDefault()), 0)
     )
+
+    /** 统计口径：null = 全部类型。统计页顶部的类型筛选直接写这里。 */
+    private val statsTypeFilter = MutableStateFlow<String?>(null)
+    val statsScope: StateFlow<String?> = statsTypeFilter.asStateFlow()
 
     /** 每个周期各自的翻页偏移：0 = 当前周期，-1 = 上一周期。 */
     private val statsOffsets = MutableStateFlow(StatsPeriod.entries.associateWith { 0 })
@@ -109,34 +119,42 @@ class MainViewModel(
      * 三个周期的统计一次算完。
      * 查询区间覆盖「最远的上一周期起点 → 最远的本周期终点」，只用三次查询，
      * 避免每切一次周期就重新查库、出现两段加载态。
+     * 类型筛选为空表示全部类型；形态分布只在排便口径下查询，避免与其他类型的总数串口径。
      */
-    val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> = combine(todayDate, statsOffsets) { today, offsets ->
-        today to StatsPeriod.entries.associateWith { period ->
-            statsWindow(period, offsets[period] ?: 0, today)
-        }
-    }.flatMapLatest { (today, windows) ->
-        val rangeStart = windows.values.minOf { it.previous.start }.toString()
-        val rangeEnd = windows.values.maxOf { it.lastDate }.toString()
-        combine(
-            repository.observeDailyCounts(rangeStart, rangeEnd),
-            repository.observeEventTimestamps(rangeStart, rangeEnd),
-            repository.observeStatDetails(rangeStart, rangeEnd)
-        ) { dailyCounts, timestamps, details ->
-            windows.mapValues { (_, window) ->
-                StatsAggregator.build(
-                    window = window,
-                    today = today,
-                    dailyCounts = dailyCounts,
-                    timestamps = timestamps,
-                    details = details
-                )
+    val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> =
+        combine(todayDate, statsOffsets, statsTypeFilter) { today, offsets, typeCode ->
+            Triple(today, offsets, typeCode)
+        }.flatMapLatest { (today, offsets, typeCode) ->
+            val windows = StatsPeriod.entries.associateWith { period ->
+                statsWindow(period, offsets[period] ?: 0, today)
             }
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        emptyStatistics()
-    )
+            val rangeStart = windows.values.minOf { it.previous.start }.toString()
+            val rangeEnd = windows.values.maxOf { it.lastDate }.toString()
+            val details = if (typeCode == DEFAULT_POOP_TYPE.code) {
+                repository.observeStatDetails(rangeStart, rangeEnd)
+            } else {
+                flowOf(emptyList())
+            }
+            combine(
+                repository.observeDailyCounts(rangeStart, rangeEnd, typeCode),
+                repository.observeEventTimestamps(rangeStart, rangeEnd, typeCode),
+                details
+            ) { dailyCounts, timestamps, details ->
+                windows.mapValues { (_, window) ->
+                    StatsAggregator.build(
+                        window = window,
+                        today = today,
+                        dailyCounts = dailyCounts,
+                        timestamps = timestamps,
+                        details = details
+                    )
+                }
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyStatistics()
+        )
 
     val darkTheme: StateFlow<Boolean> = settingsRepository.darkTheme
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -166,6 +184,10 @@ class MainViewModel(
             val next = (currentOffset + steps).coerceAtMost(0)
             if (next == currentOffset) current else current + (period to next)
         }
+    }
+
+    fun setStatsTypeFilter(typeCode: String?) {
+        statsTypeFilter.value = typeCode
     }
 
     fun shiftCalendarMonth(steps: Int) {

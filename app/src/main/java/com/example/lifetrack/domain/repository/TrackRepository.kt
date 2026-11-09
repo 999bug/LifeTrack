@@ -15,9 +15,22 @@ interface TrackRepository {
     fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>>
     /** 今天页：所有类型的记录，详情已按 typeCode 归一成 [BackupRecord]。 */
     fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>>
-    fun observePoopRecordsInRange(startDate: String, endDate: String): Flow<List<PoopRecordRelation>>
-    fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
-    fun observeEventTimestamps(startDate: String, endDate: String): Flow<List<EventTimestamp>>
+    /** 历史页：按类型过滤的区间记录（null = 全部类型）。 */
+    fun observeRecordsInRange(
+        startDate: String,
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<BackupRecord>>
+    fun observeDailyCounts(
+        startDate: String,
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<DailyCountProjection>>
+    fun observeEventTimestamps(
+        startDate: String,
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<EventTimestamp>>
     fun observeStatDetails(startDate: String, endDate: String): Flow<List<StatDetailProjection>>
     fun observeTrackTypes(): Flow<List<TrackTypeEntity>>
 

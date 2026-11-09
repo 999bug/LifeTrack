@@ -1,20 +1,35 @@
 package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 
 /**
  * 通用详情的字段规格。
  *
  * 结构级校验（key 命名、数量、长度）在 [DetailLimits]，业务级规则由各类型在此注册。
- * A6 起注册饮水、A7 起注册咖啡 / 茶；后续加类型只需在这里加一项，
+ * A6 起注册饮水、A7 咖啡 / 茶、A8 运动；后续加类型只需在这里加一项，
  * 不必再动备份格式或 Room schema。
+ *
+ * [requireValidatorsForAllFields] 在构造时强制「声明了字段就必须有校验器」，
+ * 防止新增字段只加进 allowedFields 却漏掉 validator，让脏值从备份通道溜进库。
  */
 data class DetailSpec(
     val typeCode: String,
     val allowedFields: Set<String> = emptySet(),
     val validators: Map<String, (String) -> Boolean> = emptyMap()
-)
+) {
+    init {
+        require(validators.keys.containsAll(allowedFields)) {
+            "类型 $typeCode 的字段缺少校验器：${allowedFields - validators.keys}"
+        }
+    }
+
+    /** 键必须已声明，且每个值都要通过对应校验器。 */
+    fun isFieldsValid(fields: Map<String, String>): Boolean =
+        fields.keys.all { it in allowedFields } &&
+            fields.all { (key, value) -> validators[key]?.invoke(value) != false }
+}
 
 object DetailSpecRegistry {
     val builtIn: Map<String, DetailSpec> = mapOf(
@@ -39,6 +54,19 @@ object DetailSpecRegistry {
                 CoffeeFields.AMOUNT to CoffeeFields::isValidAmount,
                 CoffeeFields.UNIT to { it in CoffeeFields.UNITS },
                 CoffeeFields.CAFFEINE to { it in CoffeeFields.CAFFEINE_LEVELS }
+            )
+        ),
+        SportFields.TYPE_CODE to DetailSpec(
+            typeCode = SportFields.TYPE_CODE,
+            allowedFields = setOf(
+                SportFields.SPORT,
+                SportFields.DURATION,
+                SportFields.INTENSITY
+            ),
+            validators = mapOf(
+                SportFields.SPORT to { it in SportFields.SPORTS },
+                SportFields.DURATION to SportFields::isValidDuration,
+                SportFields.INTENSITY to { it in SportFields.INTENSITIES }
             )
         )
     )

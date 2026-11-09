@@ -31,13 +31,13 @@ description: 「生活记」：Local First 的个人生活与身体状态记录 
 
 ```yaml
 languages:                         # 只填实际用到的，版本写实际值
-  kotlin: 2.4.21                   # 25 个 .kt，0 个 .java
+  kotlin: 2.4.21                   # 64 个 .kt（main）+ 16 个单测 + 2 个仪器测试，0 个 .java
   java: 17                         # 仅 JVM target / compileOptions 版本
 framework: Android (Jetpack Compose + Material 3)   # Room 2.8.5 + KSP、DataStore、Navigation Compose
 package_manager: gradle
-build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-06，产物 app/build/outputs/apk/debug/LifeTrack-<version>-debug.apk）
-test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（RecordTimeMapperTest 3 例）
-dev_command: ./gradlew :app:installDebug        # 未验证，需连接 API 26+ 设备
+build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-09，产物 app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk）
+test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（2026-11-09，115 项）
+dev_command: ./gradlew :app:installDebug        # 已通过 adb install -r 实测（emulator-5554，API 37）
 ```
 
 ## 3. 提交与推送
@@ -81,8 +81,10 @@ ai_scope:
   - app/src/main/java
   - app/src/main/res
 log_language: en
-verify_build: 未验证（构建失败，见 §9）
-verify_test: 未验证（见 §9）
+verify_build: ./gradlew :app:assembleDebug       # 已验证（2026-11-09）
+verify_test: ./gradlew :app:testDebugUnitTest    # 已验证（2026-11-09，115 项全绿）
+verify_lint: ./gradlew :app:lintDebug            # 已验证（2026-11-09，无 error）
+verify_instrumented: ./gradlew :app:connectedDebugAndroidTest   # 已验证（2026-11-09，emulator API 37，5 项全绿）
 verify_test_policy: full
 test_port: 9099
 # 有冒烟/版本/UI 检查就补：verify_smoke、verify_version、verify_ui，写命令
@@ -94,7 +96,14 @@ test_port: 9099
 
 ```yaml
 related_docs:                      # 先读这些再动手，优先级高于通用建议
-  - 无                             # 根目录只有 README.md / AGENTS.md / CLAUDE.md
+  - README.md                      # 已实现范围、版本基线、安全边界、验收建议
+  - docs/PROGRESS.md               # 剩余工作子任务台账与风险，跨会话接手先看这个
+  - docs/release-guide.md          # 签名密钥、出包步骤、下载校验与回滚
+  - docs/local-verification-and-upgrade.md   # 模拟器验证与手机升级流程
+  - docs/statistics-enhancement-confirmation.md   # 统计口径与实施记录
+  - docs/module-extension-confirmation.md        # 通用编辑器 / 通用详情 / 备份 v2
+  - docs/water-module-confirmation.md            # 饮水模块与 Room v2
+  - docs/coffee-module-confirmation.md           # 咖啡 / 茶模块
 ```
 
 ## 8. 覆盖与例外
@@ -105,7 +114,7 @@ related_docs:                      # 先读这些再动手，优先级高于通�
 overrides:
   - 规则: lang-java.md（Java 编码规范）
     偏离: 不直接适用——项目为 Kotlin/Android，无 .java 源文件
-    理由: 套件没有 Kotlin 语言模块；Kotlin 与 Compose 代码按官方 Kotlin 风格和项目现有写法执行
+    理由: Kotlin/Compose 代码按 .agents/lang-android.md 与官方 Kotlin 风格执行；lang-java.md 保留但不在分流表引用
 ```
 
 ## 9. 已知的雷区
@@ -114,7 +123,7 @@ overrides:
 - **`gradle/wrapper/` 已是官方 Wrapper（含 `gradle-wrapper.jar`）**：旧的 `gradlew` / `gradlew.bat` 是自制下载引导脚本，硬编码 Gradle 8.13 且只认 `~/.gradle/life-track-bootstrap/`，升级版本时必须同步改脚本里的 `VERSION`。现已替换为官方脚本，改版本只改 `gradle-wrapper.properties` 的 `distributionUrl`。
 - **数据库未加密**：不得声称 Room 已加密；应用私有目录只是沙箱隔离。面向真实用户发布前必须先完成加密选型、Android Keystore 密钥管理、导出文件加密与备份/迁移评审（见 README「安全边界」）。
 - **Manifest 的 INTERNET 权限例外（已评审）**：原本 Local First 硬约束是「不申请 INTERNET」，但应用内「检查更新」需要联网查询 GitHub Releases 并下载 APK，已作为**唯一例外**放开——新增 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限（见 `app/src/main/AndroidManifest.xml`）。该网络能力仅用于更新（HTTPS GET `api.github.com/repos/999bug/LifeTrack/releases/latest` + 下载 APK），不携带任何用户数据/设备标识/遥测；对应的 README「本地存储」「安全边界」第 6 条与隐私评审已同步更新。新增任何其它网络能力仍需回到本约束重新评审。
-- **`allowBackup=false` 且尚未实现主动导出/恢复**：卸载、清除数据或丢机即可能永久丢数据；设置页已有提示。
+- **`allowBackup=false`，主动导出 / 恢复已实现但未加密**：设置页「备份与恢复」走 SAF 导出单个 JSON（schemaVersion 2，可读 v1），恢复在单事务内整体替换；卸载、清除数据或丢机仍会丢数据，备份文件本身是明文，加密与密钥管理见 README「安全边界」与台账 C4–C6。
 - **发布签名密钥由 Repository secrets 注入**：流水线从 `LIFETRACK_KEYSTORE*` 环境变量读取，首次发版前需按 docs/release-guide.md 配置 4 个 secrets；keystore 与口令绝不入库，密钥丢失后用户只能卸载重装且数据全丢。
 - **CI 不能用 `android-actions/setup-android@v3`（2026-11-09 修复）**：现象 → `Set up Android SDK` 步骤 15 秒失败，日志 `Warning: Failed to find package 'tools'` 与 `sdkmanager failed with exit code 1`。根因 → 该 action 固定执行 `sdkmanager tools`，而 2026 年 ubuntu-latest 预装的 cmdline-tools 16.0 已移除 `tools` 包。修复 → 去掉 action，直接定位 `$ANDROID_HOME/cmdline-tools/*/bin/sdkmanager`，并把 ANDROID_HOME 写进 GITHUB_ENV、显式校验安装目录。教训 → 第三方 setup action 会随 runner 镜像漂移，优先用镜像自带工具并验证结果目录存在。
 - **compileSdk 37 的 sdkmanager 包名不是 `platforms;android-37`（2026-11-09 修复）**：现象 → `sdkmanager "platforms;android-37"` 报 `Failed to find package`。根因 → 官方主清单 `repository2-1.xml` 最高只到 `android-36`；API 37 在分片 `repository2-3.xml` 中，包名是 `platforms;android-37.0`（另有 37.1 / 37.2），本机 SDK 目录同样是 `platforms/android-37.0`。修复 → 从 `sdkmanager --list` 动态取最低的 `platforms;android-37.x` 安装，并用解析出的包名校验目录。教训 → compileSdk 的数字不等于 sdkmanager 包名；新平台先在 `--list` 里核对再写死。
@@ -131,8 +140,11 @@ overrides:
 - **同一工作区多会话并发时，共享文件会互相叠加（2026-11-09）**：现象 → A6 收尾时全仓 `compileDebugKotlin` 突然失败，报 `jsonPrimitive` / junit 未解析与 `No value passed for parameter 'updateRepository'`，但本包改动此前刚全绿。根因 → 另一会话同时在开发「应用内检查更新」，改了 `MainActivity` / `LifeTrackApplication` / `AndroidManifest` / `SettingsScreen` / `README` / `profile`，并在 `LifeTrackApp` 与 `MainViewModel` 上叠加了 `checkForUpdate` 与 `updateRepository`；其测试文件误放进 main 源集。修复 → 不修改、不回退、不 stash 对方文件；用 `git archive HEAD` 到系统临时目录、只叠加本包文件做隔离验证；提交时只 add 具体路径。教训 → 构建突然失败先看 `git status` 与文件时间戳，别急着改自己的代码；共享文件里混着两边改动时，不能把整文件当「自己的成果」提交。**结局（17:55）**：对方 `33ef32d` 修好编译并把两边改动一并提交，合并后 90 项单测 + assembleDebug 全绿；原计划的「补提交 A6 代码」因此取消——共享文件被别人提交后，先 `git show --stat` 核对内容再决定是否还要补提交，不要重复 commit。
 
 - **横向滚动的 chips 在 200% 字体下会把最后一项裁成半截（2026-11-09 A7 修复）**：现象 → 咖啡因三态 chips（含咖啡因 / 低因 / 无咖啡因）在大字号下初始只露出「无」，看起来像文字截断。根因 → `Row + horizontalScroll` 只保证「可滑动到达」，不保证「初始完整可见」；字号放大后前两项已占满卡片宽度。修复 → `LocalDensity.current.fontScale > 1.3f` 时用 `values.chunked(2)` 拆成多行 `Row`，常规字号保留横向滚动。教训 → 枚举项少（≤4）且文案短时优先分行展示；横向滚动只适合项目较多、用户明确知道能滑的场景；大字体回归要看「首屏是否完整」，不能只看「能否滚到」。
-- **注册新类型会打破以它为「未注册样例」的既有测试（2026-11-09 A7）**：现象 → 注册 `coffee` 规格后 `BackupCodecV2Test` / `DetailSpecTest` 里两条「生产默认拒绝未注册类型」用例必然失败。根因 → 测试用 `coffee` 这个具体字符串代表「未来才做的类型」，一旦它被实现就失去语义。修复 → 换成真正未注册的 `sport`（A8 尚未实现），并同步更新生产放行集合断言。教训 → 负向用例要用「永远不会注册」的占位名（如 `unknown_type`），别用路线图里的真实类型名。
+- **注册新类型会打破以它为「未注册样例」的既有测试（2026-11-09 A7，A8 再次复现）**：现象 → 注册 `coffee` / 之后注册 `sport` 时，`BackupCodecV2Test` / `DetailSpecTest` 里「生产默认拒绝未注册类型」用例必然失败。根因 → 测试用路线图里的真实类型名代表「未来才做的类型」，一旦它被实现就失去语义。修复 → 负向样例统一改用不会注册的 `mood`，并同步更新生产放行集合断言。教训 → 负向用例要用「永远不会注册」的占位名（如 `mood` / `unknown_type`），别用路线图里的真实类型名。
+- **切换条用固定 dp 高度，200% 字体下选中块会压住文字（2026-11-09 B4 修复）**：现象 → 统计页「周 / 月 / 年」在 200% 字体下文字被压扁/裁切，历史页「列表 / 月历」同构问题。根因 → 整条固定 `height(38.dp)`，而 13sp 文字随 `fontScale` 变成 26sp，行高超过容器。修复 → 按 `LocalDensity.current.fontScale > 1.3f` 把整条抬到 52dp，圆角与指示块改由 `barHeight` 推导，并给文字加 `maxLines = 1, softWrap = false`。教训 → 分段控件的高度必须从字号推导，不能只写死一次；改完在 200% 字体下截图核对。
+- **`MigrationTestHelper` 需要把 `app/schemas/` 注册进 androidTest assets（2026-11-09 B1）**：现象 → 迁移测试报「Cannot find schema file for version 1」。根因 → KSP 只把 schema 导出到工程目录，androidTest APK 里没有这些资源。修复 → `android.sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")` + `androidTestImplementation("androidx.room:room-testing")`。教训 → Room 迁移测试是「拿历史 schema 建库」，schema 文件必须随测试打包，不能只留在仓库里。
+- **内存库测试插入子表前必须先有父表行（2026-11-09 B1/B2）**：现象 → `LocalDatabaseTest` 插入 `track_event` 报 `FOREIGN KEY constraint failed (code 787)`。根因 → `track_event.typeCode` 外键指向 `track_type.code`，测试只插事件没插类型。修复 → 先 `trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)`。教训 → 开外键的 Room 库里，测试夹具要按父表 → 子表顺序造数据；`insertEvents(list)` 是批量插入，不会逐行容错。
+- **`lintDebug` 是发布门禁的硬前置（2026-11-09 B11）**：现象 → 首次把 lint 接进 CI 时 `BUILD FAILED`，唯一 error 是 `android:windowLightNavigationBar requires API level 27 (current min is 26)`。根因 → 该主题属性 API 27 才有，minSdk 是 26。修复 → 在 `<item>` 上加 `tools:targetApi="27"`（系统在 26 上会忽略该属性，不必复制整份 `values-v27` 主题）。教训 → 新接 lint 前先本地跑一次 `:app:lintDebug`；历史工程接门禁时，先分清「新引入的 error」与「一直存在的 error」，后者单独修，别为了让门禁变绿而全局关规则。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
-
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

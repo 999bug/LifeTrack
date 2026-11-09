@@ -38,9 +38,22 @@ val DEFAULT_COFFEE_TYPE = TrackTypeEntity(
     schemaVersion = 1
 )
 
+/** 第三个走通用详情表的新类型；只注册类型与字段规格，沿用 A6 的扩展点。 */
+val DEFAULT_SPORT_TYPE = TrackTypeEntity(
+    code = "sport",
+    name = "运动",
+    iconKey = "sport",
+    category = "activity",
+    trackingMode = "EVENT",
+    enabled = true,
+    sortOrder = 40,
+    schemaVersion = 1
+)
+
 /** 新增内置类型时只改这里，ensureDefaultTypes 与备份恢复兜底会一起生效。 */
 val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(
     DEFAULT_POOP_TYPE,
     DEFAULT_WATER_TYPE,
-    DEFAULT_COFFEE_TYPE
+    DEFAULT_COFFEE_TYPE,
+    DEFAULT_SPORT_TYPE
 )

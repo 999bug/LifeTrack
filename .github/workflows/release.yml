@@ -100,7 +100,15 @@ jobs:
       - name: Build and test
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon
+          ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon
+
+      - name: Upload lint report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
 
       - name: Verify signature and write checksum
         id: apk

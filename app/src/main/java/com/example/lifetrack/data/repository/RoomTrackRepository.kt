@@ -38,20 +38,26 @@ class RoomTrackRepository(
     override fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>> =
         dao.observeRecordsForDate(localDate).map { rows -> rows.map { it.toBackupRecord() } }
 
-    override fun observePoopRecordsInRange(
+    override fun observeRecordsInRange(
         startDate: String,
-        endDate: String
-    ): Flow<List<PoopRecordRelation>> = dao.observePoopRecordsInRange(startDate, endDate)
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<BackupRecord>> =
+        dao.observeRecordsInRange(startDate, endDate, typeCode).map { rows ->
+            rows.map { it.toBackupRecord() }
+        }
 
     override fun observeDailyCounts(
         startDate: String,
-        endDate: String
-    ): Flow<List<DailyCountProjection>> = dao.observeDailyCounts(startDate, endDate)
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<DailyCountProjection>> = dao.observeDailyCounts(startDate, endDate, typeCode)
 
     override fun observeEventTimestamps(
         startDate: String,
-        endDate: String
-    ): Flow<List<EventTimestamp>> = dao.observeEventTimestamps(startDate, endDate)
+        endDate: String,
+        typeCode: String?
+    ): Flow<List<EventTimestamp>> = dao.observeEventTimestamps(startDate, endDate, typeCode)
 
     override fun observeStatDetails(
         startDate: String,

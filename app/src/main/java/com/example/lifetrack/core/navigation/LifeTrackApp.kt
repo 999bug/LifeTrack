@@ -29,15 +29,16 @@ import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
-import com.example.lifetrack.core.model.toRecordDetail
 import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
 import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
 import com.example.lifetrack.feature.settings.SettingsScreen
+import com.example.lifetrack.feature.sport.SportEditorDialog
 import com.example.lifetrack.feature.statistics.StatisticsScreen
 import com.example.lifetrack.feature.water.WaterEditorDialog
 
@@ -113,6 +114,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
+                    onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
                     onOpenSettings = { navController.navigate("settings") },
                     onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it }
@@ -121,12 +123,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
             composable("history") {
                 HistoryScreen(
                     viewModel = viewModel,
-                    onEdit = { relation ->
-                        openEditor(
-                            DEFAULT_POOP_TYPE.code,
-                            BackupRecord(relation.event, relation.detail?.toRecordDetail())
-                        )
-                    },
+                    onEdit = { record -> openEditor(record.event.typeCode, record) },
                     onDelete = { pendingDeleteId = it }
                 )
             }
@@ -146,6 +143,14 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 }
             )
             CoffeeFields.TYPE_CODE -> CoffeeEditorDialog(
+                record = editingRecord,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            SportFields.TYPE_CODE -> SportEditorDialog(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->

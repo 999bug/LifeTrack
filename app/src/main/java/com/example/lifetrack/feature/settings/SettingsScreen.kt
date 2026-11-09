@@ -45,6 +45,7 @@ private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
     val darkTheme by viewModel.darkTheme.collectAsStateWithLifecycle()
+    val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -138,6 +139,11 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 Switch(checked = darkTheme, onCheckedChange = viewModel::setDarkTheme)
             }
         }
+        ModuleSettingsCard(
+            types = trackTypes,
+            onToggle = viewModel::setTypeEnabled,
+            onMove = viewModel::moveType
+        )
         Card {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("备份与恢复", style = MaterialTheme.typography.titleMedium)

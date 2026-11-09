@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.feature.poop.PoopRecordItem
 import java.time.LocalDate
@@ -29,10 +30,14 @@ fun TodayScreen(
     viewModel: MainViewModel,
     onQuickRecord: () -> Unit,
     onDetailedRecord: () -> Unit,
+    onOpenSettings: () -> Unit,
     onEdit: (PoopRecordRelation) -> Unit,
     onDelete: (String) -> Unit
 ) {
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
+    val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
+    // 目前只有排便实现了记录编辑器，其他类型启用后会在后续模块里接入。
+    val canRecord = trackTypes.any { it.enabled && it.code == DEFAULT_POOP_TYPE.code }
     val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE"))
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -53,16 +58,33 @@ fun TodayScreen(
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onQuickRecord, modifier = Modifier.weight(1f)) { Text("快速打卡") }
-                OutlinedButton(onClick = onDetailedRecord, modifier = Modifier.weight(1f)) { Text("详细记录") }
+            if (canRecord) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onQuickRecord, modifier = Modifier.weight(1f)) { Text("快速打卡") }
+                    OutlinedButton(onClick = onDetailedRecord, modifier = Modifier.weight(1f)) { Text("详细记录") }
+                }
+                Text(
+                    "快速打卡会立即保存当前时间；详细记录可以补充形态和身体感受。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            } else {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("当前没有启用的记录项目", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "可在设置 → 记录项目中启用后继续记录。已有的历史记录不受影响。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(onClick = onOpenSettings) { Text("去设置") }
+                    }
+                }
             }
-            Text(
-                "快速打卡会立即保存当前时间；详细记录可以补充形态和身体感受。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
         item { Text("今日记录", style = MaterialTheme.typography.titleLarge) }
         if (records.isEmpty()) {

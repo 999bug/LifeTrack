@@ -5,6 +5,7 @@ import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import kotlinx.coroutines.flow.Flow
 
@@ -14,6 +15,13 @@ interface TrackRepository {
     fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
     fun observeEventTimestamps(startDate: String, endDate: String): Flow<List<EventTimestamp>>
     fun observeStatDetails(startDate: String, endDate: String): Flow<List<StatDetailProjection>>
+    fun observeTrackTypes(): Flow<List<TrackTypeEntity>>
+
+    /** 首次进入应用时补齐内置类型，已存在的不会被覆盖（保留用户的启用/排序设置）。 */
+    suspend fun ensureDefaultTypes()
+    suspend fun setTypeEnabled(code: String, enabled: Boolean)
+    suspend fun reorderTypes(types: List<TrackTypeEntity>)
+
     suspend fun addPoopRecord(draft: PoopRecordDraft): String
     suspend fun updatePoopRecord(eventId: String, draft: PoopRecordDraft)
     suspend fun deletePoopRecord(eventId: String)

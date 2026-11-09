@@ -3,7 +3,7 @@ package com.example.lifetrack.data.repository
 import androidx.room.withTransaction
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.AppDatabase
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+import com.example.lifetrack.core.database.DEFAULT_TYPES
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
@@ -44,6 +44,21 @@ class RoomTrackRepository(
         startDate: String,
         endDate: String
     ): Flow<List<StatDetailProjection>> = dao.observeStatDetails(startDate, endDate)
+
+    override fun observeTrackTypes(): Flow<List<TrackTypeEntity>> =
+        database.trackTypeDao().observeAll()
+
+    override suspend fun ensureDefaultTypes() {
+        database.trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)
+    }
+
+    override suspend fun setTypeEnabled(code: String, enabled: Boolean) {
+        database.trackTypeDao().setEnabled(code, enabled)
+    }
+
+    override suspend fun reorderTypes(types: List<TrackTypeEntity>) {
+        database.withTransaction { database.trackTypeDao().updateAll(types) }
+    }
 
     override suspend fun addPoopRecord(draft: PoopRecordDraft): String {
         val id = UUID.randomUUID().toString()
@@ -103,7 +118,9 @@ class RoomTrackRepository(
             dao.deleteAllEvents()
             database.trackTypeDao().deleteAll()
             val types = payload.types.toMutableList()
-            if (types.none { it.code == DEFAULT_POOP_TYPE.code }) types += DEFAULT_POOP_TYPE
+            DEFAULT_TYPES.forEach { default ->
+                if (types.none { it.code == default.code }) types += default
+            }
             database.trackTypeDao().insertAll(types)
             dao.insertEvents(payload.events.map { it.event })
             dao.putPoopDetails(payload.events.mapNotNull { it.detail })

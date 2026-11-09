@@ -88,6 +88,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                         editingRecord = null
                         editorVisible = true
                     },
+                    onOpenSettings = { navController.navigate("settings") },
                     onEdit = {
                         editingRecord = it
                         editorVisible = true

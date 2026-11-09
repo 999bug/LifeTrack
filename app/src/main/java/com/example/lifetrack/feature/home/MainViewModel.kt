@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
+import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
 import com.example.lifetrack.core.model.HistoryFilter
 import com.example.lifetrack.core.model.HistoryQuery
+import com.example.lifetrack.core.model.ModuleOrdering
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.domain.model.PoopRecordDraft
@@ -39,6 +41,14 @@ class MainViewModel(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
     private val todayDate = MutableStateFlow(LocalDate.now(ZoneId.systemDefault()))
+
+    /** 记录项目（启用状态 + 排序）。首次进入时补齐内置类型，之后由 Room Flow 驱动。 */
+    val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        viewModelScope.launch { repository.ensureDefaultTypes() }
+    }
 
     val todayRecords: StateFlow<List<PoopRecordRelation>> = todayDate
         .flatMapLatest { repository.observePoopRecordsForDate(it.toString()) }
@@ -140,6 +150,18 @@ class MainViewModel(
 
     fun shiftCalendarMonth(steps: Int) {
         calendarOffset.update { (it + steps).coerceAtMost(0) }
+    }
+
+    fun setTypeEnabled(code: String, enabled: Boolean) {
+        viewModelScope.launch { repository.setTypeEnabled(code, enabled) }
+    }
+
+    fun moveType(code: String, offset: Int) {
+        val current = trackTypes.value
+        val reordered = ModuleOrdering.move(current, code, offset)
+        if (reordered != current) {
+            viewModelScope.launch { repository.reorderTypes(reordered) }
+        }
     }
 
     fun loadEarlierHistory() {

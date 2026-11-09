@@ -13,3 +13,6 @@ val DEFAULT_POOP_TYPE = TrackTypeEntity(
     sortOrder = 10,
     schemaVersion = 1
 )
+
+/** 新增内置类型时只改这里，ensureDefaultTypes 与备份恢复兜底会一起生效。 */
+val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(DEFAULT_POOP_TYPE)

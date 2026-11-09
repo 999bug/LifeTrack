@@ -55,8 +55,8 @@ push_policy: on-request            # 只提交，push 等用户授权
 ## 4. 交付与发布
 
 ```yaml
-deploy_target: none                # 本地 Android App，无服务端
-release_trigger: manual            # 尚无 CI；发布走手动
+deploy_target: GitHub Releases      # 通过 Release 分发签名 APK，无服务端
+release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
 version_scheme: 语义化 semver       # versionName 0.1.0，尚无 tag
 registry: none
 pages: no
@@ -115,7 +115,7 @@ overrides:
 - **数据库未加密**：不得声称 Room 已加密；应用私有目录只是沙箱隔离。面向真实用户发布前必须先完成加密选型、Android Keystore 密钥管理、导出文件加密与备份/迁移评审（见 README「安全边界」）。
 - **Manifest 不申请 INTERNET**：这是 Local First 的硬约束，新增网络能力必须先改 README 并评审隐私影响。
 - **`allowBackup=false` 且尚未实现主动导出/恢复**：卸载、清除数据或丢机即可能永久丢数据；设置页已有提示。
-- **发布签名密钥尚未配置**：目前无 CI、无 secrets；按 GitHub Repository secrets 约定管理，不要提交 keystore 或口令。
+- **发布签名密钥由 Repository secrets 注入**：流水线从 `LIFETRACK_KEYSTORE*` 环境变量读取，首次发版前需按 docs/release-guide.md 配置 4 个 secrets；keystore 与口令绝不入库，密钥丢失后用户只能卸载重装且数据全丢。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
 

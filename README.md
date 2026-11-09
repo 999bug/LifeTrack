@@ -4,6 +4,16 @@
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。MVP 只实现排便事件，但数据层按通用事件 + 业务详情表组织，为后续咖啡、饮茶、饮水、月经、运动和亲密关系模块预留扩展点。
 
+## 下载安装
+
+Release 页面：https://github.com/999bug/LifeTrack/releases
+
+- 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件。
+- 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
+- 当前版本 `0.1.0`（versionCode 1）。校验示例：`Get-FileHash .\LifeTrack-0.1.0-release.apk -Algorithm SHA256`。
+
+Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"` 且尚未实现导出/恢复，**升级时不要卸载旧版本**——卸载会永久丢失记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
+
 ## 当前已实现
 
 - Android 原生工程：Kotlin + Jetpack Compose + Material 3。
@@ -172,6 +182,7 @@ Windows 使用 `gradlew.bat`。
 ## 相关文档
 
 - [本地验证与在线升级方案](docs/local-verification-and-upgrade.md)：改完代码怎么在模拟器上验证、装到手机后怎么升级。
+- [发布与签名指南](docs/release-guide.md)：签名密钥准备、Release 出包步骤、下载校验与回滚。
 
 ## 许可证
 

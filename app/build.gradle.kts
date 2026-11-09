@@ -21,6 +21,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // 发布签名：仅当环境变量注入 keystore 时启用，本地没有密钥时仍能构建 unsigned 包。
+    // CI 从 Repository Secrets 注入，见 .github/workflows/release.yml 与 docs/release-guide.md。
+    val releaseKeystore = project.providers.environmentVariable("LIFETRACK_KEYSTORE").orNull
+    signingConfigs {
+        if (!releaseKeystore.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = project.providers.environmentVariable("LIFETRACK_KEYSTORE_PASSWORD").orNull
+                keyAlias = project.providers.environmentVariable("LIFETRACK_KEY_ALIAS").orNull
+                keyPassword = project.providers.environmentVariable("LIFETRACK_KEY_PASSWORD").orNull
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            // 未注入密钥时保持 unsigned；发布流水线用 apksigner verify 兜底拦截，避免误发
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true

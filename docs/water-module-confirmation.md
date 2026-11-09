@@ -119,4 +119,43 @@ Repository 新增通用 `addRecord / updateRecord`，**保留现有 poop 专用�
 
 ## 6. 实施记录
 
-待本轮验收后填写。
+**状态**：A6 代码与模拟器验收全部完成；Room 升 version 2，`2.json` 已生成。
+
+### 落地内容
+
+| 项 | 实际落地 |
+| --- | --- |
+| Room v2 | 新增 `EventDetailEntity`（`eventId` / `typeCode` / `payload`）、`EventWithDetails`（两个 `@Relation`）、`MIGRATION_1_2`；`AppDatabase` 升 version 2 并挂 `addMigrations`；KSP 生成 `2.json`，其 `createSql` / index 与 Migration SQL 逐字一致 |
+| 通用详情落库 | 新增 `RecordDetailCodec`（显式 `MapSerializer`，解析失败返回 null）、`WaterFields`（字段与范围单一来源）、`RecordDraft` + `PoopRecordDraft.toRecordDraft()`；DAO 新增通用查询与 `event_detail` 写入；Repository 新增 `observeRecordsForDate` / `addRecord` / `updateRecord`，快照读写同时处理两类详情 |
+| water 放行 | `DEFAULT_TYPES` 增加 `DEFAULT_WATER_TYPE`（category `drink`）；`DetailSpecRegistry.builtIn` 注册 water（amountMl 1..5000、unit ml/cup）；`SUPPORTED_DETAIL_TYPES` 由空集改为 `{water}`，`BackupDecodeOptions.Default` 随之放行 |
+| UI | `WaterEditorDialog` 复用通用壳（壳新增 `saveEnabled`）、`WaterRecordItem`；`TodayScreen` 按启用类型给三个入口、今日列表按 typeCode 分派、次数卡只数排便；`LifeTrackApp` 统一 `BackupRecord` 编辑态并按类型分派 dialog；`RecordEditorDialog` 加 `saveEnabled` 不改变 poop 行为 |
+| 单测 | 新增 `RecordDetailCodecTest` 5 项、`BackupWaterDetailTest` 6 项；`DetailSpecTest` 改为 6 项（新增内置规格与范围断言）；`BackupCodecV2Test` 把「生产默认拒绝」改为「仍拒绝未注册类型」。全项目 **83 项全绿**（71 → 83） |
+| 未改 | `HistoryScreen` / `CalendarMonthView` / `StatisticsScreen` / `StatsAggregator` / `PoopEditorDialog`；备份 `schemaVersion` 仍为 v2，字节格式未变 |
+
+### 验收结果
+
+- 83 项单测全绿、`assembleDebug` 通过（最后一次完整单测运行）；之后仅把 water 的 `category` 从 `intake` 改成已有的 `drink` 映射以消除中英混排，`assembleDebug` 再次通过。
+- 模拟器 `emulator-5554` 实测闭环：
+  - 设置页「记录项目」显示排便 + 饮水两项、均启用、排序箭头可用、「已启用 2 / 共 2 项」，中文分类显示「饮食 · 事件记录」。
+  - 首页出现「记录饮水」；新增 250 ml 保存成功，今日记录显示「09:25 饮水 / 250 ml」，**今日排便次数仍为 0**（与统计口径一致）；编辑回填 250 + ml 高亮 + 09:25，改成 300 保存后列表更新为 300 ml；删除后列表回到空态。
+  - 导出 JSON：`schemaVersion: 2`、types 含 poop/water、water 事件带 `detail.fields {amountMl:"300", unit:"ml"}`、`poop: null`；恢复该文件后 300 ml 完整回来（「已恢复 1 条记录」）；`amountMl=99999` 的坏文件被明确拒绝「记录的详情字段不合法或取值超出范围。（记录 <id>）」。
+  - 深/浅色、200% 字体（首页三入口 + 编辑器日期时间上下堆叠、保存置灰）、1200×800 宽屏（滚动后三入口与列表项完整）均无截断或溢出。
+- 测试文件、截图、临时构建目录已清理；字号 1.0、分辨率 1080×2400、深色模式已还原。
+
+### 相对设计的修正与过程说明
+
+1. **W2 存量数据实测未做**：过程中误执行 `pm clear` 清空了模拟器存量数据；用户随后明确「不需要考虑旧数据」「目前项目处于开发阶段，破坏性更新允许」，因此停止补验（已导出的 v1 工程与临时 APK 均已删除）。改为静态核对 `MIGRATION_1_2` 与 `2.json` 一致 + 全新安装验证 Room v2 能正常建库。**真机存量库 1→2 升级仍未实测**，正式 `MigrationTestHelper` 仪器测试归 B1/B2。
+2. **`unit` 不做换算**：chips 只作为显示单位，同一数值在列表、备份、恢复中保持一致，卡面明确写出，避免出现两套数字。
+3. **未知类型记录只读**：备份可能带入当前版本没有编辑器的类型，列表给只读卡 + 删除按钮，不假装能编辑。
+4. **`category` 用已有映射**：`ModuleSettingsCard.categoryLabel` 已有 `drink → 饮食`，把 water 的 category 从新造的 `intake` 改成 `drink`，比新增映射更收口。
+
+### 并发冲突（影响提交，非功能问题）
+
+本轮收尾时另一会话同时在同一工作区开发「应用内检查更新」，改动了 `MainActivity` / `LifeTrackApplication` / `AndroidManifest.xml` / `SettingsScreen` / `README` / `profile`，并在 `LifeTrackApp` 与 `MainViewModel` 上叠加了 `LaunchedEffect { checkForUpdate(auto = true) }` 与 `updateRepository` 构造参数。其 `core/update/GitHubReleaseCheckerTest.kt` 被放进 main 源集且缺 import，导致全仓 `compileDebugKotlin` 失败。按并发规则未修改、未回退、未 stash 对方文件；本包改动已在「HEAD 干净基线 + 仅叠加本包文件」的临时目录中单独核对，失败原因确认为共享文件混改后 `MainActivity` 与 `MainViewModel.Factory` 签名不一致，属对方进行中的改动。
+
+### 遗留 / 下一包
+
+- A7 咖啡/茶、A8 运动只需加 `DEFAULT_TYPES` 与 `DetailSpec` 注册，**不再触发 Room 迁移**；A11 再把历史/统计/月历按类型适配（本轮它们仍只统计排便）。
+- B1 的 `MigrationTestHelper` 现在有 `1.json` / `2.json` 两级基线，可以做真实迁移用例了；B2 的 `connectedDebugAndroidTest` 仍未跑。
+- 真机、千条数据帧率未测。
+

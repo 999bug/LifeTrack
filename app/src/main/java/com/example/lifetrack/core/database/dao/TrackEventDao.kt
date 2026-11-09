@@ -6,10 +6,12 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.example.lifetrack.core.database.entity.EventDetailEntity
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
+import com.example.lifetrack.core.database.model.EventWithDetails
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +26,31 @@ interface TrackEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putPoopDetail(detail: PoopDetailEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putEventDetail(detail: EventDetailEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putEventDetails(details: List<EventDetailEntity>)
+
+    @Query("DELETE FROM event_detail WHERE eventId = :eventId")
+    suspend fun deleteEventDetail(eventId: String)
+
+    @Query("DELETE FROM poop_detail WHERE eventId = :eventId")
+    suspend fun deletePoopDetail(eventId: String)
+
+    /** 今天页要显示所有启用类型的记录，不再按 typeCode 过滤。 */
+    @Transaction
+    @Query("SELECT * FROM track_event WHERE localDate = :localDate ORDER BY occurredAtEpochMillis DESC")
+    fun observeRecordsForDate(localDate: String): Flow<List<EventWithDetails>>
+
+    /** 备份快照：一条查询取全部事件与两种可选详情。 */
+    @Transaction
+    @Query("SELECT * FROM track_event ORDER BY occurredAtEpochMillis ASC")
+    suspend fun getAllRecords(): List<EventWithDetails>
+
+    @Query("SELECT * FROM track_event WHERE id = :eventId LIMIT 1")
+    suspend fun findEvent(eventId: String): TrackEventEntity?
 
     @Query("SELECT * FROM track_event WHERE id = :eventId AND typeCode = 'poop' LIMIT 1")
     suspend fun findPoopEvent(eventId: String): TrackEventEntity?

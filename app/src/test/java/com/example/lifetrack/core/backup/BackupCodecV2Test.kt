@@ -37,6 +37,10 @@ class BackupCodecV2Test {
             """{"code":"water","name":"饮水","iconKey":"water","category":"intake",""" +
             """"trackingMode":"EVENT","enabled":true,"sortOrder":20,"schemaVersion":1}]"""
 
+    private val coffeeTypesJson = waterTypesJson.trimEnd(']') +
+        """,{"code":"coffee","name":"咖啡","iconKey":"coffee","category":"intake",""" +
+        """"trackingMode":"EVENT","enabled":true,"sortOrder":30,"schemaVersion":1}]"""
+
     private val waterOptions = BackupDecodeOptions(
         supportedDetailTypes = setOf("water"),
         detailSpecs = mapOf(
@@ -91,8 +95,12 @@ class BackupCodecV2Test {
     }
 
     @Test
-    fun `production defaults reject generic detail instead of dropping it`() {
-        val text = backupJson(events = waterEvent())
+    fun `production defaults still reject unregistered detail types`() {
+        val detail = """{"typeCode":"coffee","fields":{"cups":"1"}}"""
+        val text = backupJson(
+            typesJson = coffeeTypesJson,
+            events = waterEvent(typeCode = "coffee", detail = detail)
+        )
         val result = BackupCodec.decode(text, fixedNow)
 
         assertEquals(
@@ -209,14 +217,15 @@ class BackupCodecV2Test {
     private fun backupJson(
         version: Int = BackupCodec.SCHEMA_VERSION,
         events: String,
-        eventCount: Int = 1
+        eventCount: Int = 1,
+        typesJson: String = waterTypesJson
     ): String = """
         {
           "app": "LifeTrack",
           "schemaVersion": $version,
           "exportedAt": "2026-11-09T05:00:00Z",
           "eventCount": $eventCount,
-          "types": $waterTypesJson,
+          "types": $typesJson,
           "events": [$events]
         }
     """.trimIndent()

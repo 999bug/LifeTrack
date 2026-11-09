@@ -24,9 +24,10 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - 统计：周 / 月 / 年三档切换，可上下翻页查看历史周期；包含总次数与环比、日均（年视图为月均）、单日最高、最长连续、常见 2 小时时段，图表为自绘 Canvas。新增时段分布（24 根逐小时柱，高亮常见 2 小时窗口）与形态分布（布里斯托、排便量、费力程度、身体感受），跟随当前周期统计；详情字段可空，按各字段「已填写条数」分别计分母，未填写不计入也不画 0 型柱。
 - 备份与恢复：设置页可把全部记录导出为单个 JSON 文件，或从备份恢复；导出/导入走系统文件选择器（SAF），恢复前校验应用标识、schemaVersion、条数、ID 唯一性、时区、本地日期与字段范围，替换在单个数据库事务内完成。当前导出格式为 **v2**，仍可读取 v1 旧备份；v2 增加通用详情通道，遇到本版本尚未落库的详情类型会明确拒绝导入，不会静默丢数据。
 - 记录项目：设置页列出已注册类型，可启用/停用并调整顺序；启用状态持久化，停用只隐藏新增记录入口，已有历史记录仍可查；全部停用时首页给出提示与设置入口。
+- 饮水模块（试点）：新增「记录饮水」入口，可填写数量与显示单位；今日记录列表按类型分派展示，支持编辑与删除。数据落在通用 `event_detail` 表，导出/恢复走备份 v2 的通用详情通道。历史页、月历与统计目前仍只统计排便，按类型适配见后续计划。
 - Room 数据持久化、DataStore 深色模式设置。
 - UTC 时间戳 + IANA zoneId + 发生时 localDate；本地日期映射有单元测试。
-- Manifest 不申请 INTERNET 权限；显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
+- 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 GitHub Releases 最新版本号与下载本应用 APK，不发送任何用户数据、设备标识或遥测。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
 
 ## 版本基线（固定版本，不使用动态版本）
 
@@ -122,7 +123,7 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 71 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`DetailSpecTest` 5、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`DetailDistributionTest` 6、`ModuleOrderingTest` 5。
+- `./gradlew :app:testDebugUnitTest` 通过，共 83 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`DetailSpecTest` 6、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。
 
@@ -134,7 +135,7 @@ Windows 使用 `gradlew.bat`。
 
 每天多次记录就是多条 `track_event`。当天次数通过 COUNT 查询得出，不冗余维护每日计数。
 
-Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增表或 Migration。备份快照使用独立的 `BackupRecord = 事件 + 可选 RecordDetail` 模型，与 Room 的 `@Relation` 解耦，为后续记录类型预留扩展点。
+Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1_2` 只新增 `event_detail` 通用详情表与索引，不改写存量数据；后续新增记录类型只需注册类型与字段规格，不必再升 Room 版本。备份快照使用独立的 `BackupRecord = 事件 + 可选 RecordDetail` 模型，与 Room 的 `@Relation` 解耦。
 
 ### 时区规则
 
@@ -142,7 +143,7 @@ Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增�
 
 ## 本地存储、自动备份和主动导出边界
 
-- 业务数据库位于应用私有目录，不提供网络接口；Manifest 不声明 `INTERNET`。
+- 业务数据库位于应用私有目录，不提供数据上传接口；`INTERNET` 权限仅用于应用内「检查更新」向 `api.github.com` 查询 GitHub Releases 最新版本与下载 APK，不发起任何其它网络请求、不上传数据。
 - `android:allowBackup="false"`，同时提供 `fullBackupContent` 与 Android 12+ `dataExtractionRules`，将数据库、偏好设置、文件和根目录排除在云备份及设备迁移之外。不同厂商设备仍应实机验证系统迁移行为。
 - 自动备份关闭意味着用户不能依靠 Google/厂商备份恢复数据。卸载应用、清除应用数据或丢失手机，都可能导致未主动导出的数据永久丢失。
 - **已实现主动导出 / 恢复（明文 JSON）**：设置页 → 备份与恢复，通过 Storage Access Framework 由用户选择保存位置。文件含 `schemaVersion`、类型表与全部记录（含详情）；恢复时校验应用标识、版本号、事件条数、ID 唯一性、时区、本地日期与字段范围，任一不通过即整体拒绝，替换在单个 Room 事务内完成。
@@ -159,6 +160,7 @@ Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增�
 3. 主动导出文件加密、完整性校验、恢复与密钥轮换方案。
 4. Android 自动备份、设备迁移、卸载重装、换机恢复和厂商 ROM 行为评审。
 5. 日志、崩溃报告、剪贴板、最近任务屏幕预览及通知内容的隐私审查。
+6. 应用内「检查更新」的网络行为（仅 HTTPS GET `api.github.com/repos/999bug/LifeTrack/releases/latest` 与下载 APK）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
 
 不要在尚未完成上述评审前把真实的敏感数据交给此开发骨架长期保管。
 
@@ -185,7 +187,7 @@ Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增�
 - 切到月历视图翻到上个月再翻回，格子次数应与统计页对应月份一致；点按有记录的日期，列表应只剩当天记录清除筛选后恢复最近 30 天。
 - 只有快速打卡（无详情）的周期，形态分布应显示「已填写 0 / 共 N 条」而不是画出 0 型柱；有详情的周期，Bristol 各柱之和应等于卡面标注的已填写数且不超过总次数。
 - 在设置页停用记录项目后，首页应隐藏打卡按钮并显示提示；重新启用或重启应用后按钮恢复，已有记录不丢失；排序箭头在只有一个项目时应禁用。
-- 检查 APK Manifest 确认没有 `android.permission.INTERNET`。
+- 检查 APK Manifest 确认 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 仅用于「检查更新」（代码注释与 README 已声明用途），且不存在其它数据上传行为。
 - 在 Android 12+ 设备上验证云备份与设备迁移都不会带走业务数据库。
 
 ## 相关文档
@@ -194,6 +196,7 @@ Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增�
 - [发布与签名指南](docs/release-guide.md)：签名密钥准备、Release 出包步骤、下载校验与回滚。
 - [统计增强包设计前确认单](docs/statistics-enhancement-confirmation.md)：月历视图、形态分布与时段分布的口径、影响面与实施记录。
 - [模块扩展第二批设计前确认单](docs/module-extension-confirmation.md)：通用编辑器壳、通用详情模型、备份 v2 兼容口径与实施记录。
+- [饮水模块试点设计前确认单](docs/water-module-confirmation.md)：Room v2 迁移、通用详情表、water 规格注册与验收结果。
 - [剩余工作子任务台账](docs/PROGRESS.md)：A/B/C 三包共 33 项子任务的交付物、依赖与状态。
 
 ## 许可证

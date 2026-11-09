@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.lifetrack.BuildConfig
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
@@ -182,14 +183,18 @@ fun SettingsScreen(viewModel: MainViewModel) {
         Card {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("数据与隐私", style = MaterialTheme.typography.titleMedium)
-                Text("记录仅保存在本应用的私有存储中。此版本不申请网络权限，也不提供账号或云同步。", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "记录仅保存在本应用的私有存储中，不上传任何服务器。为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限（REQUEST_INSTALL_PACKAGES），该权限仅用于查询 GitHub Releases 上的最新版本与下载本应用安装包，不收集、不上传任何用户数据、设备标识或遥测。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Text("系统自动云备份和设备迁移已通过 Manifest 与规则文件排除应用数据。卸载应用或清除应用数据仍可能造成记录丢失，建议定期导出备份。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        UpdateCard(viewModel = viewModel)
         Card {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("关于生活记", style = MaterialTheme.typography.titleMedium)
-                Text("版本 0.1.0 · 本地生活记录工具")
+                Text("版本 ${BuildConfig.VERSION_NAME} · 本地生活记录工具")
                 Text("本产品用于个人记录与回顾，不提供医疗诊断。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

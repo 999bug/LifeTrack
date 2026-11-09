@@ -8,14 +8,18 @@ import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
+import com.example.lifetrack.core.update.ReleaseInfo
+import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.core.model.HistoryFilter
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.ModuleOrdering
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.domain.model.PoopRecordDraft
+import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.StatsAggregator
@@ -38,7 +42,8 @@ import java.time.ZoneId
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(
     private val repository: TrackRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val updateRepository: UpdateRepository
 ) : ViewModel() {
     private val todayDate = MutableStateFlow(LocalDate.now(ZoneId.systemDefault()))
 
@@ -50,8 +55,8 @@ class MainViewModel(
         viewModelScope.launch { repository.ensureDefaultTypes() }
     }
 
-    val todayRecords: StateFlow<List<PoopRecordRelation>> = todayDate
-        .flatMapLatest { repository.observePoopRecordsForDate(it.toString()) }
+    val todayRecords: StateFlow<List<BackupRecord>> = todayDate
+        .flatMapLatest { repository.observeRecordsForDate(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 0 = 最近 30 天；每加载一页再往前多取 30 天。 */
@@ -136,6 +141,21 @@ class MainViewModel(
     val darkTheme: StateFlow<Boolean> = settingsRepository.darkTheme
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val updateState: StateFlow<UpdateRepository.Status> =
+        updateRepository.state.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            UpdateRepository.Status.Idle
+        )
+
+    fun checkForUpdate(auto: Boolean = false) {
+        viewModelScope.launch { updateRepository.check(auto) }
+    }
+
+    fun downloadAndInstall(release: ReleaseInfo) {
+        viewModelScope.launch { updateRepository.downloadAndInstall(release) }
+    }
+
     fun refreshToday() {
         todayDate.value = LocalDate.now(ZoneId.systemDefault())
     }
@@ -215,6 +235,15 @@ class MainViewModel(
         }
     }
 
+    /** 新类型（饮水等）走通用详情表；排便仍走上面的强类型路径。 */
+    fun saveGenericRecord(eventId: String?, draft: RecordDraft) {
+        viewModelScope.launch {
+            if (eventId == null) repository.addRecord(draft)
+            else repository.updateRecord(eventId, draft)
+            refreshToday()
+        }
+    }
+
     fun deleteRecord(eventId: String) {
         viewModelScope.launch {
             repository.deletePoopRecord(eventId)
@@ -240,14 +269,15 @@ class MainViewModel(
 
     class Factory(
         private val repository: TrackRepository,
-        private val settingsRepository: SettingsRepository
+        private val settingsRepository: SettingsRepository,
+        private val updateRepository: UpdateRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (!modelClass.isAssignableFrom(MainViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return MainViewModel(repository, settingsRepository) as T
+            return MainViewModel(repository, settingsRepository, updateRepository) as T
         }
     }
 }

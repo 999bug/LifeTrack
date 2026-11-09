@@ -5,12 +5,16 @@ import com.example.lifetrack.core.database.model.DailyCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.domain.model.PoopRecordDraft
+import com.example.lifetrack.domain.model.RecordDraft
 import kotlinx.coroutines.flow.Flow
 
 interface TrackRepository {
     fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>>
+    /** 今天页：所有类型的记录，详情已按 typeCode 归一成 [BackupRecord]。 */
+    fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>>
     fun observePoopRecordsInRange(startDate: String, endDate: String): Flow<List<PoopRecordRelation>>
     fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
     fun observeEventTimestamps(startDate: String, endDate: String): Flow<List<EventTimestamp>>
@@ -24,7 +28,12 @@ interface TrackRepository {
 
     suspend fun addPoopRecord(draft: PoopRecordDraft): String
     suspend fun updatePoopRecord(eventId: String, draft: PoopRecordDraft)
+    /** 删除任意类型的事件（两类详情随外键级联）。 */
     suspend fun deletePoopRecord(eventId: String)
+
+    /** 通用写入：按 draft.typeCode 与 detail 分派到 poop_detail 或 event_detail。 */
+    suspend fun addRecord(draft: RecordDraft): String
+    suspend fun updateRecord(eventId: String, draft: RecordDraft)
 
     /** 导出用的完整快照。 */
     suspend fun readBackup(): BackupPayload

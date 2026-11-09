@@ -18,7 +18,8 @@ class MainActivity : ComponentActivity() {
             val mainViewModel: MainViewModel = viewModel(
                 factory = MainViewModel.Factory(
                     repository = container.trackRepository,
-                    settingsRepository = container.settingsRepository
+                    settingsRepository = container.settingsRepository,
+                    updateRepository = container.updateRepository
                 )
             )
             val darkTheme by mainViewModel.darkTheme.collectAsStateWithLifecycle()

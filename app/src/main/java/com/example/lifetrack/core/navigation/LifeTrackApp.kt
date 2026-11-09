@@ -14,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,13 +24,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.WaterFields
+import com.example.lifetrack.core.model.toEntity
+import com.example.lifetrack.core.model.toRecordDetail
 import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
 import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.statistics.StatisticsScreen
+import com.example.lifetrack.feature.water.WaterEditorDialog
 
 private data class Destination(
     val route: String,
@@ -44,14 +52,30 @@ private val destinations = listOf(
     Destination("settings", "设置", Icons.Filled.Settings)
 )
 
+private fun BackupRecord.toPoopRelation() = PoopRecordRelation(
+    event = event,
+    detail = (detail as? RecordDetail.Poop)?.toEntity(event.id)
+)
+
 @Composable
 fun LifeTrackApp(viewModel: MainViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     var editorVisible by remember { mutableStateOf(false) }
-    var editingRecord by remember { mutableStateOf<PoopRecordRelation?>(null) }
+    var editorTypeCode by remember { mutableStateOf(DEFAULT_POOP_TYPE.code) }
+    var editingRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkForUpdate(auto = true)
+    }
+
+    fun openEditor(typeCode: String, record: BackupRecord?) {
+        editorTypeCode = typeCode
+        editingRecord = record
+        editorVisible = true
+    }
 
     Scaffold(
         bottomBar = {
@@ -84,24 +108,21 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 TodayScreen(
                     viewModel = viewModel,
                     onQuickRecord = viewModel::quickRecord,
-                    onDetailedRecord = {
-                        editingRecord = null
-                        editorVisible = true
-                    },
+                    onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
+                    onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onOpenSettings = { navController.navigate("settings") },
-                    onEdit = {
-                        editingRecord = it
-                        editorVisible = true
-                    },
+                    onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it }
                 )
             }
             composable("history") {
                 HistoryScreen(
                     viewModel = viewModel,
-                    onEdit = {
-                        editingRecord = it
-                        editorVisible = true
+                    onEdit = { relation ->
+                        openEditor(
+                            DEFAULT_POOP_TYPE.code,
+                            BackupRecord(relation.event, relation.detail?.toRecordDetail())
+                        )
                     },
                     onDelete = { pendingDeleteId = it }
                 )
@@ -112,14 +133,24 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     }
 
     if (editorVisible) {
-        PoopEditorDialog(
-            record = editingRecord,
-            onDismiss = { editorVisible = false },
-            onSave = { draft ->
-                viewModel.saveRecord(editingRecord?.event?.id, draft)
-                editorVisible = false
-            }
-        )
+        when (editorTypeCode) {
+            WaterFields.TYPE_CODE -> WaterEditorDialog(
+                record = editingRecord,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            else -> PoopEditorDialog(
+                record = editingRecord?.toPoopRelation(),
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+        }
     }
 
     pendingDeleteId?.let { id ->

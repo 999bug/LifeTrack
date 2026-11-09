@@ -71,6 +71,7 @@ fun RecordEditorDialog(
     initialMillis: Long? = null,
     initialZoneId: String? = null,
     initialNote: String = "",
+    saveEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit = {}
 ) {
     val recordZone = remember(resetKey) {
@@ -146,16 +147,19 @@ fun RecordEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val localDateTime = LocalDateTime.of(selectedDate, LocalTime.of(selectedHour, selectedMinute))
-                onSave(
-                    RecordEditorValue(
-                        occurredAtEpochMillis = localDateTime.atZone(recordZone).toInstant().toEpochMilli(),
-                        zoneId = recordZone.id,
-                        note = note.trim()
+            TextButton(
+                enabled = saveEnabled,
+                onClick = {
+                    val localDateTime = LocalDateTime.of(selectedDate, LocalTime.of(selectedHour, selectedMinute))
+                    onSave(
+                        RecordEditorValue(
+                            occurredAtEpochMillis = localDateTime.atZone(recordZone).toInstant().toEpochMilli(),
+                            zoneId = recordZone.id,
+                            note = note.trim()
+                        )
                     )
-                )
-            }) { Text("保存") }
+                }
+            ) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )

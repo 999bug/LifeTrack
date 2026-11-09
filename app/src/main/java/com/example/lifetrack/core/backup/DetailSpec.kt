@@ -1,10 +1,12 @@
 package com.example.lifetrack.core.backup
 
+import com.example.lifetrack.core.model.WaterFields
+
 /**
  * 通用详情的字段规格。
  *
- * A5 只做结构级校验（key 命名、数量、长度）并留出注册表扩展点；
- * 业务级规则（数值范围、枚举）由 A6/A7/A8 注册，A12 补齐逐字段校验与坏文件用例。
+ * 结构级校验（key 命名、数量、长度）在 [DetailLimits]，业务级规则由各类型在此注册。
+ * A6 起注册饮水；A7/A8 加类型只需在这里加一项，不必再动备份格式或 Room schema。
  */
 data class DetailSpec(
     val typeCode: String,
@@ -13,16 +15,27 @@ data class DetailSpec(
 )
 
 object DetailSpecRegistry {
-    /** 当前还没有已落库的通用详情类型；A6 加表后在此注册 water。 */
-    val builtIn: Map<String, DetailSpec> = emptyMap()
+    val builtIn: Map<String, DetailSpec> = mapOf(
+        WaterFields.TYPE_CODE to DetailSpec(
+            typeCode = WaterFields.TYPE_CODE,
+            allowedFields = setOf(WaterFields.AMOUNT, WaterFields.UNIT),
+            validators = mapOf(
+                WaterFields.AMOUNT to WaterFields::isValidAmount,
+                WaterFields.UNIT to { it in WaterFields.UNITS }
+            )
+        )
+    )
 
     fun specFor(typeCode: String, extra: Map<String, DetailSpec> = emptyMap()): DetailSpec? =
         extra[typeCode] ?: builtIn[typeCode]
 }
 
-/** 解码选项：生产默认空集，任何通用详情都会被明确拒绝，避免恢复时静默丢数据。 */
+/** 当前版本真正能落库的通用详情类型；未列入的类型在解码时明确拒绝，绝不静默丢弃。 */
+val SUPPORTED_DETAIL_TYPES: Set<String> = DetailSpecRegistry.builtIn.keys
+
+/** 解码选项：生产默认放行 [SUPPORTED_DETAIL_TYPES]，单测可注入自定义规格。 */
 data class BackupDecodeOptions(
-    val supportedDetailTypes: Set<String> = emptySet(),
+    val supportedDetailTypes: Set<String> = SUPPORTED_DETAIL_TYPES,
     val detailSpecs: Map<String, DetailSpec> = emptyMap()
 ) {
     companion object {

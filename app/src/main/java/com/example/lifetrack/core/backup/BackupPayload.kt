@@ -1,12 +1,12 @@
 package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
 
-/** 一份完整快照：类型表 + 全部记录（含详情）。恢复时整体替换。 */
+/** 一份完整快照：类型表 + 全部记录（含各类型可选详情）。恢复时整体替换。 */
 data class BackupPayload(
     val types: List<TrackTypeEntity>,
-    val events: List<PoopRecordRelation>
+    val events: List<BackupRecord>
 )
 
 /** 解析失败的原因。对外文案由 UI 层映射，这里只保留可判定的枚举。 */
@@ -25,7 +25,11 @@ enum class BackupError {
     INVALID_TIMESTAMP,
     INVALID_BRISTOL,
     INVALID_AMOUNT,
-    INVALID_EFFORT
+    INVALID_EFFORT,
+    UNSUPPORTED_DETAIL_TYPE,
+    DETAIL_TYPE_MISMATCH,
+    INVALID_DETAIL_FIELD,
+    DETAIL_NOT_ALLOWED
 }
 
 sealed interface BackupDecodeResult {

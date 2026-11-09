@@ -144,4 +144,43 @@ v2 事件 DTO 保留 `poop: BackupPoopDto?`（排便详情继续走强类型校�
 
 ## 8. 实施记录
 
-待本轮验收后填写。
+**状态**：A3 / A4 / A5 全部完成并验收，Room 仍是 version 1。
+
+### 落地内容
+
+| 项 | 实际落地 |
+| --- | --- |
+| A3 | 新增 `feature/record/RecordEditorDialog.kt`（通用事件壳 + `RecordEditorValue` + 日期/时间选择器）与 `RecordChoiceFields.kt`（`ChoiceRow` / `TriStateRow` 公共化）；`PoopEditorDialog.kt` 从 303 行缩到 96 行，只保留六个详情字段并组装 `PoopRecordDraft`，对外签名不变 |
+| A4 | 新增 `core/model/RecordDetail.kt`（`RecordDetail.Poop` / `RecordDetail.Generic` / `BackupRecord` 及与 `PoopDetailEntity` 的双向转换）；`BackupPayload.events` 改为 `List<BackupRecord>`；`RoomTrackRepository` 读写快照做转换，恢复事务顺序不变 |
+| A5 | `BackupCodec` 升 v2：`SCHEMA_VERSION = 2`、`SUPPORTED_VERSIONS = {1,2}`、`BackupEventDto.detail` 通用通道、`parseDetail()` 按类型分派；新增 `DetailSpec.kt`（规格表、结构级限制、`BackupDecodeOptions`）；`BackupError` 增 4 项并在设置页补中文文案 |
+| 单测 | 新增 `BackupCodecV2Test` 13 项、`DetailSpecTest` 5 项；`BackupCodecTest` 适配 `BackupRecord` 并把「未知版本」断言从 2 改为 99。全项目 **71 项全绿**（53 → 71） |
+| 文档 | README（已实现 / 数据模型 / 测试数 / 验收建议 / 相关文档）、`PROGRESS.md`（A3–A5 标 ✅、归档、B1 依赖改为 A6、R2 缓解、R3 澄清）、profile §9、工作日志 |
+
+### 相对设计的三处修正
+
+1. **Q5 收紧**：确认单写「v1 忽略 `detail` 字段」，实现改为**拒绝**（`DETAIL_NOT_ALLOWED`）。理由与 Q4 一致——旧格式被塞进无法落库的详情时，忽略等于静默丢弃，拒绝才可定位。验收标准 5 已按拒绝写，单测 `rejects a v1 file carrying a v2 detail channel` 覆盖。
+2. **`MainViewModel` 实际未改**：`decode` 用默认 `BackupDecodeOptions.Default` 即可，`buildBackupJson` 的 `payload.events` 类型随 `BackupPayload` 自动适配。原文件清单里列了它，实施时按最小 diff 移除。
+3. **README 清单顺手校准**：上一批 A1 完成后，「用户可启用/排序记录项目的模块管理页」仍留在「当前尚未实现」清单里，本轮删除该行（属 B9 文档欠账的一小部分，不新开任务）。
+
+### 验收结果
+
+- `./gradlew :app:testDebugUnitTest :app:assembleDebug` 通过，71 项单测零失败，原有 53 项用例无删减。
+- `AppDatabase` 仍 `version = 1`，`app/schemas/` 只有 `1.json`，无 Migration、无新依赖、导航与 DAO 查询零改动。
+- 模拟器 `emulator-5556` 实测：
+  - 编辑器：新增记录（选中 Bristol 4 型 + 少量）→ 保存后今日次数 3、列表摘要正确 → 重新打开编辑，标题「编辑排便记录」、时间 08:32、两个字段高亮回填 → 200% 字体下日期/时间上下堆叠、文字无截断。
+  - 备份导出：SAF 导出 JSON，`schemaVersion: 2`、`eventCount: 4`、`poop` 详情结构原样、新增 `detail: null`，设置页提示「已导出 4 条记录」。
+  - 四种恢复场景：v1 旧备份（手工降级版本并删 `detail`）→ **成功**「已恢复 4 条记录」；v2 原文件 → **成功**；v2 带 `Generic` 详情 → **拒绝**，提示「备份包含当前版本尚不支持的记录类型详情…为避免丢失数据，已拒绝导入。（记录 water-test-1）」；v2 但 Bristol=8 → **拒绝**，提示「布里斯托类型超出 1–7」并带记录 ID。恢复后首页 3 条今日记录与详情完整。
+- 测试文件已从模拟器 Downloads 与本地 `build/` 清理；字号、分辨率、深色模式均还原，无遗留后台任务。
+
+### 过程中踩到的两个坑
+
+1. 首轮 5 项 v2 单测报 `NOT_JSON`：测试里把 `detail` 当**位置参数**传给了 `waterEvent` 的第一个形参 `typeCode`，拼出非法 JSON。实现没错，改成命名参数 `waterEvent(detail = detail)` 后全绿。
+2. 截图目测坐标仍会偏（缩放图按 540×1200 显示，实际 1080×2400），且 SAF 打开时 Activity 可能重建使 NavHost 回到首页。统一改用 `uiautomator dump` 读节点 bounds 再点击；文件选择器的条目顺序每次会变，每次都重新 dump。
+
+### 遗留 / 下一包开工前须知
+
+- `DetailSpecRegistry.builtIn` 目前为空；`supportedDetailTypes` 生产默认空集。**A6 落库饮水详情后，必须同时注册 `water` 规格并把 `water` 加入生产支持集合**，否则 v2 里的饮水详情仍会被拒绝。
+- A6 新增详情表时会升 Room v2，届时才具备 B1 真实 Migration 测试的条件；C3 的加密迁移顺延到 v3。
+- 旧版 App（v0.1.0）无法读取 v2 备份，是单向兼容；若需要降级回退，需手工把 `schemaVersion` 改回 1 并删除 `detail` 字段（结构与 v1 一致）。
+- 真机、`connectedDebugAndroidTest` 仍未跑；200% 字体下 `PoopRecordItem` 的「布里斯托 4 型」换行属既有现象，归入 B4。
+

@@ -3,7 +3,8 @@ package com.example.lifetrack.core.backup
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.RecordDetail
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -20,11 +21,15 @@ import kotlin.math.abs
  * - 缺字段一律给默认值，让「校验」而不是「反序列化」来报错，错误信息才可定位。
  * - localDate 与 (instant, zoneId) 的一致性允许 ±1 天误差：时区数据库更新可能改变历史偏移，
  *   完全相等会把合法但年代久远的记录判死。
+ * - v1 / v2 共用一个 DTO：v1 的 `poop` 字段在 v2 里原样保留，只新增通用 `detail` 通道，
+ *   因此旧备份无需第二套解析器；校验按版本号收紧，避免旧格式被塞入无法落库的数据。
  */
 object BackupCodec {
 
     const val APP_ID = "LifeTrack"
-    const val SCHEMA_VERSION = 1
+    const val LEGACY_SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
+    val SUPPORTED_VERSIONS = setOf(LEGACY_SCHEMA_VERSION, SCHEMA_VERSION)
     const val MAX_EVENTS = 100_000
 
     private const val BASE_TYPE = "poop"
@@ -40,7 +45,7 @@ object BackupCodec {
 
     fun encode(
         types: List<TrackTypeEntity>,
-        events: List<PoopRecordRelation>,
+        events: List<BackupRecord>,
         now: Instant = Instant.now()
     ): String {
         val file = BackupFileDto(
@@ -54,12 +59,16 @@ object BackupCodec {
         return json.encodeToString(BackupFileDto.serializer(), file)
     }
 
-    fun decode(text: String, now: Instant = Instant.now()): BackupDecodeResult {
+    fun decode(
+        text: String,
+        now: Instant = Instant.now(),
+        options: BackupDecodeOptions = BackupDecodeOptions.Default
+    ): BackupDecodeResult {
         val file = runCatching { json.decodeFromString(BackupFileDto.serializer(), text) }.getOrNull()
             ?: return BackupDecodeResult.Invalid(BackupError.NOT_JSON)
 
         if (file.app != APP_ID) return BackupDecodeResult.Invalid(BackupError.NOT_LIFETRACK_FILE)
-        if (file.schemaVersion != SCHEMA_VERSION) {
+        if (file.schemaVersion !in SUPPORTED_VERSIONS) {
             return BackupDecodeResult.Invalid(BackupError.UNSUPPORTED_VERSION, "v${file.schemaVersion}")
         }
         if (file.events.size > MAX_EVENTS) {
@@ -82,7 +91,7 @@ object BackupCodec {
 
         val knownTypes = types.mapTo(HashSet()) { it.code }
         val seenIds = HashSet<String>(file.events.size)
-        val events = ArrayList<PoopRecordRelation>(file.events.size)
+        val events = ArrayList<BackupRecord>(file.events.size)
         val maxTimestamp = now.plusSeconds(MAX_FUTURE_SKEW_DAYS * 24 * 3600).toEpochMilli()
 
         for ((index, dto) in file.events.withIndex()) {
@@ -105,12 +114,12 @@ object BackupCodec {
                 return BackupDecodeResult.Invalid(BackupError.LOCAL_DATE_MISMATCH, label)
             }
 
-            val detail = if (dto.typeCode == BASE_TYPE) dto.poop?.toEntity(dto.id) else null
+            val detail = parseDetail(dto, file.schemaVersion, options)
             if (detail is DetailParse.Failed) {
                 return BackupDecodeResult.Invalid(detail.error, label)
             }
 
-            events += PoopRecordRelation(
+            events += BackupRecord(
                 event = TrackEventEntity(
                     id = dto.id,
                     typeCode = dto.typeCode,
@@ -123,15 +132,58 @@ object BackupCodec {
                     updatedAtEpochMillis = dto.updatedAtEpochMillis.takeIf { it > 0 }
                         ?: dto.occurredAtEpochMillis
                 ),
-                detail = (detail as? DetailParse.Parsed)?.entity
+                detail = (detail as? DetailParse.Parsed)?.value
             )
         }
 
         return BackupDecodeResult.Success(BackupPayload(types = types, events = events))
     }
 
+    /**
+     * 详情按类型分派：排便走强类型 `poop` 字段，其余走通用 `detail`。
+     * 生产默认不声明任何受支持的通用类型，遇到即拒绝，避免恢复事务静默丢弃数据。
+     */
+    private fun parseDetail(
+        dto: BackupEventDto,
+        version: Int,
+        options: BackupDecodeOptions
+    ): DetailParse {
+        if (version == LEGACY_SCHEMA_VERSION && dto.detail != null) {
+            return DetailParse.Failed(BackupError.DETAIL_NOT_ALLOWED)
+        }
+        if (dto.typeCode != BASE_TYPE && dto.poop != null) {
+            return DetailParse.Failed(BackupError.DETAIL_NOT_ALLOWED)
+        }
+
+        val poopDetail = if (dto.typeCode == BASE_TYPE) dto.poop?.toEntity(dto.id) else null
+        if (poopDetail is DetailParse.Failed) return poopDetail
+        val poop = (poopDetail as? DetailParse.Parsed)?.value as? RecordDetail.Poop
+
+        val genericDto = dto.detail
+        if (genericDto == null) return DetailParse.Parsed(poop)
+        if (dto.typeCode == BASE_TYPE) return DetailParse.Failed(BackupError.DETAIL_NOT_ALLOWED)
+        if (genericDto.typeCode != dto.typeCode) {
+            return DetailParse.Failed(BackupError.DETAIL_TYPE_MISMATCH)
+        }
+        if (genericDto.typeCode !in options.supportedDetailTypes) {
+            return DetailParse.Failed(BackupError.UNSUPPORTED_DETAIL_TYPE)
+        }
+        if (!DetailLimits.isStructuralValid(genericDto.fields)) {
+            return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
+        }
+        val spec = DetailSpecRegistry.specFor(genericDto.typeCode, options.detailSpecs)
+        if (spec != null) {
+            if (genericDto.fields.keys.any { it !in spec.allowedFields } ||
+                genericDto.fields.any { (key, value) -> spec.validators[key]?.invoke(value) == false }
+            ) {
+                return DetailParse.Failed(BackupError.INVALID_DETAIL_FIELD)
+            }
+        }
+        return DetailParse.Parsed(RecordDetail.Generic(genericDto.typeCode, genericDto.fields))
+    }
+
     private sealed interface DetailParse {
-        data class Parsed(val entity: PoopDetailEntity) : DetailParse
+        data class Parsed(val value: RecordDetail?) : DetailParse
         data class Failed(val error: BackupError) : DetailParse
     }
 
@@ -140,8 +192,7 @@ object BackupCodec {
         amountCode?.let { if (it !in 1..3) return DetailParse.Failed(BackupError.INVALID_AMOUNT) }
         effortCode?.let { if (it !in 1..3) return DetailParse.Failed(BackupError.INVALID_EFFORT) }
         return DetailParse.Parsed(
-            PoopDetailEntity(
-                eventId = eventId,
+            RecordDetail.Poop(
                 bristolType = bristolType,
                 amountCode = amountCode,
                 effortCode = effortCode,
@@ -174,7 +225,7 @@ object BackupCodec {
         schemaVersion = schemaVersion
     )
 
-    private fun PoopRecordRelation.toDto() = BackupEventDto(
+    private fun BackupRecord.toDto() = BackupEventDto(
         id = event.id,
         typeCode = event.typeCode,
         occurredAtEpochMillis = event.occurredAtEpochMillis,
@@ -183,7 +234,7 @@ object BackupCodec {
         note = event.note,
         createdAtEpochMillis = event.createdAtEpochMillis,
         updatedAtEpochMillis = event.updatedAtEpochMillis,
-        poop = detail?.let {
+        poop = (detail as? RecordDetail.Poop)?.let {
             BackupPoopDto(
                 bristolType = it.bristolType,
                 amountCode = it.amountCode,
@@ -192,6 +243,9 @@ object BackupCodec {
                 abdominalDiscomfort = it.abdominalDiscomfort,
                 incompleteEvacuation = it.incompleteEvacuation
             )
+        },
+        detail = (detail as? RecordDetail.Generic)?.let {
+            BackupDetailDto(typeCode = it.typeCode, fields = it.fields)
         }
     )
 }
@@ -228,7 +282,10 @@ internal data class BackupEventDto(
     val note: String = "",
     val createdAtEpochMillis: Long = 0,
     val updatedAtEpochMillis: Long = 0,
-    val poop: BackupPoopDto? = null
+    /** 排便详情，v1 起就存在，v2 原样保留。 */
+    val poop: BackupPoopDto? = null,
+    /** v2 新增：其余类型的通用详情，值统一字符串，由规格表校验。 */
+    val detail: BackupDetailDto? = null
 )
 
 @Serializable
@@ -239,4 +296,10 @@ internal data class BackupPoopDto(
     val urgency: Boolean? = null,
     val abdominalDiscomfort: Boolean? = null,
     val incompleteEvacuation: Boolean? = null
+)
+
+@Serializable
+internal data class BackupDetailDto(
+    val typeCode: String = "",
+    val fields: Map<String, String> = emptyMap()
 )

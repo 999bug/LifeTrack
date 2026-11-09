@@ -12,6 +12,10 @@ import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.core.model.RecordTimeMapper
+import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.toEntity
+import com.example.lifetrack.core.model.toRecordDetail
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
 import kotlinx.coroutines.flow.Flow
@@ -109,10 +113,23 @@ class RoomTrackRepository(
 
     override suspend fun readBackup(): BackupPayload = BackupPayload(
         types = database.trackTypeDao().getAll(),
-        events = dao.getAllPoopEvents()
+        events = dao.getAllPoopEvents().map { relation ->
+            BackupRecord(
+                event = relation.event,
+                detail = relation.detail?.toRecordDetail()
+            )
+        }
     )
 
     override suspend fun restoreBackup(payload: BackupPayload) {
+        // 通用详情在持久化落地前已被 BackupCodec 拒绝；这里再挡一层，绝不静默丢弃。
+        val poopDetails = payload.events.map { record ->
+            when (val detail = record.detail) {
+                null -> null
+                is RecordDetail.Poop -> detail.toEntity(record.event.id)
+                is RecordDetail.Generic -> error("暂不支持的详情类型：${detail.typeCode}")
+            }
+        }
         database.withTransaction {
             // 先删事件（详情随外键级联），再重建类型，顺序反了会触发外键约束
             dao.deleteAllEvents()
@@ -123,7 +140,7 @@ class RoomTrackRepository(
             }
             database.trackTypeDao().insertAll(types)
             dao.insertEvents(payload.events.map { it.event })
-            dao.putPoopDetails(payload.events.mapNotNull { it.detail })
+            dao.putPoopDetails(poopDetails.filterNotNull())
         }
     }
 

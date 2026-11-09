@@ -19,10 +19,10 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - Android 原生工程：Kotlin + Jetpack Compose + Material 3。
 - 四个底部入口：今天、记录、统计、设置。
 - 快速打卡：点击后立即记录当前时刻。
-- 详细记录：原生日期与时间选择器、布里斯托 1–7 型、排便量、费力程度、便意急迫感、腹部不适、排不净感和备注；详情字段均可空。
+- 详细记录：原生日期与时间选择器、布里斯托 1–7 型、排便量、费力程度、便意急迫感、腹部不适、排不净感和备注；详情字段均可空。编辑器已抽出通用「事件壳」（日期 / 时间 / 时区 / 备注 / 选择器），各记录类型只需提供详情插槽。
 - 历史：默认最近 30 天，可向前分页加载更早记录；支持按日期范围筛选并一键清除，按记录发生时保存的本地日期分组，支持编辑和删除；另有月历视图，可按月回看、点按某天只看当天记录。
 - 统计：周 / 月 / 年三档切换，可上下翻页查看历史周期；包含总次数与环比、日均（年视图为月均）、单日最高、最长连续、常见 2 小时时段，图表为自绘 Canvas。新增时段分布（24 根逐小时柱，高亮常见 2 小时窗口）与形态分布（布里斯托、排便量、费力程度、身体感受），跟随当前周期统计；详情字段可空，按各字段「已填写条数」分别计分母，未填写不计入也不画 0 型柱。
-- 备份与恢复：设置页可把全部记录导出为单个 JSON 文件，或从备份恢复；导出/导入走系统文件选择器（SAF），恢复前校验应用标识、schemaVersion、条数、ID 唯一性、时区、本地日期与字段范围，替换在单个数据库事务内完成。
+- 备份与恢复：设置页可把全部记录导出为单个 JSON 文件，或从备份恢复；导出/导入走系统文件选择器（SAF），恢复前校验应用标识、schemaVersion、条数、ID 唯一性、时区、本地日期与字段范围，替换在单个数据库事务内完成。当前导出格式为 **v2**，仍可读取 v1 旧备份；v2 增加通用详情通道，遇到本版本尚未落库的详情类型会明确拒绝导入，不会静默丢数据。
 - 记录项目：设置页列出已注册类型，可启用/停用并调整顺序；启用状态持久化，停用只隐藏新增记录入口，已有历史记录仍可查；全部停用时首页给出提示与设置入口。
 - Room 数据持久化、DataStore 深色模式设置。
 - UTC 时间戳 + IANA zoneId + 发生时 localDate；本地日期映射有单元测试。
@@ -122,7 +122,7 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 53 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`DetailDistributionTest` 6、`ModuleOrderingTest` 5。
+- `./gradlew :app:testDebugUnitTest` 通过，共 71 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`DetailSpecTest` 5、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`DetailDistributionTest` 6、`ModuleOrderingTest` 5。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。
 
@@ -133,6 +133,8 @@ Windows 使用 `gradlew.bat`。
 - `poop_detail`：排便专属详情，以 eventId 一对一关联通用事件；布里斯托类型、排便量、费力程度和身体感受不进入通用表。
 
 每天多次记录就是多条 `track_event`。当天次数通过 COUNT 查询得出，不冗余维护每日计数。
+
+Room schema 仍是 **version 1**（`app/schemas/1.json`），本轮没有新增表或 Migration。备份快照使用独立的 `BackupRecord = 事件 + 可选 RecordDetail` 模型，与 Room 的 `@Relation` 解耦，为后续记录类型预留扩展点。
 
 ### 时区规则
 
@@ -165,7 +167,6 @@ Windows 使用 `gradlew.bat`。
 - 加密备份与恢复（当前导出为明文 JSON，尚无密钥管理）。
 - 应用锁（BiometricPrompt / 系统凭据）。
 - 数据库加密。
-- 用户可启用/排序记录项目的模块管理页。
 - 咖啡、茶、饮水、运动、月经和亲密关系模块。
 - Room schema 已导出到 `app/schemas/`，尚未编写正式 Migration 测试。
 - 无障碍、字体缩放、横屏、深色主题和多尺寸设备完整回归。
@@ -179,6 +180,7 @@ Windows 使用 `gradlew.bat`。
 - 分别在东京与洛杉矶时区测试同一 UTC instant 的 `localDate`。
 - 修改备注、形态和详情后，退出并重进应用检查持久化。
 - 导出备份后新增一条记录，再从该备份恢复，确认记录数与详情回到导出时的状态；用其他 App 的 JSON 或手工改坏的备份恢复，应被拒绝并给出原因。
+- 把导出文件里的 `schemaVersion` 改成 `1` 并删掉 `detail` 字段当作旧备份恢复，应成功且详情保真；在 v2 文件里塞入当前版本不支持的 `detail`，应被明确拒绝并提示升级，而不是「恢复成功」。
 - 删除记录后，今日次数、历史列表和统计页都应更新。
 - 切到月历视图翻到上个月再翻回，格子次数应与统计页对应月份一致；点按有记录的日期，列表应只剩当天记录清除筛选后恢复最近 30 天。
 - 只有快速打卡（无详情）的周期，形态分布应显示「已填写 0 / 共 N 条」而不是画出 0 型柱；有详情的周期，Bristol 各柱之和应等于卡面标注的已填写数且不超过总次数。
@@ -191,6 +193,8 @@ Windows 使用 `gradlew.bat`。
 - [本地验证与在线升级方案](docs/local-verification-and-upgrade.md)：改完代码怎么在模拟器上验证、装到手机后怎么升级。
 - [发布与签名指南](docs/release-guide.md)：签名密钥准备、Release 出包步骤、下载校验与回滚。
 - [统计增强包设计前确认单](docs/statistics-enhancement-confirmation.md)：月历视图、形态分布与时段分布的口径、影响面与实施记录。
+- [模块扩展第二批设计前确认单](docs/module-extension-confirmation.md)：通用编辑器壳、通用详情模型、备份 v2 兼容口径与实施记录。
+- [剩余工作子任务台账](docs/PROGRESS.md)：A/B/C 三包共 33 项子任务的交付物、依赖与状态。
 
 ## 许可证
 

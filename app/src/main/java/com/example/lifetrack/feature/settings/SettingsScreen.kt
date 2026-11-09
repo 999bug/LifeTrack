@@ -251,4 +251,8 @@ private fun BackupError.message(): String = when (this) {
     BackupError.INVALID_BRISTOL -> "布里斯托类型超出 1–7。"
     BackupError.INVALID_AMOUNT -> "排便量取值超出范围。"
     BackupError.INVALID_EFFORT -> "费力程度取值超出范围。"
+    BackupError.UNSUPPORTED_DETAIL_TYPE -> "备份包含当前版本尚不支持的记录类型详情，请升级应用后再恢复。为避免丢失数据，已拒绝导入。"
+    BackupError.DETAIL_TYPE_MISMATCH -> "记录的详情类型与事件类型不一致。"
+    BackupError.INVALID_DETAIL_FIELD -> "记录的详情字段不合法或取值超出范围。"
+    BackupError.DETAIL_NOT_ALLOWED -> "备份中的详情字段与记录类型或备份版本不匹配。"
 }

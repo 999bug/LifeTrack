@@ -1,9 +1,9 @@
 package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.RecordDetail
 import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.time.ZoneId
@@ -31,8 +31,7 @@ class BackupCodecTest {
         val events = listOf(
             record(
                 id = "e1",
-                detail = PoopDetailEntity(
-                    eventId = "e1",
+                detail = RecordDetail.Poop(
                     bristolType = 4,
                     amountCode = 2,
                     effortCode = 1,
@@ -53,13 +52,14 @@ class BackupCodecTest {
         assertEquals(2, payload.events.size)
 
         val first = payload.events.first()
+        val poop = first.detail as RecordDetail.Poop
         assertEquals("e1", first.event.id)
         assertEquals(occurredMillis, first.event.occurredAtEpochMillis)
         assertEquals(occurredDate, first.event.localDate)
         assertEquals("Asia/Tokyo", first.event.zoneId)
-        assertEquals(4, first.detail?.bristolType)
-        assertEquals(true, first.detail?.urgency)
-        assertNull(first.detail?.incompleteEvacuation)
+        assertEquals(4, poop.bristolType)
+        assertEquals(true, poop.urgency)
+        assertNull(poop.incompleteEvacuation)
 
         assertNull(payload.events[1].detail)
     }
@@ -78,7 +78,7 @@ class BackupCodecTest {
 
     @Test
     fun `rejects an unknown schema version`() {
-        val result = BackupCodec.decode(backupJson(schemaVersion = 2), fixedNow)
+        val result = BackupCodec.decode(backupJson(schemaVersion = 99), fixedNow)
         assertEquals(BackupError.UNSUPPORTED_VERSION, (result as BackupDecodeResult.Invalid).error)
     }
 
@@ -154,7 +154,7 @@ class BackupCodecTest {
 
     private fun backupJson(
         app: String = "LifeTrack",
-        schemaVersion: Int = 1,
+        schemaVersion: Int = BackupCodec.SCHEMA_VERSION,
         eventCount: Int = 1,
         typesJson: String = defaultTypesJson,
         eventsJson: String = "[${event("e1")}]"
@@ -183,7 +183,7 @@ class BackupCodecTest {
             """"createdAtEpochMillis":$millis,"updatedAtEpochMillis":$millis,"poop":$poop}"""
     }
 
-    private fun record(id: String, detail: PoopDetailEntity?): PoopRecordRelation = PoopRecordRelation(
+    private fun record(id: String, detail: RecordDetail.Poop?): BackupRecord = BackupRecord(
         event = TrackEventEntity(
             id = id,
             typeCode = "poop",

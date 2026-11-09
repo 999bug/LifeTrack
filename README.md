@@ -2,7 +2,7 @@
 
 > 版本：0.1.0 · 文档核对日期：2026-11-09 · 许可证：MIT
 
-「生活记」是一个 Local First 的个人生活与身体状态记录 App。MVP 只实现排便事件，但数据层按通用事件 + 业务详情表组织，为后续咖啡、饮茶、饮水、月经、运动和亲密关系模块预留扩展点。
+「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便与饮水两类事件：排便走专用 `poop_detail` 表，饮水走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续咖啡 / 茶、运动、月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
 
 ## 下载安装
 
@@ -12,7 +12,7 @@ Release 页面：https://github.com/999bug/LifeTrack/releases
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
 - 当前版本 `0.1.0`（versionCode 1）。校验示例：`Get-FileHash .\LifeTrack-0.1.0-release.apk -Algorithm SHA256`。
 
-Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"` 且尚未实现导出/恢复，**升级时不要卸载旧版本**——卸载会永久丢失记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
+Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"`，应用内提供 JSON 备份导出 / 恢复（设置页「备份与恢复」）；**升级时不要卸载旧版本**——卸载会永久丢失本地记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
 
 ## 当前已实现
 
@@ -123,7 +123,7 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 83 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`DetailSpecTest` 6、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5。
+- `./gradlew :app:testDebugUnitTest` 通过，共 90 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`DetailSpecTest` 6、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。
 
@@ -169,7 +169,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - 加密备份与恢复（当前导出为明文 JSON，尚无密钥管理）。
 - 应用锁（BiometricPrompt / 系统凭据）。
 - 数据库加密。
-- 咖啡、茶、饮水、运动、月经和亲密关系模块。
+- 咖啡 / 茶、运动、月经和亲密关系模块（饮水已作为通用详情试点上线；月经与亲密关系模块依赖数据库加密，后置到安全加固包之后）。
 - Room schema 已导出到 `app/schemas/`，尚未编写正式 Migration 测试。
 - 无障碍、字体缩放、横屏、深色主题和多尺寸设备完整回归。
 

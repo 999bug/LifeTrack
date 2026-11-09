@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
+import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import kotlinx.coroutines.flow.Flow
 
@@ -54,4 +55,14 @@ interface TrackEventDao {
             "GROUP BY localDate ORDER BY localDate ASC"
     )
     fun observeDailyCounts(startDate: String, endDate: String): Flow<List<DailyCountProjection>>
+
+    /** 统计时段分布只需要时刻与时区，不查 detail。 */
+    @Query(
+        "SELECT occurredAtEpochMillis AS occurredAtEpochMillis, zoneId AS zoneId FROM track_event " +
+            "WHERE typeCode = 'poop' AND localDate BETWEEN :startDate AND :endDate"
+    )
+    fun observeEventTimestamps(
+        startDate: String,
+        endDate: String
+    ): Flow<List<EventTimestamp>>
 }

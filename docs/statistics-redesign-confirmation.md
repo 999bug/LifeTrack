@@ -171,3 +171,28 @@
 - [ ] **Q7** Bristol 分布：v1.1（推荐） / v1
 - [ ] **Q8** 浅色模式：同构降饱和（推荐） / 暂不适配
 - [ ] **Q9** 新增依赖：不新增（推荐） / 可引入图表库
+
+---
+
+## 11. 实施记录（2026-11-09）
+
+按第 10 节推荐值落地，未新增依赖、未改 Room schema（只有新增查询，无迁移）。
+
+落地内容：
+
+| 文件 | 作用 |
+| --- | --- |
+| `core/model/StatsWindow.kt` | `StatsPeriod` / `StatsWindow` / `statsWindow()`。自然周（周一起）、自然月、自然年；offset 为绝对偏移，来回翻页不漂移 |
+| `core/database/model/EventTimestamp.kt`、`TrackEventDao.observeEventTimestamps()` | 时段统计只查「时刻 + 时区」，不加载 detail |
+| `feature/statistics/StatsAggregator.kt` | 纯函数聚合：总数、环比、日均、峰值、最长连续、常见 2 小时时段、柱状图数据 |
+| `feature/home/MainViewModel.kt` | 一次查询覆盖「最远上一周期 → 最远本周期」，三个周期共用；`shiftStatistics()` 翻页，不允许翻到未来 |
+| `feature/statistics/StatisticsScreen.kt` | 暗夜仪表盘重写：周期胶囊 + Pager 滑动、Hero 数字滚动、Canvas 柱图逐根 reveal、2×2 指标、洞察卡、空状态 |
+
+实施中相对原设计的修正：
+
+1. **年视图主指标改「月均」**：2 条记录 / 365 天显示「0.0 次」没有意义，改为按 12 个月平均。
+2. **上期为 0 时不显示「较上期」**：否则「↑ 2 较上期」和洞察卡「本期首次留下记录」自相矛盾。
+3. **跨年周标签改短格式** `2025/12/29 — 2026/1/4`：原全角格式会撑破顶部胶囊。
+4. **字体放大 200% 的适配**：标题与胶囊改上下两行；常见时段退化为 `03–05`；图表轴标签行高按实际字号计算，避免裁切。
+
+验收：`testDebugUnitTest` 全部通过；`assembleDebug` 通过；模拟器实测深/浅色、周/月/年、上下周期翻页、左右滑动切换、200% 字体。

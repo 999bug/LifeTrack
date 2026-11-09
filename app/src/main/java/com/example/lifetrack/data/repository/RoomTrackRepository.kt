@@ -6,6 +6,7 @@ import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
+import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.RecordTimeMapper
 import com.example.lifetrack.domain.model.PoopRecordDraft
@@ -30,6 +31,11 @@ class RoomTrackRepository(
         startDate: String,
         endDate: String
     ): Flow<List<DailyCountProjection>> = dao.observeDailyCounts(startDate, endDate)
+
+    override fun observeEventTimestamps(
+        startDate: String,
+        endDate: String
+    ): Flow<List<EventTimestamp>> = dao.observeEventTimestamps(startDate, endDate)
 
     override suspend fun addPoopRecord(draft: PoopRecordDraft): String {
         val id = UUID.randomUUID().toString()

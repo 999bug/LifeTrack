@@ -1,6 +1,6 @@
 # 发布与签名指南
 
-> 适用版本 0.2.0 · 分发渠道：GitHub Releases · 流水线：`.github/workflows/release.yml`
+> 适用版本 0.3.0 · 分发渠道：GitHub Releases · 流水线：`.github/workflows/release.yml`
 
 这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases，以及为什么签名密钥一旦丢失就无法挽回。
 
@@ -9,7 +9,7 @@
 ## 0. 为什么必须固定签名
 
 - Release 包必须用同一个 keystore 签名。签名不一致时，Android 拒绝覆盖安装。
-- 本项目 `android:allowBackup="false"`，且 MVP 尚未实现导出/恢复（见 README「本地存储、自动备份和主动导出边界」）。因此「卸载旧版 → 装新版」等于**永久丢失全部记录**。
+- 本项目 `android:allowBackup="false"`，但应用内已提供 JSON 导出 / 恢复（设置页「备份与恢复」）。没主动导出过备份就升级失败/装错包时，「卸载旧版 → 装新版」仍等于**永久丢失全部记录**。
 - 结论：keystore 文件、keystore 口令、key 口令从第一个 Release 起就要备份到离机的安全位置，不能只留在开发机上。
 
 `app/build.gradle.kts` 的 release 签名配置是条件式的：仅当 `LIFETRACK_KEYSTORE` 等 4 个环境变量存在时启用，本地没有密钥照样能 `assembleDebug` / 出 unsigned 包。流水线会强制验签，unsigned 包和 debug 证书包都不会被发布。
@@ -145,7 +145,7 @@ Release 页面：https://github.com/999bug/LifeTrack/releases
 Windows 校验：
 
 ```powershell
-Get-FileHash .\LifeTrack-0.2.0-release.apk -Algorithm SHA256
+Get-FileHash .\LifeTrack-0.3.0-release.apk -Algorithm SHA256
 ```
 
 把输出与 `.sha256` 文件内容比对。`sha256` 只证明下载完整，安装包身份由系统在校验 APK 签名时保证。

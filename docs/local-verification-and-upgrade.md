@@ -1,6 +1,6 @@
 # 本地验证与在线升级方案
 
-> 适用版本 0.2.0 · 核对日期 2026-11-06 · 仓库 https://github.com/999bug/LifeTrack
+> 适用版本 0.3.0 · 核对日期 2026-11-09 · 仓库 https://github.com/999bug/LifeTrack
 
 这份文档解决两件事：
 
@@ -182,10 +182,10 @@ adb exec-out screencap -p > shot.png
 
 ```json
 {
-  "versionCode": 2,
-  "versionName": "0.2.0",
+  "versionCode": 3,
+  "versionName": "0.3.0",
   "minSupportedVersionCode": 1,
-  "apkUrl": "https://example.com/LifeTrack-0.2.0-release.apk",
+  "apkUrl": "https://example.com/LifeTrack-0.3.0-release.apk",
   "sha256": "3f6a...（64 位十六进制）",
   "sizeBytes": 14217690,
   "changelog": "修复跨午夜记录日期错误",
@@ -259,8 +259,8 @@ installer.openSession(sessionId).use { session ->
 
 ### 5. 发布前检查清单
 
-- [ ] `versionCode` 与 `versionName` 都已更新（当前 `2` / `0.2.0`）
-- [ ] release 包用**正式 keystore** 签名（现在 debug/release 都还没配签名，产物装不上也发不了）
+- [ ] `versionCode` 与 `versionName` 都已更新（当前 `3` / `0.3.0`）
+- [ ] release 包用**正式 keystore** 签名（CI 从 Repository secrets 注入，缺失即失败，不会产出 unsigned 包）
 - [ ] Room schema 已导出并入库，`Migration` 有对应测试
 - [ ] 真机做一次"旧版 → 新版"覆盖安装，确认数据完整
 - [ ] 清单 JSON 带 `sha256` 与 `minSupportedVersionCode`
@@ -272,7 +272,7 @@ installer.openSession(sessionId).use { session ->
 ## 附：一页速查
 
 ```bash
-./gradlew :app:assembleDebug          # 编译，产物 LifeTrack-0.2.0-debug.apk
+./gradlew :app:assembleDebug          # 编译，产物 LifeTrack-0.3.0-debug.apk
 ./gradlew :app:testDebugUnitTest      # 单元测试
 ./gradlew :app:installDebug           # 装到设备
 adb shell am start -n com.example.lifetrack/.MainActivity

@@ -35,7 +35,7 @@ languages:                         # 只填实际用到的，版本写实际值
   java: 17                         # 仅 JVM target / compileOptions 版本
 framework: Android (Jetpack Compose + Material 3)   # Room 2.8.5 + KSP、DataStore、Navigation Compose
 package_manager: gradle
-build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-09，产物 app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk）
+build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-09，产物 app/build/outputs/apk/debug/LifeTrack-0.3.0-debug.apk）
 test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（2026-11-09，115 项）
 dev_command: ./gradlew :app:installDebug        # 已通过 adb install -r 实测（emulator-5554，API 37）
 ```
@@ -57,7 +57,7 @@ push_policy: on-request            # 只提交，push 等用户授权
 ```yaml
 deploy_target: GitHub Releases      # 通过 Release 分发签名 APK，无服务端
 release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
-version_scheme: 语义化 semver       # versionName 0.2.0 / versionCode 2，已发布 v0.1.0、v0.2.0
+version_scheme: 语义化 semver       # versionName 0.3.0 / versionCode 3，已发布 v0.1.0、v0.2.0
 registry: none
 pages: no
 ```

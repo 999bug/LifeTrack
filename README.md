@@ -1,6 +1,6 @@
 # 生活记（LifeTrack）Android 工程骨架
 
-> 版本：0.2.0 · 文档核对日期：2026-11-09 · 许可证：MIT
+> 版本：0.3.0 · 文档核对日期：2026-11-09 · 许可证：MIT
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水、咖啡 / 茶、运动四类事件：排便走专用 `poop_detail` 表，其余三类走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
 
@@ -10,7 +10,7 @@ Release 页面：https://github.com/999bug/LifeTrack/releases
 
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
-- 当前版本 `0.2.0`（versionCode 2）。校验示例：`Get-FileHash .\LifeTrack-0.2.0-release.apk -Algorithm SHA256`。
+- 当前版本 `0.3.0`（versionCode 3）。校验示例：`Get-FileHash .\LifeTrack-0.3.0-release.apk -Algorithm SHA256`。
 
 > 本 README 描述 main 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。
 

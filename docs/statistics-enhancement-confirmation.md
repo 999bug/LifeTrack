@@ -191,32 +191,18 @@
 - [ ] 模拟器实测：深/浅色各一张、200% 字体一张、360dp 窄屏与平板宽屏各一张
 - [ ] 读屏能听到月历格与分布卡的汇总描述
 
----
-
-## 8. 风险
-
-| 编号 | 风险                                     | 应对                                       |
-| -- | -------------------------------------- | ---------------------------------------- |
-| R1 | 月历的「月」与统计月视图的「月」翻页状态独立，用户可能以为联动        | 月历明确放在「记录」tab，卡内独立显示月份；不声称联动             |
-| R2 | 详情字段全可空，分母口径不统一会出现「分布合计 5 但总数 12」的观感矛盾 | 每张卡显式标注「已填写 N / 共 M 条」，并写「未填写不计入」        |
-| R3 | 滑动 2 小时窗口与固定桶混淆                        | 采用 §3 D3 推荐方案，柱图按逐小时、高亮按滑动窗口，单测锁死等式      |
-| R4 | 200% 字体 + 360dp 下月历 7 列挤压              | 降字号 + 固定行高 + `maxLines=1`，实测截图验收         |
-| R5 | 统计查询区间最长覆盖 2 年，新增 LEFT JOIN 可能拖慢切页     | 单条 Flow 复用既有区间；若实测卡顿再考虑索引（需单独批准改 schema） |
-| R6 | 统计页继续变长                                | 两张卡可折叠或置于指标网格之后；v1 先不折叠，实测滚动手感再定         |
-
----
 
 ## 9. 待确认清单（勾选后开工）
 
-- [ ] **Q1** 月历归属：历史页「列表 / 月历」切换（推荐） / 统计页新增卡 / 独立 tab
-- [ ] **Q2** 点击月历某天：筛选该日并切回列表（推荐） / 只高亮不筛选 / 弹当天摘要
-- [ ] **Q3** 翻月范围：可回看全部历史、禁止翻到未来（推荐） / 限最近 12 个月
-- [ ] **Q4** 分布字段：Bristol + 排便量 + 费力程度 + 三项身体感受（推荐） / 只做 Bristol
-- [ ] **Q5** 空值分母：每字段独立「已填写 N / 共 M 条」并显式标注（推荐） / 未填写算作一个分箱
-- [ ] **Q6** 时段口径：24 根小时柱 + 高亮现有滑动窗口、不改单测（推荐） / 改固定 12 桶（需批准口径变更）
-- [ ] **Q7** 分布数据窗口：跟随当前周/月/年周期（推荐） / 固定近 30 天
-- [ ] **Q8** 视觉：沿用暗夜仪表盘单色薄荷绿（推荐） / 另定
-- [ ] **Q9** 范围：按第 2 节非目标执行，不夹带其它清单项（推荐） / 顺带做热力图
+- [x] **Q1** 月历归属：历史页「列表 / 月历」切换（推荐） / 统计页新增卡 / 独立 tab
+- [x] **Q2** 点击月历某天：筛选该日并切回列表（推荐） / 只高亮不筛选 / 弹当天摘要
+- [x] **Q3** 翻月范围：可回看全部历史、禁止翻到未来（推荐） / 限最近 12 个月
+- [x] **Q4** 分布字段：Bristol + 排便量 + 费力程度 + 三项身体感受（推荐） / 只做 Bristol
+- [x] **Q5** 空值分母：每字段独立「已填写 N / 共 M 条」并显式标注（推荐） / 未填写算作一个分箱
+- [x] **Q6** 时段口径：24 根小时柱 + 高亮现有滑动窗口、不改单测（推荐） / 改固定 12 桶（需批准口径变更）
+- [x] **Q7** 分布数据窗口：跟随当前周/月/年周期（推荐） / 固定近 30 天
+- [x] **Q8** 视觉：沿用暗夜仪表盘单色薄荷绿（推荐） / 另定
+- [x] **Q9** 范围：按第 2 节非目标执行，不夹带其它清单项（推荐） / 顺带做热力图
 
 ---
 
@@ -226,18 +212,18 @@
 
 落地内容：
 
-| 文件 | 作用 |
-| --- | --- |
-| `core/model/CalendarMonth.kt` | 周一为首的 6×7 网格，绝对偏移、补白格、`withCounts()` |
-| `core/database/model/StatDetailProjection.kt` | 详情轻投影；三个身体感受用 `Int?` 承接 SQLite 的 0/1 |
-| `core/database/dao/TrackEventDao.observeStatDetails()` | `track_event LEFT JOIN poop_detail`，无详情的行以 NULL 出现 |
-| `feature/statistics/DetailDistribution.kt` | 纯函数聚合，各字段独立分母，非法值整条忽略 |
-| `feature/statistics/StatsAggregator.kt` | 拆出 `hourlyCounts()` 并公开 `hourlyCounts` / `distribution`；滑动窗口算法原样保留 |
-| `feature/statistics/StatsColors.kt` | 把原 `StatisticsScreen` 私有的 `StatsColors` / `CardShape` / `MetricShape` 抽成共用色板 |
-| `feature/statistics/DistributionCards.kt` | 时段分布卡（Canvas 24 柱）+ 形态分布卡（Bristol 柱图、堆叠条、身体感受） |
-| `feature/history/CalendarMonthView.kt` | 月历 Composable，四级透明度、今日描边、读屏描述 |
-| `feature/history/HistoryScreen.kt` | 「列表 / 月历」切换、翻月、点按日期复用 `setHistoryFilter` |
-| `feature/home/MainViewModel.kt` | `calendar` StateFlow + `shiftCalendarMonth()`；统计 `combine` 由两路变三路 |
+| 文件                                                     | 作用                                                                           |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `core/model/CalendarMonth.kt`                          | 周一为首的 6×7 网格，绝对偏移、补白格、`withCounts()`                                         |
+| `core/database/model/StatDetailProjection.kt`          | 详情轻投影；三个身体感受用 `Int?` 承接 SQLite 的 0/1                                         |
+| `core/database/dao/TrackEventDao.observeStatDetails()` | `track_event LEFT JOIN poop_detail`，无详情的行以 NULL 出现                           |
+| `feature/statistics/DetailDistribution.kt`             | 纯函数聚合，各字段独立分母，非法值整条忽略                                                        |
+| `feature/statistics/StatsAggregator.kt`                | 拆出 `hourlyCounts()` 并公开 `hourlyCounts` / `distribution`；滑动窗口算法原样保留           |
+| `feature/statistics/StatsColors.kt`                    | 把原 `StatisticsScreen` 私有的 `StatsColors` / `CardShape` / `MetricShape` 抽成共用色板 |
+| `feature/statistics/DistributionCards.kt`              | 时段分布卡（Canvas 24 柱）+ 形态分布卡（Bristol 柱图、堆叠条、身体感受）                               |
+| `feature/history/CalendarMonthView.kt`                 | 月历 Composable，四级透明度、今日描边、读屏描述                                                |
+| `feature/history/HistoryScreen.kt`                     | 「列表 / 月历」切换、翻月、点按日期复用 `setHistoryFilter`                                     |
+| `feature/home/MainViewModel.kt`                        | `calendar` StateFlow + `shiftCalendarMonth()`；统计 `combine` 由两路变三路            |
 
 相对原设计的修正（均不扩大范围）：
 

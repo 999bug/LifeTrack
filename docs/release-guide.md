@@ -69,6 +69,56 @@ gh secret set SIGNING_KEY_ALIAS --repo $repo --body "lifetrack"
 
 检查：`gh secret list --repo 999bug/LifeTrack` 应列出 4 项。Secret 值无法再读出，只能覆盖；流水线缺任意一项会直接失败并打印缺失项名称，不会产出 unsigned 包。
 
+### 1.3 校验本地 keystore 与已发布包是否同一把密钥
+
+签名证书一旦变化，Android 拒绝覆盖安装；本项目 `allowBackup=false` 且尚无导出/恢复，等于用户记录永久丢失。所以**每次发版前、每次备份恢复后**都要核一次证书指纹。指纹是公开信息（随 APK 一起分发），可以写进文档。
+
+v0.1.0 已发布包的签名证书 SHA-256（用 `apksigner verify --print-certs <apk>` 可查）：
+
+```text
+6A6CC4C13B5055E505DCF9BC2F6ACD213A6B87AC45BC7039E1252627B51459D9
+```
+
+在 PowerShell 里整段执行，口令交互式输入，经 `-storepass:env` 传给 keytool，不进命令行历史、用完即删：
+
+```powershell
+$jks = Join-Path $HOME "lifetrack-keys\lifetrack-release.jks"
+$expected = "6A6CC4C13B5055E505DCF9BC2F6ACD213A6B87AC45BC7039E1252627B51459D9"
+$sec = Read-Host "Keystore password" -AsSecureString
+$env:LT_KS_PASS = [Net.NetworkCredential]::new("", $sec).Password
+$info = keytool -list -v -keystore $jks -storetype PKCS12 -storepass:env LT_KS_PASS 2>&1
+$ok = $LASTEXITCODE
+Remove-Item Env:\LT_KS_PASS -ErrorAction SilentlyContinue
+if ($ok -ne 0) {
+  "FAILED: keytool exit=$ok"; $info | Select-Object -First 3
+} else {
+  $info | Select-String "别名:|Alias name:|有效起始|Valid from"
+  $line = $info | Select-String "SHA256:" | Select-Object -First 1
+  if ($line) {
+    $got = (($line.ToString() -split 'SHA256:\s*', 2)[1] -replace '[^0-9A-Fa-f]', '').ToUpper()
+    if ($got -eq $expected) { "MATCH: 与已发布 v0.1.0 APK 是同一把密钥" } else { "MISMATCH: $got" }
+  } else { "FAILED: 没找到 SHA256 指纹" }
+}
+```
+
+输出 `MATCH` 即通过；`MISMATCH` 说明本地 jks 不是同一把，**不要发版**，先查是不是拿错了文件。只要密钥不轮换，这个指纹对后续所有版本都适用；一旦主动轮换密钥，必须同步更新这里的值并公告用户。
+
+只想肉眼核对时一条命令即可，看输出里的 `SHA256:` 是否等于下面这串：
+
+```powershell
+keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storetype PKCS12
+```
+
+```text
+6A:6C:C4:C1:3B:50:55:E5:05:DC:F9:BC:2F:6A:CD:21:3A:6B:87:AC:45:BC:70:39:E1:25:26:27:B5:14:59:D9
+```
+
+注意：
+
+- keystore 实际是 PKCS12（扩展名虽为 `.jks`），显式写 `-storetype PKCS12`；生成时 key 口令回车沿用了 keystore 口令，实际只需记一个口令。口令明文只应存在密码管理器里，不要贴进聊天、仓库或文档。
+- **不要加 `-J-Duser.language=en`**：PowerShell 会把它拆成 `.language=en`，keytool 报「非法选项」并退出 1，脚本会误导成「口令错了」。中文 JDK 输出里 `SHA256:` 标签仍是英文，上面的脚本已做中英兼容；同一命令在 Git Bash 下反而正常。
+- 出现 `FAILED: keytool exit=N` 时先看脚本打印出的真实报错，不要据此改口令或重生成密钥；密钥轮换 = 用户卸载重装 = 数据全丢。
+
 ---
 
 ## 2. 每次发版
@@ -114,6 +164,7 @@ Get-FileHash .\LifeTrack-0.1.0-release.apk -Algorithm SHA256
 ## 5. 发布前检查清单
 
 - [ ] 4 个 Repository secrets 齐备
+- [ ] 按 §1.3 核对本地 keystore 证书指纹与已发布包一致（换密钥 = 用户数据全丢）
 - [ ] `versionCode` 递增、`versionName` 与 tag 一致
 - [ ] `./gradlew :app:testDebugUnitTest :app:assembleDebug` 本地通过
 - [ ] README / 本文档版本号已同步

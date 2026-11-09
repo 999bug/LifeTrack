@@ -36,10 +36,8 @@
 
 | 看到什么                                               | 结论                                              | 加载                  |
 | -------------------------------------------------- | ----------------------------------------------- | ------------------- |
-| `pom.xml` / `build.gradle`                         | Java 项目；JDK 版本看 `java.version` / toolchain，不看习惯 | `lang-java.md`      |
+| `app/build.gradle.kts` + `AndroidManifest.xml`      | Android 应用；AGP 与 SDK 版本看 `gradle/libs.versions.toml` | `lang-android.md`   |
 | `pyproject.toml` / `requirements.txt` / `setup.py` | Python；解释器与依赖管理看文件本身                            | `lang-python.md`    |
-| `package.json` + `vue` 依赖 / `vite.config.*`        | Vue 前端                                          | `lang-vue.md`       |
-| `Dockerfile` / `docker-compose*.yml`               | 容器交付                                            | `release-docker.md` |
 | `.github/workflows/*.yml`                          | 已有流水线，**先读再改**，不要另起一套                           | `release-github.md` |
 | `.env.example` / `config/*.json` / `secrets`       | 有运行时配置，先确认哪些不入库                                 | `discipline.md`     |
 | 单个类 >1000 行 / 核心流程里按实现名分支（`isXxxType`） | 老系统，**不要直接加功能**，先看体检与接缝                        | `legacy.md`         |
@@ -52,11 +50,12 @@
 | 首次进入项目、准备改代码                      | `project-profile.md` + 第 2 节探测出的模块 |
 | **跨多次会话、要拆子任务、接手半成品**            | `task-workflow.md`                 |
 | 新增/修改 Java、Python、Vue 代码          | 对应 `lang-*.md`                     |
+| 新增/修改 Kotlin、Compose、Room、Gradle 脚本 | `lang-android.md`                  |
+| 打 APK、配签名、发版到 Releases / 应用商店 | `release-android.md`               |
 | **在老项目里加功能、重构巨型类、迁移分支逻辑** | `legacy.md` |
 | **对接外部系统、调第三方 SDK、处理 HTTP 响应**   | `integration.md`                   |
 | **写 commit message、定分支、合并 MR**    | `commit.md`                        |
 | 准备发版、改 tag/Release/Pages/workflow | `release-github.md` + `commit.md`  |
-| 改 Dockerfile、compose、镜像源、部署方式     | `release-docker.md`                |
 | 碰凭据、日志、示例数据、提交历史                  | `discipline.md`                    |
 | 收尾（提交、清理、交付说明）                    | `discipline.md` + `commit.md`      |
 

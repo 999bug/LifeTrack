@@ -116,6 +116,7 @@ overrides:
 - **Manifest 不申请 INTERNET**：这是 Local First 的硬约束，新增网络能力必须先改 README 并评审隐私影响。
 - **`allowBackup=false` 且尚未实现主动导出/恢复**：卸载、清除数据或丢机即可能永久丢数据；设置页已有提示。
 - **发布签名密钥由 Repository secrets 注入**：流水线从 `LIFETRACK_KEYSTORE*` 环境变量读取，首次发版前需按 docs/release-guide.md 配置 4 个 secrets；keystore 与口令绝不入库，密钥丢失后用户只能卸载重装且数据全丢。
+- **CI 不能用 `android-actions/setup-android@v3`（2026-11-09 修复）**：现象 → `Set up Android SDK` 步骤 15 秒失败，日志 `Warning: Failed to find package 'tools'` 与 `sdkmanager failed with exit code 1`。根因 → 该 action 固定执行 `sdkmanager tools`，而 2026 年 ubuntu-latest 预装的 cmdline-tools 16.0 已移除 `tools` 包。修复 → 去掉 action，直接定位 `$ANDROID_HOME/cmdline-tools/*/bin/sdkmanager` 安装 `platforms;android-37` 与 `build-tools;36.0.0`，并把 ANDROID_HOME 写进 GITHUB_ENV、显式校验安装目录。教训 → 第三方 setup action 会随 runner 镜像漂移，优先用镜像自带工具并验证结果目录存在。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
 

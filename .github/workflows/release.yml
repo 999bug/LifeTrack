@@ -37,13 +37,22 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # 不用 setup-android action：它固定执行 `sdkmanager tools`，2026 年 runner 预装的
+      # cmdline-tools 16.0 已移除 tools 包，会以 exit 1 直接失败。改用镜像自带的 sdkmanager。
       - name: Install required SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-37" "build-tools;36.0.0" > /dev/null
+          ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found under $ANDROID_SDK/cmdline-tools"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" > /dev/null
+          test -d "$ANDROID_SDK/platforms/android-37" || { echo "::error::android-37 platform missing"; exit 1; }
+          test -d "$ANDROID_SDK/build-tools/36.0.0" || { echo "::error::build-tools 36.0.0 missing"; exit 1; }
+          echo "Android SDK ready at $ANDROID_SDK"
 
       - name: Prepare release signing config
         run: |

@@ -49,8 +49,22 @@ jobs:
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" > /dev/null
-          test -d "$ANDROID_SDK/platforms/android-37" || { echo "::error::android-37 platform missing"; exit 1; }
+          # API 37 的平台包名带修订号（platforms;android-37.0），不叫 platforms;android-37。
+          # 从可用包列表里取最低的 37.x，与本机 SDK 目录 android-37.0 保持一致。
+          AVAILABLE=$("$SDKMANAGER" --list 2>/dev/null)
+          PLATFORM=$(printf '%s\n' "$AVAILABLE" | grep -oE 'platforms;android-37\.[0-9]+' | sort -uV | head -1)
+          if [ -z "$PLATFORM" ]; then
+            echo "::warning::android-37.x missing from sdkmanager --list; falling back to platforms;android-37.0"
+            PLATFORM="platforms;android-37.0"
+          fi
+          echo "Installing $PLATFORM + build-tools;36.0.0"
+          if ! "$SDKMANAGER" "$PLATFORM" "build-tools;36.0.0" > /dev/null; then
+            echo "::error::SDK package install failed"
+            printf '%s\n' "$AVAILABLE" | grep -iE 'android-3[67]|build-tools;36' | head -30
+            exit 1
+          fi
+          PLATFORM_DIR="${PLATFORM#platforms;}"
+          test -d "$ANDROID_SDK/platforms/$PLATFORM_DIR" || { echo "::error::$PLATFORM_DIR missing"; exit 1; }
           test -d "$ANDROID_SDK/build-tools/36.0.0" || { echo "::error::build-tools 36.0.0 missing"; exit 1; }
           echo "Android SDK ready at $ANDROID_SDK"
 

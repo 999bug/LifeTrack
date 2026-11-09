@@ -2,7 +2,7 @@
 
 > 版本：0.1.0 · 文档核对日期：2026-11-09 · 许可证：MIT
 
-「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便与饮水两类事件：排便走专用 `poop_detail` 表，饮水走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续咖啡 / 茶、运动、月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
+「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水与咖啡 / 茶三类事件：排便走专用 `poop_detail` 表，饮水与咖啡 / 茶走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续运动、月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
 
 ## 下载安装
 
@@ -25,6 +25,7 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - 备份与恢复：设置页可把全部记录导出为单个 JSON 文件，或从备份恢复；导出/导入走系统文件选择器（SAF），恢复前校验应用标识、schemaVersion、条数、ID 唯一性、时区、本地日期与字段范围，替换在单个数据库事务内完成。当前导出格式为 **v2**，仍可读取 v1 旧备份；v2 增加通用详情通道，遇到本版本尚未落库的详情类型会明确拒绝导入，不会静默丢数据。
 - 记录项目：设置页列出已注册类型，可启用/停用并调整顺序；启用状态持久化，停用只隐藏新增记录入口，已有历史记录仍可查；全部停用时首页给出提示与设置入口。
 - 饮水模块（试点）：新增「记录饮水」入口，可填写数量与显示单位；今日记录列表按类型分派展示，支持编辑与删除。数据落在通用 `event_detail` 表，导出/恢复走备份 v2 的通用详情通道。历史页、月历与统计目前仍只统计排便，按类型适配见后续计划。
+- 咖啡 / 茶模块：新增「记录咖啡 / 茶」入口，可填写饮品类型（咖啡 / 茶）、份量、单位与咖啡因标记（含咖啡因 / 低因 / 无咖啡因）；与饮水共用通用详情表与备份 v2 通道，字段取值由规格表逐项校验。新增该类型未升 Room、未改备份格式。
 - Room 数据持久化、DataStore 深色模式设置。
 - UTC 时间戳 + IANA zoneId + 发生时 localDate；本地日期映射有单元测试。
 - 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 GitHub Releases 最新版本号与下载本应用 APK，不发送任何用户数据、设备标识或遥测。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
@@ -123,7 +124,7 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-06，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.1.0-debug.apk`（约 20 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 90 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`DetailSpecTest` 6、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7。
+- `./gradlew :app:testDebugUnitTest` 通过，共 103 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`DetailSpecTest` 7、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7。
 
 未验证项：真机安装与 `connectedDebugAndroidTest`（Room 集成测试）需连接 API 26+ 设备后执行。
 
@@ -169,7 +170,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - 加密备份与恢复（当前导出为明文 JSON，尚无密钥管理）。
 - 应用锁（BiometricPrompt / 系统凭据）。
 - 数据库加密。
-- 咖啡 / 茶、运动、月经和亲密关系模块（饮水已作为通用详情试点上线；月经与亲密关系模块依赖数据库加密，后置到安全加固包之后）。
+- 运动、月经和亲密关系模块（饮水与咖啡 / 茶已上线；月经与亲密关系模块依赖数据库加密，后置到安全加固包之后）。
 - Room schema 已导出到 `app/schemas/`，尚未编写正式 Migration 测试。
 - 无障碍、字体缩放、横屏、深色主题和多尺寸设备完整回归。
 
@@ -187,6 +188,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - 切到月历视图翻到上个月再翻回，格子次数应与统计页对应月份一致；点按有记录的日期，列表应只剩当天记录清除筛选后恢复最近 30 天。
 - 只有快速打卡（无详情）的周期，形态分布应显示「已填写 0 / 共 N 条」而不是画出 0 型柱；有详情的周期，Bristol 各柱之和应等于卡面标注的已填写数且不超过总次数。
 - 在设置页停用记录项目后，首页应隐藏打卡按钮并显示提示；重新启用或重启应用后按钮恢复，已有记录不丢失；排序箭头在只有一个项目时应禁用。
+- 新增饮水或咖啡 / 茶记录后，今日排便次数不应增加（统计页与次数卡同口径）；导出备份中该记录应带 `detail.fields`，把份量改成越界值、把枚举改成非法值或塞入未注册字段后恢复，应被拒绝且不破坏现有数据。
 - 检查 APK Manifest 确认 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 仅用于「检查更新」（代码注释与 README 已声明用途），且不存在其它数据上传行为。
 - 在 Android 12+ 设备上验证云备份与设备迁移都不会带走业务数据库。
 
@@ -197,6 +199,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - [统计增强包设计前确认单](docs/statistics-enhancement-confirmation.md)：月历视图、形态分布与时段分布的口径、影响面与实施记录。
 - [模块扩展第二批设计前确认单](docs/module-extension-confirmation.md)：通用编辑器壳、通用详情模型、备份 v2 兼容口径与实施记录。
 - [饮水模块试点设计前确认单](docs/water-module-confirmation.md)：Room v2 迁移、通用详情表、water 规格注册与验收结果。
+- [A7 咖啡 / 茶模块设计前确认单](docs/coffee-module-confirmation.md)：单类型 + 枚举字段的取舍、四字段规格、跨面板口径与验收结果。
 - [剩余工作子任务台账](docs/PROGRESS.md)：A/B/C 三包共 33 项子任务的交付物、依赖与状态。
 
 ## 许可证

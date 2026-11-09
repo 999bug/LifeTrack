@@ -27,10 +27,12 @@ import androidx.navigation.compose.rememberNavController
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.core.model.toRecordDetail
+import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
 import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
@@ -110,6 +112,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onQuickRecord = viewModel::quickRecord,
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
+                    onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onOpenSettings = { navController.navigate("settings") },
                     onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it }
@@ -135,6 +138,14 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     if (editorVisible) {
         when (editorTypeCode) {
             WaterFields.TYPE_CODE -> WaterEditorDialog(
+                record = editingRecord,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            CoffeeFields.TYPE_CODE -> CoffeeEditorDialog(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->

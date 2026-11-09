@@ -130,6 +130,9 @@ overrides:
 - **Room 迁移 SQL 必须逐字对齐 KSP 生成的 schema（2026-11-09 A6）**：现象 → 首次升 Room v2 新增 `event_detail` 表时，若 Migration 的 `CREATE TABLE` 列顺序 / 外键 / 索引名与 `2.json` 不一致，Room 打开时会抛「Migration didn't properly handle」。根因 → Room 用 schema identity 校验迁移结果，不是只看表是否存在。修复 → 先写实体与 version 2、编译让 KSP 生成 `2.json`，再照 `createSql` 写 `MIGRATION_1_2`，最后 `addMigrations`；`2.json` 随代码入库。教训 → 迁移 SQL 不要凭记忆手写，先生成 schema 再抄；只加表、不改列、不删数据，是对已发布库最安全的升级形态。
 - **同一工作区多会话并发时，共享文件会互相叠加（2026-11-09）**：现象 → A6 收尾时全仓 `compileDebugKotlin` 突然失败，报 `jsonPrimitive` / junit 未解析与 `No value passed for parameter 'updateRepository'`，但本包改动此前刚全绿。根因 → 另一会话同时在开发「应用内检查更新」，改了 `MainActivity` / `LifeTrackApplication` / `AndroidManifest` / `SettingsScreen` / `README` / `profile`，并在 `LifeTrackApp` 与 `MainViewModel` 上叠加了 `checkForUpdate` 与 `updateRepository`；其测试文件误放进 main 源集。修复 → 不修改、不回退、不 stash 对方文件；用 `git archive HEAD` 到系统临时目录、只叠加本包文件做隔离验证；提交时只 add 具体路径。教训 → 构建突然失败先看 `git status` 与文件时间戳，别急着改自己的代码；共享文件里混着两边改动时，不能把整文件当「自己的成果」提交。**结局（17:55）**：对方 `33ef32d` 修好编译并把两边改动一并提交，合并后 90 项单测 + assembleDebug 全绿；原计划的「补提交 A6 代码」因此取消——共享文件被别人提交后，先 `git show --stat` 核对内容再决定是否还要补提交，不要重复 commit。
 
+- **横向滚动的 chips 在 200% 字体下会把最后一项裁成半截（2026-11-09 A7 修复）**：现象 → 咖啡因三态 chips（含咖啡因 / 低因 / 无咖啡因）在大字号下初始只露出「无」，看起来像文字截断。根因 → `Row + horizontalScroll` 只保证「可滑动到达」，不保证「初始完整可见」；字号放大后前两项已占满卡片宽度。修复 → `LocalDensity.current.fontScale > 1.3f` 时用 `values.chunked(2)` 拆成多行 `Row`，常规字号保留横向滚动。教训 → 枚举项少（≤4）且文案短时优先分行展示；横向滚动只适合项目较多、用户明确知道能滑的场景；大字体回归要看「首屏是否完整」，不能只看「能否滚到」。
+- **注册新类型会打破以它为「未注册样例」的既有测试（2026-11-09 A7）**：现象 → 注册 `coffee` 规格后 `BackupCodecV2Test` / `DetailSpecTest` 里两条「生产默认拒绝未注册类型」用例必然失败。根因 → 测试用 `coffee` 这个具体字符串代表「未来才做的类型」，一旦它被实现就失去语义。修复 → 换成真正未注册的 `sport`（A8 尚未实现），并同步更新生产放行集合断言。教训 → 负向用例要用「永远不会注册」的占位名（如 `unknown_type`），别用路线图里的真实类型名。
+
 ## 10. 附：从 /init 产物抽取的原文（可选）
 
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

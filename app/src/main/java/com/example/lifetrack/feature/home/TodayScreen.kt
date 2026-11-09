@@ -26,9 +26,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
+import com.example.lifetrack.feature.coffee.CoffeeRecordItem
 import com.example.lifetrack.feature.poop.PoopRecordItem
 import com.example.lifetrack.feature.water.WaterRecordItem
 import java.time.Instant
@@ -44,6 +46,7 @@ fun TodayScreen(
     onQuickRecord: () -> Unit,
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
+    onCoffeeRecord: () -> Unit,
     onOpenSettings: () -> Unit,
     onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit
@@ -53,7 +56,8 @@ fun TodayScreen(
     val enabled = trackTypes.filter { it.enabled }.mapTo(HashSet()) { it.code }
     val canRecordPoop = DEFAULT_POOP_TYPE.code in enabled
     val canRecordWater = WaterFields.TYPE_CODE in enabled
-    // 统计、历史、月历目前仍只统计排便，这里的次数卡必须同口径，不能把饮水算进去。
+    val canRecordCoffee = CoffeeFields.TYPE_CODE in enabled
+    // 统计、历史、月历目前仍只统计排便，这里的次数卡必须同口径，不能把饮水或咖啡算进去。
     val poopCount = records.count { it.event.typeCode == DEFAULT_POOP_TYPE.code }
     val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE"))
 
@@ -76,7 +80,7 @@ fun TodayScreen(
             }
         }
         item {
-            if (!canRecordPoop && !canRecordWater) {
+            if (!canRecordPoop && !canRecordWater && !canRecordCoffee) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -105,8 +109,14 @@ fun TodayScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("记录饮水") }
                     }
+                    if (canRecordCoffee) {
+                        OutlinedButton(
+                            onClick = onCoffeeRecord,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("记录咖啡 / 茶") }
+                    }
                     Text(
-                        "快速打卡会立即保存当前时间；详细记录可补形态与身体感受，记录饮水需填写数量。",
+                        "快速打卡会立即保存当前时间；详细记录可补形态与身体感受，饮水与咖啡 / 茶需填写份量。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -130,6 +140,11 @@ fun TodayScreen(
                         onDelete = { onDelete(record.event.id) }
                     )
                     WaterFields.TYPE_CODE -> WaterRecordItem(
+                        record = record,
+                        onEdit = { onEdit(record) },
+                        onDelete = { onDelete(record.event.id) }
+                    )
+                    CoffeeFields.TYPE_CODE -> CoffeeRecordItem(
                         record = record,
                         onEdit = { onEdit(record) },
                         onDelete = { onDelete(record.event.id) }

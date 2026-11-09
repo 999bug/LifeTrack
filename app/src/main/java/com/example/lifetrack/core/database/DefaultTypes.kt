@@ -26,5 +26,21 @@ val DEFAULT_WATER_TYPE = TrackTypeEntity(
     schemaVersion = 1
 )
 
+/** 第二个走通用详情表的新类型；咖啡与茶用同一个类型，靠 drinkType 字段区分。 */
+val DEFAULT_COFFEE_TYPE = TrackTypeEntity(
+    code = "coffee",
+    name = "咖啡 / 茶",
+    iconKey = "coffee",
+    category = "drink",
+    trackingMode = "EVENT",
+    enabled = true,
+    sortOrder = 30,
+    schemaVersion = 1
+)
+
 /** 新增内置类型时只改这里，ensureDefaultTypes 与备份恢复兜底会一起生效。 */
-val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(DEFAULT_POOP_TYPE, DEFAULT_WATER_TYPE)
+val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(
+    DEFAULT_POOP_TYPE,
+    DEFAULT_WATER_TYPE,
+    DEFAULT_COFFEE_TYPE
+)

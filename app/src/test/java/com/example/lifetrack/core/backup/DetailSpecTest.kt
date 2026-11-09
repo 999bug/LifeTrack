@@ -1,5 +1,6 @@
 package com.example.lifetrack.core.backup
 
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.WaterFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -41,19 +42,26 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `registry has builtin water spec and falls back to injected specs`() {
+    fun `registry has builtin water and coffee specs and falls back to injected specs`() {
         assertNotNull(DetailSpecRegistry.specFor(WaterFields.TYPE_CODE))
-        assertNull(DetailSpecRegistry.specFor("coffee"))
-        val coffee = DetailSpec("coffee", allowedFields = setOf("cups"))
-        assertEquals(coffee, DetailSpecRegistry.specFor("coffee", mapOf("coffee" to coffee)))
+        assertNotNull(DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE))
+        assertNull(DetailSpecRegistry.specFor("sport"))
+        val sport = DetailSpec("sport", allowedFields = setOf("minutes"))
+        assertEquals(sport, DetailSpecRegistry.specFor("sport", mapOf("sport" to sport)))
         val override = DetailSpec("water", allowedFields = emptySet())
         assertEquals(override, DetailSpecRegistry.specFor("water", mapOf("water" to override)))
     }
 
     @Test
     fun `production decode options only allow registered types`() {
-        assertEquals(setOf(WaterFields.TYPE_CODE), BackupDecodeOptions.Default.supportedDetailTypes)
-        assertEquals(setOf(WaterFields.TYPE_CODE), SUPPORTED_DETAIL_TYPES)
+        assertEquals(
+            setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE),
+            BackupDecodeOptions.Default.supportedDetailTypes
+        )
+        assertEquals(
+            setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE),
+            SUPPORTED_DETAIL_TYPES
+        )
         assertTrue(BackupDecodeOptions.Default.detailSpecs.isEmpty())
     }
 
@@ -67,5 +75,29 @@ class DetailSpecTest {
         assertTrue(spec.validators[WaterFields.UNIT]!!("ml"))
         assertTrue(spec.validators[WaterFields.UNIT]!!("cup"))
         assertFalse(spec.validators[WaterFields.UNIT]!!("litre"))
+    }
+
+    @Test
+    fun `coffee spec enforces enums and amount range`() {
+        val spec = DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE)!!
+        assertEquals(
+            setOf(
+                CoffeeFields.DRINK,
+                CoffeeFields.AMOUNT,
+                CoffeeFields.UNIT,
+                CoffeeFields.CAFFEINE
+            ),
+            spec.allowedFields
+        )
+        assertTrue(spec.validators[CoffeeFields.AMOUNT]!!("300"))
+        assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("0"))
+        assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("2001"))
+        assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("abc"))
+        assertTrue(spec.validators[CoffeeFields.DRINK]!!("tea"))
+        assertFalse(spec.validators[CoffeeFields.DRINK]!!("juice"))
+        assertTrue(spec.validators[CoffeeFields.CAFFEINE]!!("low"))
+        assertFalse(spec.validators[CoffeeFields.CAFFEINE]!!("high"))
+        assertTrue(spec.validators[CoffeeFields.UNIT]!!("cup"))
+        assertFalse(spec.validators[CoffeeFields.UNIT]!!("litre"))
     }
 }

@@ -1,12 +1,14 @@
 package com.example.lifetrack.core.backup
 
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.WaterFields
 
 /**
  * 通用详情的字段规格。
  *
  * 结构级校验（key 命名、数量、长度）在 [DetailLimits]，业务级规则由各类型在此注册。
- * A6 起注册饮水；A7/A8 加类型只需在这里加一项，不必再动备份格式或 Room schema。
+ * A6 起注册饮水、A7 起注册咖啡 / 茶；后续加类型只需在这里加一项，
+ * 不必再动备份格式或 Room schema。
  */
 data class DetailSpec(
     val typeCode: String,
@@ -22,6 +24,21 @@ object DetailSpecRegistry {
             validators = mapOf(
                 WaterFields.AMOUNT to WaterFields::isValidAmount,
                 WaterFields.UNIT to { it in WaterFields.UNITS }
+            )
+        ),
+        CoffeeFields.TYPE_CODE to DetailSpec(
+            typeCode = CoffeeFields.TYPE_CODE,
+            allowedFields = setOf(
+                CoffeeFields.DRINK,
+                CoffeeFields.AMOUNT,
+                CoffeeFields.UNIT,
+                CoffeeFields.CAFFEINE
+            ),
+            validators = mapOf(
+                CoffeeFields.DRINK to { it in CoffeeFields.DRINKS },
+                CoffeeFields.AMOUNT to CoffeeFields::isValidAmount,
+                CoffeeFields.UNIT to { it in CoffeeFields.UNITS },
+                CoffeeFields.CAFFEINE to { it in CoffeeFields.CAFFEINE_LEVELS }
             )
         )
     )

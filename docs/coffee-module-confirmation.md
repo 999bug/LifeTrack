@@ -102,4 +102,14 @@
 
 ## 8. 实施记录
 
-待本轮验收后填写。
+- 状态：**已完成并验收**（确认单 `1931c3e`；代码与文档另提交）。
+- 落地文件：新增 `CoffeeFields.kt`、`CoffeeEditorDialog.kt`、`CoffeeRecordItem.kt`、`CoffeeFieldsTest.kt`、`BackupCoffeeDetailTest.kt`；修改 `DefaultTypes.kt`、`DetailSpec.kt`、`TodayScreen.kt`、`LifeTrackApp.kt`、`BackupCodecV2Test.kt`、`DetailSpecTest.kt` 及 README / PROGRESS / profile。
+- **Room 与备份版本均未变**：`AppDatabase` 仍 `version = 2`，`app/schemas/` 仍只有 `1.json` + `2.json`，`BackupCodec.SCHEMA_VERSION` 仍为 2。新增类型只改 `DEFAULT_TYPES` 与 `DetailSpecRegistry`，`SUPPORTED_DETAIL_TYPES` 由 `builtIn.keys` 自动放行 `coffee`。
+- 相对设计的两处修正：
+  1. 既有测试把 `coffee` 当作「未注册类型」样例（`BackupCodecV2Test.production defaults still reject unregistered detail types`、`DetailSpecTest.registry has builtin water spec…`），注册后必然失败。统一改成用真正未注册的 `sport`，并把 `DetailSpecTest` 的生产放行集合扩成 `{water, coffee}`、增加 coffee 规格断言。**改的是测试样例，不是放宽校验**。
+  2. 200% 字体实测发现咖啡因三态 chips 在横向滚动区里初始只露「无」半个字。把 `ChipRow` 改成 `fontScale > 1.3f` 时两列分行（常规字号仍单行横向滚动），三项完整可见、无需横向滑动。这是 A6「固定 dp 裁字」雷区的同类延伸。
+- 验收结果：`testDebugUnitTest` **103 项全绿**（合并基线 90 + 新增 13：`CoffeeFieldsTest` 5、`BackupCoffeeDetailTest` 7、`DetailSpecTest` +1），`assembleDebug` 通过。
+- 模拟器 `emulator-5554` 实测：设置页三项与排序箭头、重启后三项仍在；新增「茶 / 300 ml / 无咖啡因」→ 今日排便次数仍 0 → 编辑四字段全部回填 → 改为「咖啡 / 400 ml / 低因」保存生效 → 删除清空；导出 JSON 为 `schemaVersion: 2`、三类型、`detail.fields` 四字段；恢复原始 v2 后摘要完整回来；`amountMl=99999`、`caffeine=high`、未知字段 `sugar` 三种坏文件均「操作失败」并带记录 ID，且不破坏现有数据；深 / 浅色、200% 字体、1200×800 宽屏无截断或溢出。
+- 踩坑（非实现缺陷）：键盘弹出后对话框上移约 177px，按旧坐标点 chip 误跳进 Gboard 设置页。改为「先选 chips → 再输入份量 → 隐藏键盘后再点保存」，全程用 `uiautomator dump` 取 bounds，不靠截图目测。
+- 未验证 / 遗留：真机、`connectedDebugAndroidTest`；历史页、月历、统计仍只统计排便，咖啡 / 茶记录只出现在今日列表（与 A6 饮水一致），按类型统一适配归 **A11**；`A12` 的系统性字段校验扩展尚未做，本包只覆盖 coffee 四字段。
+- 环境收尾：设备 Downloads 测试文件与本地截图已清理；分辨率 1080×2400、字号 1.0、深色模式已还原；本会话无遗留后台任务。

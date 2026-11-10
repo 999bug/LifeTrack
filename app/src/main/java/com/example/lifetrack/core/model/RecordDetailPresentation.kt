@@ -92,6 +92,7 @@ private fun BackupRecord.detailFields(): List<DetailField> = when (event.typeCod
     WaterFields.TYPE_CODE -> waterFields(genericFields())
     CoffeeFields.TYPE_CODE -> coffeeFields(genericFields())
     SportFields.TYPE_CODE -> sportFields(genericFields())
+    IntimacyFields.TYPE_CODE -> intimacyFields(genericFields())
     else -> listOf(
         DetailField("详情", "该类型来自更新的版本，当前版本无法展示详情", muted = true)
     )
@@ -127,4 +128,10 @@ private fun sportFields(fields: Map<String, String>): List<DetailField> = listOf
     field("运动类型", fields[SportFields.SPORT]?.let(SportFields::sportLabel)),
     field("时长", fields[SportFields.DURATION]?.let(SportFields::durationLabel)),
     field("强度", fields[SportFields.INTENSITY]?.let(SportFields::intensityLabel))
+)
+
+private fun intimacyFields(fields: Map<String, String>): List<DetailField> = listOf(
+    field("保护措施", fields[IntimacyFields.PROTECTION]?.let(IntimacyFields::protectionLabel)),
+    field("主观感受", fields[IntimacyFields.EXPERIENCE]?.let(IntimacyFields::experienceLabel)),
+    field("时长", fields[IntimacyFields.DURATION]?.let(IntimacyFields::durationLabel))
 )

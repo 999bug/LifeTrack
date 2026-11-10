@@ -100,6 +100,25 @@ class RecordDetailPresentationTest {
     }
 
     @Test
+    fun `intimacy detail labels all three fields`() {
+        val view = generic(
+            IntimacyFields.TYPE_CODE,
+            mapOf("protection" to "na", "experience" to "okay", "durationMin" to "80")
+        ).toDetailView()
+
+        assertEquals("亲密关系 · 08:30", view.title)
+        assertEquals(listOf("不适用", "一般", "1 小时 20 分"), values(view.sections[1]))
+    }
+
+    @Test
+    fun `intimacy detail without any field shows placeholders`() {
+        val view = generic(IntimacyFields.TYPE_CODE, emptyMap()).toDetailView()
+
+        assertEquals(3, view.sections[1].fields.size)
+        assertTrue(view.sections[1].fields.all { it.value == "未记录" && it.muted })
+    }
+
+    @Test
     fun `missing generic fields are marked as not recorded`() {
         val view = generic("water", mapOf("amountMl" to "200")).toDetailView()
 

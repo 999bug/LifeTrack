@@ -1,6 +1,7 @@
 package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import org.junit.Assert.assertEquals
@@ -43,10 +44,11 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `registry has builtin water coffee and sport specs and falls back to injected specs`() {
+    fun `registry has builtin water coffee sport and intimacy specs and falls back to injected specs`() {
         assertNotNull(DetailSpecRegistry.specFor(WaterFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(SportFields.TYPE_CODE))
+        assertNotNull(DetailSpecRegistry.specFor(IntimacyFields.TYPE_CODE))
         assertNull(DetailSpecRegistry.specFor("mood"))
         val mood = DetailSpec("mood", allowedFields = setOf("score"), validators = mapOf("score" to { it == "3" }))
         assertEquals(mood, DetailSpecRegistry.specFor("mood", mapOf("mood" to mood)))
@@ -56,7 +58,12 @@ class DetailSpecTest {
 
     @Test
     fun `production decode options only allow registered types`() {
-        val expected = setOf(WaterFields.TYPE_CODE, CoffeeFields.TYPE_CODE, SportFields.TYPE_CODE)
+        val expected = setOf(
+            WaterFields.TYPE_CODE,
+            CoffeeFields.TYPE_CODE,
+            SportFields.TYPE_CODE,
+            IntimacyFields.TYPE_CODE
+        )
         assertEquals(expected, BackupDecodeOptions.Default.supportedDetailTypes)
         assertEquals(expected, SUPPORTED_DETAIL_TYPES)
         assertTrue(BackupDecodeOptions.Default.detailSpecs.isEmpty())
@@ -145,5 +152,28 @@ class DetailSpecTest {
         assertFalse(spec.validators[SportFields.SPORT]!!("ski"))
         SportFields.INTENSITIES.forEach { assertTrue(it, spec.validators[SportFields.INTENSITY]!!(it)) }
         assertFalse(spec.validators[SportFields.INTENSITY]!!("extreme"))
+    }
+
+    @Test
+    fun `intimacy spec enforces enums and optional duration range`() {
+        val spec = DetailSpecRegistry.specFor(IntimacyFields.TYPE_CODE)!!
+        assertEquals(
+            setOf(IntimacyFields.PROTECTION, IntimacyFields.EXPERIENCE, IntimacyFields.DURATION),
+            spec.allowedFields
+        )
+        assertTrue(spec.isFieldsValid(emptyMap()))
+        assertTrue(spec.isFieldsValid(mapOf(IntimacyFields.PROTECTION to "na")))
+        assertTrue(spec.validators[IntimacyFields.DURATION]!!("1440"))
+        assertFalse(spec.validators[IntimacyFields.DURATION]!!("1441"))
+        assertFalse(spec.validators[IntimacyFields.DURATION]!!("abc"))
+        IntimacyFields.PROTECTION_VALUES.forEach {
+            assertTrue(it, spec.validators[IntimacyFields.PROTECTION]!!(it))
+        }
+        assertFalse(spec.validators[IntimacyFields.PROTECTION]!!("maybe"))
+        IntimacyFields.EXPERIENCE_VALUES.forEach {
+            assertTrue(it, spec.validators[IntimacyFields.EXPERIENCE]!!(it))
+        }
+        assertFalse(spec.validators[IntimacyFields.EXPERIENCE]!!("great"))
+        assertFalse(spec.isFieldsValid(mapOf("partnerName" to "someone")))
     }
 }

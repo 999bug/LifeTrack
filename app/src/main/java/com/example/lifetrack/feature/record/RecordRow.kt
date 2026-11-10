@@ -20,11 +20,13 @@ import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.feature.coffee.CoffeeRecordItem
+import com.example.lifetrack.feature.intimacy.IntimacyRecordItem
 import com.example.lifetrack.feature.poop.PoopRecordItem
 import com.example.lifetrack.feature.sport.SportRecordItem
 import com.example.lifetrack.feature.water.WaterRecordItem
@@ -70,6 +72,12 @@ fun RecordRow(
             onDelete = onDelete
         )
         SportFields.TYPE_CODE -> SportRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
+        IntimacyFields.TYPE_CODE -> IntimacyRecordItem(
             record = record,
             onShowDetail = onShowDetail,
             onEdit = onEdit,

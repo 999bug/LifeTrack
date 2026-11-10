@@ -50,10 +50,27 @@ val DEFAULT_SPORT_TYPE = TrackTypeEntity(
     schemaVersion = 1
 )
 
+/**
+ * A10：高敏感模块，默认停用，由用户在「设置 → 记录项目」主动开启。
+ * ensureDefaultTypes 用 insertIgnore、恢复备份只补齐缺失项，都不会把它改成启用。
+ * 与 A6–A8 一样只注册类型与字段规格，不升 Room 版本。
+ */
+val DEFAULT_INTIMACY_TYPE = TrackTypeEntity(
+    code = "intimacy",
+    name = "亲密关系",
+    iconKey = "intimacy",
+    category = "activity",
+    trackingMode = "EVENT",
+    enabled = false,
+    sortOrder = 50,
+    schemaVersion = 1
+)
+
 /** 新增内置类型时只改这里，ensureDefaultTypes 与备份恢复兜底会一起生效。 */
 val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(
     DEFAULT_POOP_TYPE,
     DEFAULT_WATER_TYPE,
     DEFAULT_COFFEE_TYPE,
-    DEFAULT_SPORT_TYPE
+    DEFAULT_SPORT_TYPE,
+    DEFAULT_INTIMACY_TYPE
 )

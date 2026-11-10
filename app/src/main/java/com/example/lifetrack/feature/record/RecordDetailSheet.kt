@@ -19,12 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.DetailField
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.toDetailView
 
 /**
@@ -42,6 +44,15 @@ fun RecordDetailSheet(
     val view = remember(record) { record.toDetailView() }
     // 200% 字体下左右两栏会把长值挤成多行重叠，按项目既有做法改为上下堆叠。
     val stacked = LocalDensity.current.fontScale > 1.3f
+    // A10 L1：详情由用户主动点开，视觉上照常展示；读屏只念一句汇总，
+    // 不逐字段朗读「保护措施：是」这类内容。关闭按钮留在收敛区之外，仍可操作。
+    val privacySemantics = if (record.event.typeCode == IntimacyFields.TYPE_CODE) {
+        Modifier.clearAndSetSemantics {
+            contentDescription = "已记录一条亲密关系记录，详情请查看屏幕内容"
+        }
+    } else {
+        Modifier
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -53,23 +64,25 @@ fun RecordDetailSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp)
         ) {
-            Text(
-                text = view.title,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            view.sections.forEachIndexed { index, section ->
+            Column(modifier = Modifier.fillMaxWidth().then(privacySemantics)) {
                 Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    text = view.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                section.fields.forEach { field ->
-                    DetailLine(field = field, stacked = stacked)
-                }
-                if (index < view.sections.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.padding(top = 10.dp))
+                view.sections.forEachIndexed { index, section ->
+                    Text(
+                        text = section.title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    section.fields.forEach { field ->
+                        DetailLine(field = field, stacked = stacked)
+                    }
+                    if (index < view.sections.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.padding(top = 10.dp))
+                    }
                 }
             }
             TextButton(

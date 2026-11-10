@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.feature.record.RecordRow
@@ -41,6 +42,7 @@ fun TodayScreen(
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
     onSportRecord: () -> Unit,
+    onIntimacyRecord: () -> Unit,
     onOpenSettings: () -> Unit,
     onShowDetail: (BackupRecord) -> Unit,
     onEdit: (BackupRecord) -> Unit,
@@ -169,10 +171,15 @@ fun TodayScreen(
                                 onClick = onSportRecord,
                                 modifier = Modifier.fillMaxWidth()
                             ) { Text("记录运动") }
+
+                            IntimacyFields.TYPE_CODE -> OutlinedButton(
+                                onClick = onIntimacyRecord,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("记录亲密关系") }
                         }
                     }
                     Text(
-                        "快速打卡会立即保存当前时间；其余类型需填写各自必填项（饮水 / 咖啡的份量、运动的时长）。",
+                        "快速打卡会立即保存当前时间；饮水 / 咖啡的份量、运动的时长为必填，亲密关系三项均可不填。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

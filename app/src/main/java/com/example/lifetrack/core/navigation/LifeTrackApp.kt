@@ -28,12 +28,14 @@ import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
 import com.example.lifetrack.feature.history.HistoryScreen
+import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
@@ -121,6 +123,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
+                    onIntimacyRecord = { openEditor(IntimacyFields.TYPE_CODE, null) },
                     onOpenSettings = { navController.navigate("settings") },
                     onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
@@ -170,6 +173,14 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 }
             )
             SportFields.TYPE_CODE -> SportEditorDialog(
+                record = editingRecord,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            IntimacyFields.TYPE_CODE -> IntimacyEditorDialog(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->

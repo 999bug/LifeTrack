@@ -13,6 +13,11 @@ import com.example.lifetrack.core.navigation.LifeTrackApp
 import com.example.lifetrack.feature.lock.AppLockGate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import com.example.lifetrack.core.model.IntimacyFields
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -20,15 +25,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as LifeTrackApplication).container
 
-        // 开启应用锁后隐藏最近任务预览与截屏；关掉时立即恢复。
+        // 应用锁开启，或高敏感模块（A10 亲密关系）已启用时，隐藏最近任务预览与截屏。
+        // 不强制改应用锁开关：其余用户与模块的行为保持 0.6.0 原样。
         lifecycleScope.launch {
-            container.settingsRepository.appLockEnabled.collect { enabled ->
-                if (enabled) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            val sensitiveModuleEnabled = container.trackRepository.observeTrackTypes()
+                .map { types -> types.any { it.code == IntimacyFields.TYPE_CODE && it.enabled } }
+                .onStart { emit(false) }
+                .catch { emit(false) }
+            combine(
+                container.settingsRepository.appLockEnabled,
+                sensitiveModuleEnabled
+            ) { lockEnabled, sensitive -> lockEnabled || sensitive }
+                .collect { secure ->
+                    if (secure) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
                 }
-            }
         }
 
         setContent {

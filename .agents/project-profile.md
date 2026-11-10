@@ -57,7 +57,7 @@ push_policy: on-request            # 只提交，push 等用户授权
 ```yaml
 deploy_target: GitHub Releases（权威）+ Gitee Releases（国内分发镜像）  # 同一份签名 APK，CI 同步附件，无服务端
 release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
-version_scheme: 语义化 semver       # versionName 0.5.0 / versionCode 5（待发布），已发布 v0.1.0 ~ v0.4.0
+version_scheme: 语义化 semver       # versionName 0.6.0 / versionCode 6（待发布），已发布 v0.1.0 ~ v0.5.0
 registry: none
 pages: no
 ```

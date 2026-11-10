@@ -94,6 +94,7 @@ fun SettingsScreen(
     var privacyExpanded by remember { mutableStateOf(false) }
     var timeoutDialogVisible by remember { mutableStateOf(false) }
     var appLockError by remember { mutableStateOf<String?>(null) }
+    var licensesVisible by remember { mutableStateOf(false) }
 
     // 导出：先选加密方式；加密要两次口令，明文要过一道风险确认。
     var exportChoiceVisible by remember { mutableStateOf(false) }
@@ -417,6 +418,12 @@ fun SettingsScreen(
             )
             SettingsDivider()
             UpdateSection(viewModel = viewModel)
+            SettingsDivider()
+            SettingsRow(
+                title = "开源许可",
+                subtitle = "SQLCipher Community Edition · BSD-style",
+                onClick = { licensesVisible = true }
+            )
             SettingsDivider()
             SettingsRow(
                 title = "数据与隐私",
@@ -895,6 +902,46 @@ fun SettingsScreen(
             text = { Text(lockMessage) },
             confirmButton = {
                 TextButton(onClick = { appLockError = null }) { Text("知道了") }
+            }
+        )
+    }
+
+    if (licensesVisible) {
+        AlertDialog(
+            onDismissRequest = { licensesVisible = false },
+            title = { Text("开源许可") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "SQLCipher Community Edition",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        text = SQLCIPHER_COPYRIGHT,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "许可全文如下，可上下滑动查看。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = SQLCIPHER_LICENSE,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = SQLCIPHER_COMPONENTS,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { licensesVisible = false }) { Text("关闭") }
             }
         )
     }

@@ -1,6 +1,6 @@
 # 生活记（LifeTrack）Android 工程骨架
 
-> 版本：0.5.0 · 文档核对日期：2026-11-10 · 许可证：MIT
+> 版本：0.6.0（代码就绪，尚未发布）· 文档核对日期：2026-11-10 · 许可证：MIT
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水、咖啡 / 茶、运动四类事件：排便走专用 `poop_detail` 表，其余三类走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续月经和亲密关系模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。
 
@@ -11,7 +11,7 @@
 
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件；两端是同一份 CI 产物，签名一致。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
-- 当前版本 `0.5.0`（versionCode 5）。校验示例：`Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256`。
+- 当前代码版本 `0.6.0`（versionCode 6，**尚未发布**）；最新已发布版本为 `0.5.0`。校验示例：`Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256`。
 - 应用内检查更新优先查询 Gitee，Gitee 暂无 Release、未附 APK 或请求失败时回退 GitHub。
 
 > 本 README 描述 main 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。
@@ -132,7 +132,7 @@ Windows 使用 `gradlew.bat`。
 
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
-- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk`（约 21 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
+- `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.6.0-debug.apk`（约 30 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
 - `./gradlew :app:testDebugUnitTest` 通过，共 151 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
 - `./gradlew :app:connectedDebugAndroidTest` 通过，共 14 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2 + `DatabaseKeyStoreTest` 5 + `DatabaseEncryptionTest` 4）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除、Keystore 封装/篡改/密钥缺失、明文 v1/v2 库加密搬迁、中断恢复与错误口令拒绝。
@@ -166,14 +166,16 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 ## 安全边界（重要）
 
-数据库加密已在 `main` 分支落地（SQLCipher 4.20.0 + Android Keystore 密钥管理），但**尚未发版**；0.5.0 及更早版本仍是明文库。导出备份自 C4 起默认加密。下列评审项仍在推进，未全部销项前不要把高度敏感的数据交给此开发骨架长期保管。
+数据库加密已在 `main` 分支落地（SQLCipher 4.20.0 + Android Keystore 密钥管理），但**尚未发版**；0.5.0 及更早版本仍是明文库。导出备份默认加密，应用锁与隐私审查已完成。下列评审项除真机迁移走查外均已销项；未发版前不要把高度敏感的数据交给此开发骨架长期保管。
 
 1. ✅ 数据库静态加密（main 已实现并实测，待 0.6.0 发布）。
 2. ✅ 数据加密密钥的 Keystore 管理（不绑定生物识别，避免密钥失效导致数据不可读）。
-3. 🟡 主动导出文件加密与完整性校验已实现（v3，AES-256-GCM + AAD）；备份口令轮换与恢复流程打磨仍待 C5 / C6。
-4. ⬜ Android 自动备份、设备迁移、卸载重装、换机恢复和厂商 ROM 行为评审（C8）。
-5. ⬜ 日志、崩溃报告、剪贴板、最近任务屏幕预览及通知内容的隐私审查（C9）。
+3. ✅ 主动导出文件加密、完整性校验与口令轮换（v3，AES-256-GCM + AAD；C4–C6）。
+4. 🟡 Android 自动备份、设备迁移、卸载重装、换机恢复：`allowBackup=false` 与两份排除规则已复核，「卸载重装 + 加密备份恢复」已模拟通过；**真机厂商迁移 / ROM 差异仍待走查**（C8 / B8）。
+5. ✅ 日志、崩溃报告、剪贴板、最近任务屏幕预览及通知内容的隐私审查（C9；应用锁开启时 `FLAG_SECURE` 遮挡预览）。
 6. 应用内「检查更新」的网络行为（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`，失败时回退 `api.github.com/repos/999bug/LifeTrack/releases/latest`，以及下载 APK）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
+
+**系统备份 / 迁移边界**：`allowBackup=false`，`fullBackupContent` 与 Android 12+ `dataExtractionRules` 把 `database` / `sharedpref` / `file` / `external` / `root` 五个域在「云备份」与「设备迁移」两条链路都排除。Keystore 密钥不属于应用数据，不会随备份离开设备；因此系统迁移既不会带走加密库，也不会留下「有库没钥匙」的半套数据。换机唯一可靠的路径是**导出加密备份 → 新设备安装 → 输入口令恢复**；卸载或清除数据仍会丢失未导出的记录。
 
 不要在尚未完成上述评审前把真实的敏感数据交给此开发骨架长期保管。
 
@@ -231,3 +233,45 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 本项目采用 [MIT License](LICENSE)。可以自由使用、修改、分发，包括商业用途，但需保留版权与许可声明。
 
 数据模型与产品设计同样开源，欢迎基于它做自己的本地优先记录工具。
+
+## 第三方许可
+
+本应用使用 **SQLCipher Community Edition**（`net.zetetic:sqlcipher-android`）实现数据库静态加密。Community Edition 采用 BSD-style 许可，要求在用户可访问的位置提供版权声明与许可全文；应用内入口为 **设置 → 关于 → 开源许可**。
+
+```text
+Copyright (c) 2008-2026, ZETETIC, LLC
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the ZETETIC LLC nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+SQLCipher 内含或依赖的开源组件：
+
+| 组件 | 许可 |
+| --- | --- |
+| SQLite / SQLite Android Bindings | 公有领域（SQLite Project） |
+| OpenSSL | Apache License 2.0 或 OpenSSL / SSLeay 双许可（OpenSSL Project） |
+| LibTomCrypt | 公有领域（LibTomCrypt project） |
+| Android 平台库 | Apache License 2.0（Android Open Source Project） |
+
+许可原文：<https://www.zetetic.net/sqlcipher/license/SQLCIPHER_COMMUNITY_EDITION_LICENSE.txt>

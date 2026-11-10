@@ -52,10 +52,13 @@ import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
 import com.example.lifetrack.core.security.BackupCrypto
+import com.example.lifetrack.core.security.PassphraseQuality
+import com.example.lifetrack.core.security.RetryBackoff
 import com.example.lifetrack.feature.home.MainViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -107,6 +110,25 @@ fun SettingsScreen(
     var rekeyNewPassphraseConfirm by remember { mutableStateOf("") }
     var rekeyError by remember { mutableStateOf<String?>(null) }
     var pendingRekeyText by remember { mutableStateOf<String?>(null) }
+
+    // 失败节流：累计失败次数 → 下一次尝试前的等待秒数；成功后清零。
+    var importFailures by remember { mutableIntStateOf(0) }
+    var importCooldown by remember { mutableIntStateOf(0) }
+    var rekeyFailures by remember { mutableIntStateOf(0) }
+    var rekeyCooldown by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(importCooldown) {
+        if (importCooldown > 0) {
+            delay(1_000)
+            importCooldown -= 1
+        }
+    }
+    LaunchedEffect(rekeyCooldown) {
+        if (rekeyCooldown > 0) {
+            delay(1_000)
+            rekeyCooldown -= 1
+        }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -174,6 +196,8 @@ fun SettingsScreen(
                     BackupDecodeResult.PassphraseRequired -> {
                         importPassphrase = ""
                         importPassphraseError = null
+                        importFailures = 0
+                        importCooldown = 0
                         pendingEncryptedText = text
                     }
                 }
@@ -211,6 +235,8 @@ fun SettingsScreen(
                         rekeyNewPassphrase = ""
                         rekeyNewPassphraseConfirm = ""
                         rekeyError = null
+                        rekeyFailures = 0
+                        rekeyCooldown = 0
                     }
                 }
             }
@@ -417,6 +443,9 @@ fun SettingsScreen(
                         onClick = { exportAsEncrypted = false }
                     )
                     if (exportAsEncrypted) {
+                        val exportQuality = remember(exportPassphrase) {
+                            PassphraseQuality.evaluate(exportPassphrase.toCharArray())
+                        }
                         OutlinedTextField(
                             value = exportPassphrase,
                             onValueChange = {
@@ -425,7 +454,17 @@ fun SettingsScreen(
                             },
                             label = { Text("备份口令") },
                             supportingText = {
-                                Text("至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位，建议用一句话，避免生日和手机号")
+                                Text(
+                                    text = passphraseHint(exportQuality, exportPassphrase.isEmpty()),
+                                    color = if (exportPassphrase.isNotEmpty() &&
+                                        (exportQuality.level == PassphraseQuality.Level.TOO_SHORT ||
+                                            exportQuality.level == PassphraseQuality.Level.WEAK)
+                                    ) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
                             },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
@@ -531,6 +570,8 @@ fun SettingsScreen(
                     pendingEncryptedText = null
                     importPassphrase = ""
                     importPassphraseError = null
+                    importFailures = 0
+                    importCooldown = 0
                 }
             },
             title = { Text("输入备份口令") },
@@ -563,7 +604,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(
-                    enabled = !busy,
+                    enabled = !busy && importCooldown == 0,
                     onClick = {
                         if (importPassphrase.isBlank()) {
                             importPassphraseError = "请输入口令。"
@@ -580,10 +621,17 @@ fun SettingsScreen(
                                         pendingEncryptedText = null
                                         importPassphrase = ""
                                         importPassphraseError = null
+                                        importFailures = 0
+                                        importCooldown = 0
                                     }
 
                                     is BackupDecodeResult.Invalid -> {
                                         importPassphraseError = result.describe()
+                                        if (result.error == BackupError.WRONG_PASSPHRASE) {
+                                            importFailures += 1
+                                            importCooldown =
+                                                RetryBackoff.secondsAfter(importFailures)
+                                        }
                                     }
 
                                     BackupDecodeResult.PassphraseRequired -> {
@@ -598,13 +646,17 @@ fun SettingsScreen(
                             }
                         }
                     }
-                ) { Text("解密") }
+                ) {
+                    Text(if (importCooldown > 0) "请等待 $importCooldown 秒" else "解密")
+                }
             },
             dismissButton = {
                 TextButton(onClick = {
                     pendingEncryptedText = null
                     importPassphrase = ""
                     importPassphraseError = null
+                    importFailures = 0
+                    importCooldown = 0
                 }) { Text("取消") }
             }
         )
@@ -620,6 +672,8 @@ fun SettingsScreen(
                     rekeyNewPassphrase = ""
                     rekeyNewPassphraseConfirm = ""
                     rekeyError = null
+                    rekeyFailures = 0
+                    rekeyCooldown = 0
                 }
             },
             title = { Text("更换备份口令") },
@@ -641,6 +695,9 @@ fun SettingsScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    val rekeyQuality = remember(rekeyNewPassphrase) {
+                        PassphraseQuality.evaluate(rekeyNewPassphrase.toCharArray())
+                    }
                     OutlinedTextField(
                         value = rekeyNewPassphrase,
                         onValueChange = {
@@ -648,7 +705,23 @@ fun SettingsScreen(
                             rekeyError = null
                         },
                         label = { Text("新口令") },
-                        supportingText = { Text("至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位，且不能与当前口令相同") },
+                        supportingText = {
+                            Text(
+                                text = if (rekeyNewPassphrase.isEmpty()) {
+                                    "至少 ${PassphraseQuality.MIN_LENGTH} 位，且不能与当前口令相同"
+                                } else {
+                                    passphraseHint(rekeyQuality, empty = false)
+                                },
+                                color = if (rekeyNewPassphrase.isNotEmpty() &&
+                                    (rekeyQuality.level == PassphraseQuality.Level.TOO_SHORT ||
+                                        rekeyQuality.level == PassphraseQuality.Level.WEAK)
+                                ) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -677,7 +750,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(
-                    enabled = !busy,
+                    enabled = !busy && rekeyCooldown == 0,
                     onClick = {
                         val error = when {
                             rekeyOldPassphrase.isBlank() -> "请输入当前口令。"
@@ -704,12 +777,18 @@ fun SettingsScreen(
                                         rekeyNewPassphrase = ""
                                         rekeyNewPassphraseConfirm = ""
                                         rekeyError = null
+                                        rekeyFailures = 0
+                                        rekeyCooldown = 0
                                         pendingRekeyText = result.text
                                         rekeySaveLauncher.launch(backupFileName(suffix = "rekeyed"))
                                     }
 
                                     is BackupReencryptResult.Invalid -> {
                                         rekeyError = result.describe()
+                                        if (result.error == BackupError.WRONG_PASSPHRASE) {
+                                            rekeyFailures += 1
+                                            rekeyCooldown = RetryBackoff.secondsAfter(rekeyFailures)
+                                        }
                                     }
                                 }
                             } catch (e: Exception) {
@@ -721,7 +800,9 @@ fun SettingsScreen(
                             }
                         }
                     }
-                ) { Text("生成新文件") }
+                ) {
+                    Text(if (rekeyCooldown > 0) "请等待 $rekeyCooldown 秒" else "生成新文件")
+                }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -730,6 +811,8 @@ fun SettingsScreen(
                     rekeyNewPassphrase = ""
                     rekeyNewPassphraseConfirm = ""
                     rekeyError = null
+                    rekeyFailures = 0
+                    rekeyCooldown = 0
                 }) { Text("取消") }
             }
         )
@@ -795,7 +878,7 @@ private fun BackupError.message(): String = when (this) {
     BackupError.DETAIL_TYPE_MISMATCH -> "记录的详情类型与事件类型不一致。"
     BackupError.INVALID_DETAIL_FIELD -> "记录的详情字段不合法或取值超出范围。"
     BackupError.DETAIL_NOT_ALLOWED -> "备份中的详情字段与记录类型或备份版本不匹配。"
-    BackupError.WRONG_PASSPHRASE -> "口令错误，或备份文件已损坏、被改动过。请确认口令后重试。"
+    BackupError.WRONG_PASSPHRASE -> "口令错误，或备份文件已损坏、被改动过。请确认口令后重试；口令区分大小写和全半角。"
     BackupError.INVALID_ENVELOPE -> "加密备份的结构不完整或已损坏，无法解密。"
     BackupError.UNSUPPORTED_ENCRYPTION -> "备份使用了当前版本不支持的加密参数，请升级应用后再恢复。"
     BackupError.EMPTY_PASSPHRASE -> "请输入备份口令。"
@@ -833,6 +916,17 @@ private fun backupFileName(suffix: String? = null): String {
     val stamp = LocalDateTime.now().format(backupStampFormatter)
     val tag = suffix?.let { "-$it" }.orEmpty()
     return "LifeTrack-backup-$stamp$tag.json"
+}
+
+/** 口令强度文案：空输入给规则提示，有输入才评强弱，避免一打开就报「偏弱」。 */
+private fun passphraseHint(quality: PassphraseQuality.Result, empty: Boolean): String = when {
+    empty -> "至少 ${PassphraseQuality.MIN_LENGTH} 位，建议用一句话，避免生日和手机号"
+    quality.level == PassphraseQuality.Level.TOO_SHORT ->
+        "至少 ${PassphraseQuality.MIN_LENGTH} 位。"
+
+    quality.level == PassphraseQuality.Level.WEAK -> "偏弱：再长一些，或加入数字 / 符号。"
+    quality.level == PassphraseQuality.Level.FAIR -> "可用：长度和字符种类都够了。"
+    else -> "较强。"
 }
 
 @Composable

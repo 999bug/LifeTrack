@@ -6,6 +6,7 @@ import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.security.BackupCrypto
+import com.example.lifetrack.core.security.PassphraseQuality
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.nio.charset.StandardCharsets
@@ -41,7 +42,7 @@ object BackupCodec {
     const val MAX_EVENTS = 100_000
 
     /** 导出 UI 的口令下限。core 只拒绝空口令，避免把外部生成的短口令备份判死。 */
-    const val MIN_PASSPHRASE_LENGTH = 8
+    const val MIN_PASSPHRASE_LENGTH = PassphraseQuality.MIN_LENGTH
 
     private const val BASE_TYPE = "poop"
 

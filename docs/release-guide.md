@@ -1,6 +1,6 @@
 # 发布与签名指南
 
-> 适用版本 0.4.0 · 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
+> 适用版本 0.5.0 · 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
 
 这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases 并同步到 Gitee，以及为什么签名密钥一旦丢失就无法挽回。代码开发与发布始终以 GitHub 为准，Gitee 只承担国内手机的更新下载。
 
@@ -158,7 +158,7 @@ Release 页面（权威）：https://github.com/999bug/LifeTrack/releases
 Windows 校验：
 
 ```powershell
-Get-FileHash .\LifeTrack-0.4.0-release.apk -Algorithm SHA256
+Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256
 ```
 
 把输出与 `.sha256` 文件内容比对。`sha256` 只证明下载完整，安装包身份由系统在校验 APK 签名时保证。

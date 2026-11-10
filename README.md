@@ -136,7 +136,7 @@ Windows 使用 `gradlew.bat`。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
 - `./gradlew :app:connectedDebugAndroidTest` 通过，共 5 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除。
 
-未验证项：真机安装与真机回归需连接 API 26+ 设备后执行；仪器测试目前只在模拟器（API 37）跑过。
+未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补。真机安装、应用内检查更新与 0.4.0 → 0.5.0 覆盖安装已于 2026-11-10 验证通过。
 
 ## 数据模型
 
@@ -177,6 +177,8 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 ## 当前尚未实现 / 下一阶段清单
 
+> 2026-11-10 更新：安全加固包（C）已启动，按 C1–C10 逐项推进；选型结论、子任务拆解与回滚方案见 [安全加固设计前确认单](docs/security-hardening-confirmation.md)，进度见 [剩余工作子任务台账](docs/PROGRESS.md) 第 4 节。下列功能**仍未实现**。
+
 - 加密备份与恢复（当前导出为明文 JSON，尚无密钥管理）。
 - 应用锁（BiometricPrompt / 系统凭据）。
 - 数据库加密。
@@ -216,6 +218,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - [A8/A11/A12 + B1/B2/B4/B9/B11 收尾确认单](docs/module-remaining-confirmation.md)：运动字段规格、统计类型筛选口径、字段校验收口、迁移测试与 CI 门禁的实施记录。
 - [设置页重构记录](docs/settings-redesign-confirmation.md)：信息架构、记录项目独立页、宽屏限宽与无障碍触摸目标的取舍与验收。
 - [剩余工作子任务台账](docs/PROGRESS.md)：A/B/C 三包共 33 项子任务的交付物、依赖与状态。
+- [C 包安全加固设计前确认单](docs/security-hardening-confirmation.md)：加密选型与构建级 POC 结论、C1–C10 逐项子任务、收益/代价/回滚与待拍板决策。
 
 ## 许可证
 

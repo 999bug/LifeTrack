@@ -43,7 +43,10 @@ enum class BackupError {
     EMPTY_PASSPHRASE,
 
     /** 记录过多，加密后的文件会超过 [BackupIo.MAX_BYTES]。 */
-    BACKUP_TOO_LARGE
+    BACKUP_TOO_LARGE,
+
+    /** 口令轮换只接受 v3 加密备份；明文备份没有口令可换。 */
+    NOT_ENCRYPTED_BACKUP
 }
 
 sealed interface BackupDecodeResult {
@@ -54,4 +57,14 @@ sealed interface BackupDecodeResult {
 
     /** v3 加密备份：需要用户输入口令后带口令再解一次。 */
     data object PassphraseRequired : BackupDecodeResult
+}
+
+/**
+ * 口令轮换结果。[text] 是完整的新备份文件内容，调用方负责写到用户选定的位置；
+ * 原文件由调用方决定是否删除，核心层不碰任何文件。
+ */
+sealed interface BackupReencryptResult {
+    data class Success(val text: String) : BackupReencryptResult
+
+    data class Invalid(val error: BackupError, val detail: String? = null) : BackupReencryptResult
 }

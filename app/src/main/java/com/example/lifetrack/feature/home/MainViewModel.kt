@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
+import com.example.lifetrack.core.backup.BackupReencryptResult
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
@@ -234,6 +235,15 @@ class MainViewModel(
         passphrase: CharArray? = null
     ): BackupDecodeResult = withContext(Dispatchers.IO) {
         BackupCodec.decode(text, passphrase = passphrase)
+    }
+
+    /** 口令轮换：旧口令解出、新口令重加密，返回完整的新文件内容。 */
+    suspend fun reencryptBackup(
+        text: String,
+        oldPassphrase: CharArray,
+        newPassphrase: CharArray
+    ): BackupReencryptResult = withContext(Dispatchers.IO) {
+        BackupCodec.reencrypt(text, oldPassphrase, newPassphrase)
     }
 
     suspend fun restoreBackup(payload: BackupPayload) {

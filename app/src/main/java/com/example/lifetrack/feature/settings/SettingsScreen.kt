@@ -50,6 +50,7 @@ import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
+import com.example.lifetrack.core.backup.BackupReencryptResult
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.feature.home.MainViewModel
 import java.time.LocalDateTime
@@ -98,6 +99,14 @@ fun SettingsScreen(
     var pendingEncryptedText by remember { mutableStateOf<String?>(null) }
     var importPassphrase by remember { mutableStateOf("") }
     var importPassphraseError by remember { mutableStateOf<String?>(null) }
+
+    // 更换备份口令：选一份加密备份，解旧 → 用新口令重加密 → 另存为新文件。
+    var rekeySourceText by remember { mutableStateOf<String?>(null) }
+    var rekeyOldPassphrase by remember { mutableStateOf("") }
+    var rekeyNewPassphrase by remember { mutableStateOf("") }
+    var rekeyNewPassphraseConfirm by remember { mutableStateOf("") }
+    var rekeyError by remember { mutableStateOf<String?>(null) }
+    var pendingRekeyText by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -173,6 +182,67 @@ fun SettingsScreen(
         }
     }
 
+    val rekeyPickLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            status = null
+            failure = null
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { BackupIo.readUtf8(it) }
+                }.getOrNull()
+            }
+            if (text == null) {
+                failure = "无法读取文件，或文件超过 ${BackupIo.MAX_BYTES / 1024 / 1024} MB。"
+            } else {
+                // 不带口令先判类型：明文没有口令可换，坏文件直接给原因。
+                when (val result = viewModel.decodeBackupJson(text)) {
+                    is BackupDecodeResult.Success ->
+                        failure = "这是未加密的备份，没有口令可以更换。"
+
+                    is BackupDecodeResult.Invalid -> failure = result.describe()
+
+                    BackupDecodeResult.PassphraseRequired -> {
+                        rekeySourceText = text
+                        rekeyOldPassphrase = ""
+                        rekeyNewPassphrase = ""
+                        rekeyNewPassphraseConfirm = ""
+                        rekeyError = null
+                    }
+                }
+            }
+            busy = false
+        }
+    }
+
+    val rekeySaveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val text = pendingRekeyText
+        pendingRekeyText = null
+        if (uri == null || text == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            status = null
+            failure = null
+            try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        BackupIo.writeUtf8(output, text)
+                    } ?: error("无法写入所选位置")
+                }
+                status = "已生成新口令的备份。确认能恢复后，再删除旧文件。"
+            } catch (e: Exception) {
+                failure = "写入失败：${e.message ?: "无法写入所选位置"}"
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     LaunchedEffect(pending) {
         currentCount = if (pending == null) 0 else viewModel.countAllRecords()
     }
@@ -223,6 +293,17 @@ fun SettingsScreen(
                 enabled = !busy,
                 onClick = {
                     importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                title = "更换备份口令",
+                subtitle = "解旧口令后用新口令重新加密，生成新文件",
+                enabled = !busy,
+                onClick = {
+                    rekeyPickLauncher.launch(
+                        arrayOf("application/json", "text/plain", "application/octet-stream")
+                    )
                 }
             )
             if (busy || status != null) {
@@ -529,6 +610,131 @@ fun SettingsScreen(
         )
     }
 
+    val rekeyText = rekeySourceText
+    if (rekeyText != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!busy) {
+                    rekeySourceText = null
+                    rekeyOldPassphrase = ""
+                    rekeyNewPassphrase = ""
+                    rekeyNewPassphraseConfirm = ""
+                    rekeyError = null
+                }
+            },
+            title = { Text("更换备份口令") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("会生成一份新文件，原备份保持不变；确认新文件能恢复后，再删除旧文件。")
+                    OutlinedTextField(
+                        value = rekeyOldPassphrase,
+                        onValueChange = {
+                            rekeyOldPassphrase = it
+                            rekeyError = null
+                        },
+                        label = { Text("当前口令") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = rekeyNewPassphrase,
+                        onValueChange = {
+                            rekeyNewPassphrase = it
+                            rekeyError = null
+                        },
+                        label = { Text("新口令") },
+                        supportingText = { Text("至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位，且不能与当前口令相同") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = rekeyNewPassphraseConfirm,
+                        onValueChange = {
+                            rekeyNewPassphraseConfirm = it
+                            rekeyError = null
+                        },
+                        label = { Text("再输一次新口令") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    rekeyError?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        val error = when {
+                            rekeyOldPassphrase.isBlank() -> "请输入当前口令。"
+                            rekeyNewPassphrase.length < BackupCodec.MIN_PASSPHRASE_LENGTH ->
+                                "新口令至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位。"
+
+                            rekeyNewPassphrase == rekeyOldPassphrase -> "新口令不能与当前口令相同。"
+                            rekeyNewPassphrase != rekeyNewPassphraseConfirm -> "两次输入的新口令不一致。"
+                            else -> null
+                        }
+                        if (error != null) {
+                            rekeyError = error
+                            return@TextButton
+                        }
+                        scope.launch {
+                            busy = true
+                            val oldChars = rekeyOldPassphrase.toCharArray()
+                            val newChars = rekeyNewPassphrase.toCharArray()
+                            try {
+                                when (val result = viewModel.reencryptBackup(rekeyText, oldChars, newChars)) {
+                                    is BackupReencryptResult.Success -> {
+                                        rekeySourceText = null
+                                        rekeyOldPassphrase = ""
+                                        rekeyNewPassphrase = ""
+                                        rekeyNewPassphraseConfirm = ""
+                                        rekeyError = null
+                                        pendingRekeyText = result.text
+                                        rekeySaveLauncher.launch(backupFileName(suffix = "rekeyed"))
+                                    }
+
+                                    is BackupReencryptResult.Invalid -> {
+                                        rekeyError = result.describe()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                rekeyError = "更换失败：${e.message ?: "加密异常"}"
+                            } finally {
+                                oldChars.fill('\u0000')
+                                newChars.fill('\u0000')
+                                busy = false
+                            }
+                        }
+                    }
+                ) { Text("生成新文件") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    rekeySourceText = null
+                    rekeyOldPassphrase = ""
+                    rekeyNewPassphrase = ""
+                    rekeyNewPassphraseConfirm = ""
+                    rekeyError = null
+                }) { Text("取消") }
+            }
+        )
+    }
+
     val payload = pending
     if (payload != null) {
         AlertDialog(
@@ -594,9 +800,10 @@ private fun BackupError.message(): String = when (this) {
     BackupError.UNSUPPORTED_ENCRYPTION -> "备份使用了当前版本不支持的加密参数，请升级应用后再恢复。"
     BackupError.EMPTY_PASSPHRASE -> "请输入备份口令。"
     BackupError.BACKUP_TOO_LARGE -> "记录过多，加密后的备份会超过大小上限。"
+    BackupError.NOT_ENCRYPTED_BACKUP -> "这是未加密的备份，没有口令可以更换。"
 }
 
-private fun BackupDecodeResult.Invalid.describe(): String = buildString {
+private fun describeError(error: BackupError, detail: String?): String = buildString {
     append(error.message())
     // 只有「定位到某条记录」的细节才对用户有意义；算法名、payload 之类的技术细节留在日志里。
     val technical = error == BackupError.INVALID_ENVELOPE ||
@@ -604,6 +811,10 @@ private fun BackupDecodeResult.Invalid.describe(): String = buildString {
         error == BackupError.UNSUPPORTED_VERSION
     if (!technical) detail?.let { append("（记录 $it）") }
 }
+
+private fun BackupDecodeResult.Invalid.describe(): String = describeError(error, detail)
+
+private fun BackupReencryptResult.Invalid.describe(): String = describeError(error, detail)
 
 private fun BackupCrypto.Reason.exportMessage(): String = when (this) {
     BackupCrypto.Reason.EMPTY_PASSPHRASE -> "口令不能为空。"
@@ -618,8 +829,11 @@ private fun BackupCrypto.Reason.exportMessage(): String = when (this) {
     BackupCrypto.Reason.DECRYPT_FAILED -> "加密失败，请重试。"
 }
 
-private fun backupFileName(): String =
-    "LifeTrack-backup-${LocalDateTime.now().format(backupStampFormatter)}.json"
+private fun backupFileName(suffix: String? = null): String {
+    val stamp = LocalDateTime.now().format(backupStampFormatter)
+    val tag = suffix?.let { "-$it" }.orEmpty()
+    return "LifeTrack-backup-$stamp$tag.json"
+}
 
 @Composable
 private fun BackupOptionRow(

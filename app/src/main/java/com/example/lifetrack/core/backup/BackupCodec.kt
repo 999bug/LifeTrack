@@ -140,10 +140,8 @@ object BackupCodec {
         options: BackupDecodeOptions = BackupDecodeOptions.Default,
         passphrase: CharArray? = null
     ): BackupDecodeResult {
-        val envelope = runCatching {
-            json.decodeFromString(EncryptedBackupFileDto.serializer(), text)
-        }.getOrNull()
-        if (envelope != null && envelope.schemaVersion == ENCRYPTED_SCHEMA_VERSION) {
+        val envelope = parseEnvelope(text)
+        if (envelope != null) {
             if (envelope.app != APP_ID) {
                 return BackupDecodeResult.Invalid(BackupError.NOT_LIFETRACK_FILE)
             }
@@ -155,6 +153,58 @@ object BackupCodec {
         }
         return decodePlaintext(text, now, options)
     }
+
+    /**
+     * 口令轮换：用旧口令解出完整payload，再用新口令重新加密。
+     *
+     * - 只接受 v3 加密备份；明文文件没有口令可换。
+     * - 重新编码会换新的盐与 IV，并重新走一遍字段校验；不会把旧密文原样复制。
+     * - 生成后会立刻用新口令解一遍并比对，确认条数与字段一致才返回，避免交付一个打不开的文件。
+     * - 不读写文件、不删原文件：落盘与清理交给调用方，核心层保持可单测。
+     */
+    fun reencrypt(
+        text: String,
+        oldPassphrase: CharArray,
+        newPassphrase: CharArray,
+        now: Instant = Instant.now()
+    ): BackupReencryptResult {
+        val envelope = parseEnvelope(text)
+            ?: return BackupReencryptResult.Invalid(BackupError.NOT_ENCRYPTED_BACKUP)
+        if (envelope.app != APP_ID) {
+            return BackupReencryptResult.Invalid(BackupError.NOT_LIFETRACK_FILE)
+        }
+        if (envelope.payload.isBlank()) {
+            return BackupReencryptResult.Invalid(BackupError.INVALID_ENVELOPE, "payload")
+        }
+
+        return when (val decoded = decodeEncrypted(envelope, oldPassphrase, now, BackupDecodeOptions.Default)) {
+            is BackupDecodeResult.Success -> {
+                val payload = decoded.payload
+                val reencrypted = try {
+                    encodeEncrypted(payload.types, payload.events, newPassphrase, now)
+                } catch (e: BackupCrypto.Failure) {
+                    return BackupReencryptResult.Invalid(e.reason.toBackupError())
+                }
+                val checkEnvelope = parseEnvelope(reencrypted)
+                    ?: return BackupReencryptResult.Invalid(BackupError.INVALID_ENVELOPE, "verify")
+                val check = decodeEncrypted(checkEnvelope, newPassphrase, now, BackupDecodeOptions.Default)
+                if (check !is BackupDecodeResult.Success || check.payload != payload) {
+                    return BackupReencryptResult.Invalid(BackupError.INVALID_ENVELOPE, "verify")
+                }
+                BackupReencryptResult.Success(reencrypted)
+            }
+
+            is BackupDecodeResult.Invalid -> BackupReencryptResult.Invalid(decoded.error, decoded.detail)
+            BackupDecodeResult.PassphraseRequired ->
+                BackupReencryptResult.Invalid(BackupError.EMPTY_PASSPHRASE)
+        }
+    }
+
+    /** 只认声明为 v3 的容器；其它版本仍按明文分支处理，保证旧文件走原错误提示。 */
+    private fun parseEnvelope(text: String): EncryptedBackupFileDto? =
+        runCatching { json.decodeFromString(EncryptedBackupFileDto.serializer(), text) }
+            .getOrNull()
+            ?.takeIf { it.schemaVersion == ENCRYPTED_SCHEMA_VERSION }
 
     private fun decodeEncrypted(
         envelope: EncryptedBackupFileDto,

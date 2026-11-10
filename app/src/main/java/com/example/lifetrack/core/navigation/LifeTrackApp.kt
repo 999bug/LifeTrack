@@ -37,6 +37,7 @@ import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
+import com.example.lifetrack.feature.record.RecordDetailSheet
 import com.example.lifetrack.feature.settings.ModuleManagementScreen
 import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.sport.SportEditorDialog
@@ -69,6 +70,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     var editorVisible by remember { mutableStateOf(false) }
     var editorTypeCode by remember { mutableStateOf(DEFAULT_POOP_TYPE.code) }
     var editingRecord by remember { mutableStateOf<BackupRecord?>(null) }
+    var detailRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -120,6 +122,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
                     onOpenSettings = { navController.navigate("settings") },
+                    onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it }
                 )
@@ -127,6 +130,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
             composable("history") {
                 HistoryScreen(
                     viewModel = viewModel,
+                    onShowDetail = { detailRecord = it },
                     onEdit = { record -> openEditor(record.event.typeCode, record) },
                     onDelete = { pendingDeleteId = it }
                 )
@@ -182,6 +186,13 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 }
             )
         }
+    }
+
+    detailRecord?.let { record ->
+        RecordDetailSheet(
+            record = record,
+            onDismiss = { detailRecord = null }
+        )
     }
 
     pendingDeleteId?.let { id ->

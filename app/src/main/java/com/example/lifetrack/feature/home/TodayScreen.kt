@@ -42,6 +42,7 @@ fun TodayScreen(
     onCoffeeRecord: () -> Unit,
     onSportRecord: () -> Unit,
     onOpenSettings: () -> Unit,
+    onShowDetail: (BackupRecord) -> Unit,
     onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -187,6 +188,7 @@ fun TodayScreen(
             items(records, key = { it.event.id }) { record ->
                 RecordRow(
                     record = record,
+                    onShowDetail = { onShowDetail(record) },
                     onEdit = { onEdit(record) },
                     onDelete = { onDelete(record.event.id) }
                 )

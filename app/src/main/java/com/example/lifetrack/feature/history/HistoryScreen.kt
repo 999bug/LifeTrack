@@ -62,6 +62,7 @@ private val fullDateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", L
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
+    onShowDetail: (BackupRecord) -> Unit,
     onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -145,6 +146,7 @@ fun HistoryScreen(
             items(dailyRecords, key = { it.event.id }) { record ->
                 RecordRow(
                     record = record,
+                    onShowDetail = { onShowDetail(record) },
                     onEdit = { onEdit(record) },
                     onDelete = { onDelete(record.event.id) }
                 )

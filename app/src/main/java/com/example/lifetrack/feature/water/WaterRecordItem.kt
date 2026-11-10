@@ -29,6 +29,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun WaterRecordItem(
     record: BackupRecord,
+    onShowDetail: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -42,6 +43,7 @@ fun WaterRecordItem(
     }.getOrDefault("时间未知")
 
     Card(
+        onClick = onShowDetail,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

@@ -42,6 +42,7 @@ private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun RecordRow(
     record: BackupRecord,
+    onShowDetail: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -51,25 +52,50 @@ fun RecordRow(
                 event = record.event,
                 detail = (record.detail as? RecordDetail.Poop)?.toEntity(record.event.id)
             ),
+            onShowDetail = onShowDetail,
             onEdit = onEdit,
             onDelete = onDelete
         )
 
-        WaterFields.TYPE_CODE -> WaterRecordItem(record = record, onEdit = onEdit, onDelete = onDelete)
-        CoffeeFields.TYPE_CODE -> CoffeeRecordItem(record = record, onEdit = onEdit, onDelete = onDelete)
-        SportFields.TYPE_CODE -> SportRecordItem(record = record, onEdit = onEdit, onDelete = onDelete)
-        else -> UnknownRecordItem(record = record, onDelete = onDelete)
+        WaterFields.TYPE_CODE -> WaterRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
+        CoffeeFields.TYPE_CODE -> CoffeeRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
+        SportFields.TYPE_CODE -> SportRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
+        else -> UnknownRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onDelete = onDelete
+        )
     }
 }
 
 @Composable
-private fun UnknownRecordItem(record: BackupRecord, onDelete: () -> Unit) {
+private fun UnknownRecordItem(
+    record: BackupRecord,
+    onShowDetail: () -> Unit,
+    onDelete: () -> Unit
+) {
     val timeLabel = runCatching {
         Instant.ofEpochMilli(record.event.occurredAtEpochMillis)
             .atZone(ZoneId.of(record.event.zoneId))
             .format(timeFormatter)
     }.getOrDefault("时间未知")
     Card(
+        onClick = onShowDetail,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

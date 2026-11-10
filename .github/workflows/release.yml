@@ -4,6 +4,7 @@ name: Release APK
 #   CI 从仓库里最高的 vX.Y.Z tag 推 patch+1、从 app/build.gradle.kts 读 versionCode+1，
 #   在 runner 内改 build.gradle.kts 后构建；全部成功后才把版本改动提交回 main、
 #   打 tag、发 Release。仅当需要跳 minor/major 时才手填 version（如 v0.7.0）。
+#   版本提交会顺带重生成 docs/release-pipeline-recipe.md 的事实快照，供 ci.yml 自检。
 # 仓库只保留这一条发布流水线，不另起第二条打 tag 的流水线。
 on:
   workflow_dispatch:
@@ -230,7 +231,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
+          # 版本号变了，配方文档的事实快照要一起更新，否则下次 ci.yml 的 --check 会标红。
+          python3 scripts/export_release_pipeline.py --write
+          git add app/build.gradle.kts docs/release-pipeline-recipe.md
           git commit -m "chore: release $TAG (versionCode $VERSION_CODE) [skip ci]"
 
           # 构建期间 main 若被推进，不做 rebase / merge（也不碰任何人的本地仓库），

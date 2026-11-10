@@ -224,6 +224,7 @@ C8 / B8 的真机厂商 ROM 迁移走查尚未完成，在此之前不要依赖�
 
 - [本地验证与在线升级方案](docs/local-verification-and-upgrade.md)：改完代码怎么在模拟器上验证、装到手机后怎么升级。
 - [发布与签名指南](docs/release-guide.md)：签名密钥准备、版本号自动递增与 CI 提交机制、Release 出包步骤、下载校验与回滚。
+- [发版流水线配方](docs/release-pipeline-recipe.md)：供规范归纳的机器可读事实、按项目类型的移植矩阵、通用不变量与自动快照生成 / 自检方式。
 - [统计增强包设计前确认单](docs/statistics-enhancement-confirmation.md)：月历视图、形态分布与时段分布的口径、影响面与实施记录。
 - [模块扩展第二批设计前确认单](docs/module-extension-confirmation.md)：通用编辑器壳、通用详情模型、备份 v2 兼容口径与实施记录。
 - [饮水模块试点设计前确认单](docs/water-module-confirmation.md)：Room v2 迁移、通用详情表、water 规格注册与验收结果。

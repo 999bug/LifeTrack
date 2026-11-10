@@ -11,6 +11,10 @@ captures/
 .cxx/
 .workbuddy/
 
+# scripts/ 下 Python 工具的字节码缓存，不属于源码
+__pycache__/
+*.pyc
+
 # 发布签名密钥只放本机与 GitHub Repository secrets，绝不入库
 *.jks
 *.keystore

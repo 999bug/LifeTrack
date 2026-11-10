@@ -139,7 +139,7 @@ CI 自己完成：
 1. 从仓库里最高的 `vX.Y.Z` tag 推 `patch + 1`（当前基线 `v0.6.0` → 下次 `v0.6.1`）；
 2. 从 `app/build.gradle.kts` 读当前 `versionCode` 并 `+1`（6 → 7）；
 3. 在 runner 的工作副本里把这两个数字写回 `app/build.gradle.kts`，**用新版本构建** release APK——所以 APK 文件名、包内版本号、tag 三者一致；
-4. 单测 / lint / 构建 / 验签全部通过后，把版本改动以 `chore: release v0.6.1 (versionCode 7) [skip ci]` 提交并推回 `main`，再以该提交为 target 创建 tag 与 GitHub Release；
+4. 单测 / lint / 构建 / 验签全部通过后，把版本改动以 `chore: release v0.6.1 (versionCode 7) [skip ci]` 提交并推回 `main`（同一个提交会自动重生成 `docs/release-pipeline-recipe.md` 的事实快照），再以该提交为 target 创建 tag 与 GitHub Release；
 5. `mirror-gitee` job 通过 `needs.release.outputs.tag` 拿到同一个 tag，下载同一份 `release-apk` artifact，创建 Gitee Release 并上传 APK 与 `.sha256`。
 
 想跳小版本时（例如想发 `0.7.0` 而不是 `0.6.1`），在 Run workflow 的 `version` 输入框里手填 `v0.7.0`；**留空就是自动递增**。手填值必须是 `vX.Y.Z` 且严格高于最新 tag，否则流水线在花几分钟构建之前就报错。
@@ -159,6 +159,7 @@ Android 的 `versionCode` 必须严格递增，否则系统拒绝覆盖安装；
 - 只允许从 `main` 手动触发；从其它分支 Run workflow 会在第一步被拒绝，避免把版本提交叠在没测过的代码上。
 - 构建期间 `main` 若出现新提交，流水线**不会** rebase / merge，而是中止并提示重跑（并发由 `concurrency: release-apk` 再兜一层）。
 - 版本提交带 `[skip ci]`，且 `GITHUB_TOKEN` 产生的 push 本身不会再触发 workflow，不会形成循环。
+- 版本提交会顺带跑 `scripts/export_release_pipeline.py --write` 更新发版配方快照；`ci.yml` 的 `--check` 会校验两者一致。配方文档的用途与归纳建议见 [发版流水线配方](release-pipeline-recipe.md)。
 
 ### 2.3 失败落在哪一步，怎么补
 

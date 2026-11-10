@@ -20,6 +20,7 @@
 | ✅ 已完成 | 0.5.0 真机验收 | 用户 2026-11-10 反馈：应用内「检查更新」正常完成且走国内网络；0.4.0 → 0.5.0 覆盖安装升级成功 | — |
 | ✅ 已完成 | 发布 0.6.0（加密首发） | 2026-11-10 16:42 由用户自行触发：GitHub Release `v0.6.0` + Gitee 同名 Release，`LifeTrack-0.6.0-release.apk`（22,283,347 B）+ `.sha256` 齐备，tag `v0.6.0` → `3b5ea49`；用户反馈真机安装与加密迁移成功。18:04 另一次触发因手填 `v0.6.0` 撞已存在 tag 在 `Check tag and version` 失败（head `40ee2ba`，未产出 Release） | 下一次发版带入 A10 |
 | ✅ 已完成 | 发版版本号自动递增 | 2026-11-10 改造 `release.yml`：CI 从最高 tag 推 patch+1、从 gradle 推 `versionCode+1`，runner 内改 `build.gradle.kts` 后构建，成功后把版本改动提交回 `main`、打 tag、发 Release；`mirror-gitee` 改读 `needs.release.outputs.tag`。YAML 解析、11 段 shell 语法与 5 类版本分支已本地模拟验证 | 首次真实运行待用户触发；`main` 若开分支保护需放行 `github-actions[bot]` |
+| ✅ 已完成 | 发版流水线配方与自动快照 | 新增 `docs/release-pipeline-recipe.md`（机器可读事实、按项目类型的移植矩阵、通用不变量、红线、给 `ai-dev-standards` 的归纳建议）与 `scripts/export_release_pipeline.py`（`--facts` / `--write` / `--check`，零第三方依赖、输出脱敏）；`ci.yml` 接 `--check`，`release.yml` 的版本提交会自动 `--write`，实测版本递增后自检报错 → 重生成 → 一致 | 待 `ai-dev-standards` 按项目类型归纳 |
 
 A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5（备份 v2、Room 仍 v1），第三批 A6（首次升 Room v2，新增通用详情表 + 饮水闭环），第四批 A7（只注册类型与规格，咖啡 / 茶闭环）。A7/A8 已验证「加类型不必升 Room」的扩展点；后续模块沿用同一路径。
 

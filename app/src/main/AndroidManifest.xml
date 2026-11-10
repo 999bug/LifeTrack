@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 应用内「检查更新」需要联网查询 GitHub Releases 并下载 APK，故申请 INTERNET；
-         安装更新包需要 REQUEST_INSTALL_PACKAGES。该网络能力仅用于更新，不上传任何数据。
+    <!-- 应用内「检查更新」需要联网查询 Gitee Releases（不可用时回退 GitHub Releases）
+         并下载 APK，故申请 INTERNET；安装更新包需要 REQUEST_INSTALL_PACKAGES。
+         该网络能力仅用于更新，不上传任何数据。
          详见 README「本地存储」「安全边界」与 project-profile.md 第 9 节。 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

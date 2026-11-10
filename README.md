@@ -6,11 +6,13 @@
 
 ## 下载安装
 
-Release 页面：https://github.com/999bug/LifeTrack/releases
+权威发布：https://github.com/999bug/LifeTrack/releases
+国内分发镜像（应用内「检查更新」使用）：https://gitee.com/saul999/LifeTrack/releases
 
-- 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件。
+- 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件；两端是同一份 CI 产物，签名一致。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
 - 当前版本 `0.4.0`（versionCode 4）。校验示例：`Get-FileHash .\LifeTrack-0.4.0-release.apk -Algorithm SHA256`。
+- 应用内检查更新优先查询 Gitee，Gitee 暂无 Release、未附 APK 或请求失败时回退 GitHub。
 
 > 本 README 描述 main 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。
 
@@ -34,7 +36,7 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - 运动模块：新增「记录运动」入口，可填写运动类型（步行 / 跑步 / 骑行 / 游泳 / 力量 / 其他）、时长（1–1440 分钟）与强度（低 / 中 / 高）；时长展示超过 60 分钟自动换算为小时，不做热量或配速推算。沿用同一扩展点，**只注册类型与字段规格**，Room 仍 version 2、备份仍 schemaVersion 2。
 - Room 数据持久化、DataStore 深色模式设置。
 - UTC 时间戳 + IANA zoneId + 发生时 localDate；本地日期映射有单元测试。
-- 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 GitHub Releases 最新版本号与下载本应用 APK，不发送任何用户数据、设备标识或遥测。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
+- 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 Gitee Releases 最新版本号与下载本应用 APK（Gitee 不可用时回退 GitHub Releases），不发送任何用户数据、设备标识或遥测。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
 
 ## 版本基线（固定版本，不使用动态版本）
 
@@ -130,7 +132,7 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk`（约 21 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 126 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11。
+- `./gradlew :app:testDebugUnitTest` 通过，共 141 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
 - `./gradlew :app:connectedDebugAndroidTest` 通过，共 5 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除。
 
@@ -152,7 +154,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 ## 本地存储、自动备份和主动导出边界
 
-- 业务数据库位于应用私有目录，不提供数据上传接口；`INTERNET` 权限仅用于应用内「检查更新」向 `api.github.com` 查询 GitHub Releases 最新版本与下载 APK，不发起任何其它网络请求、不上传数据。
+- 业务数据库位于应用私有目录，不提供数据上传接口；`INTERNET` 权限仅用于应用内「检查更新」向 `gitee.com` 查询 Gitee Releases 最新版本（失败时回退 `api.github.com`）与下载 APK，不发起任何其它网络请求、不上传数据。
 - `android:allowBackup="false"`，同时提供 `fullBackupContent` 与 Android 12+ `dataExtractionRules`，将数据库、偏好设置、文件和根目录排除在云备份及设备迁移之外。不同厂商设备仍应实机验证系统迁移行为。
 - 自动备份关闭意味着用户不能依靠 Google/厂商备份恢复数据。卸载应用、清除应用数据或丢失手机，都可能导致未主动导出的数据永久丢失。
 - **已实现主动导出 / 恢复（明文 JSON）**：设置页 → 备份与恢复，通过 Storage Access Framework 由用户选择保存位置。文件含 `schemaVersion`、类型表与全部记录（含详情）；恢复时校验应用标识、版本号、事件条数、ID 唯一性、时区、本地日期与字段范围，任一不通过即整体拒绝，替换在单个 Room 事务内完成。
@@ -169,7 +171,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 3. 主动导出文件加密、完整性校验、恢复与密钥轮换方案。
 4. Android 自动备份、设备迁移、卸载重装、换机恢复和厂商 ROM 行为评审。
 5. 日志、崩溃报告、剪贴板、最近任务屏幕预览及通知内容的隐私审查。
-6. 应用内「检查更新」的网络行为（仅 HTTPS GET `api.github.com/repos/999bug/LifeTrack/releases/latest` 与下载 APK）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
+6. 应用内「检查更新」的网络行为（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`，失败时回退 `api.github.com/repos/999bug/LifeTrack/releases/latest`，以及下载 APK）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
 
 不要在尚未完成上述评审前把真实的敏感数据交给此开发骨架长期保管。
 

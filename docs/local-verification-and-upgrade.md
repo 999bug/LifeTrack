@@ -1,6 +1,8 @@
 # 本地验证与在线升级方案
 
 > 适用版本 0.4.0 · 核对日期 2026-11-09 · 仓库 https://github.com/999bug/LifeTrack
+>
+> 注：本文第二部分的升级渠道为早期方案讨论。现行实现以 Gitee Release 为国内分发主源、GitHub Releases 为兜底，发布流水线同步两端附件，见 [发布与签名指南](release-guide.md) §6。
 
 这份文档解决两件事：
 

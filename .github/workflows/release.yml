@@ -156,3 +156,84 @@ jobs:
       - name: Remove decoded keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/lifetrack-release.jks"
+
+  # Gitee 官方仓库镜像只同步分支/标签/提交，不同步 Release 附件，
+  # 因此 APK 必须由本流水线调用 OpenAPI 单独上传。这里复用同一份 release-apk
+  # artifact，保证 Gitee 与 GitHub 的签名包字节完全一致。
+  mirror-gitee:
+    name: Mirror release to Gitee
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      TAG: ${{ inputs.version }}
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
+      GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}
+      GITEE_BRANCH: ${{ vars.GITEE_BRANCH || 'main' }}
+    steps:
+      - name: Download release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: release-apk
+          path: dist
+
+      - name: Check Gitee configuration
+        run: |
+          if [ -z "$GITEE_TOKEN" ]; then
+            echo "::error::Missing repository secret: GITEE_TOKEN (see docs/release-guide.md)"
+            exit 1
+          fi
+          if ! find dist -maxdepth 1 -type f -name 'LifeTrack-*-release.apk' | grep -q .; then
+            echo "::error::Release APK missing from artifact"
+            exit 1
+          fi
+          if ! find dist -maxdepth 1 -type f -name '*.apk.sha256' | grep -q .; then
+            echo "::error::SHA256 checksum missing from artifact"
+            exit 1
+          fi
+
+      - name: Create Gitee release and upload attachments
+        run: |
+          set -euo pipefail
+          API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases"
+
+          existing=$(curl -sS "${API}?access_token=${GITEE_TOKEN}&page=1&per_page=100")
+          if ! printf '%s' "$existing" | jq -e 'type == "array"' > /dev/null; then
+            echo "::error::Cannot list Gitee releases: $existing"
+            exit 1
+          fi
+          if printf '%s' "$existing" | jq -e --arg tag "$TAG" 'any(.[]; .tag_name == $tag)' > /dev/null; then
+            echo "::error::Gitee release $TAG already exists; refusing to overwrite"
+            exit 1
+          fi
+
+          created=$(curl -sS -X POST "$API" \
+            --data-urlencode "access_token=${GITEE_TOKEN}" \
+            --data-urlencode "tag_name=${TAG}" \
+            --data-urlencode "name=${TAG}" \
+            --data-urlencode "body=国内分发镜像，权威发布见 https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" \
+            --data-urlencode "target_commitish=${GITEE_BRANCH}" \
+            --data-urlencode "prerelease=false")
+          release_id=$(printf '%s' "$created" | jq -r '.id // empty')
+          if [ -z "$release_id" ]; then
+            echo "::error::Gitee release creation failed: $created"
+            exit 1
+          fi
+          echo "Created Gitee release id=$release_id for $TAG"
+
+          for file in dist/*.apk dist/*.apk.sha256; do
+            [ -f "$file" ] || continue
+            response=$(curl -sS -X POST "${API}/${release_id}/attach_files" \
+              -F "access_token=${GITEE_TOKEN}" \
+              -F "file=@${file}")
+            url=$(printf '%s' "$response" | jq -r '.browser_download_url // empty')
+            if [ -z "$url" ]; then
+              echo "::error::Attachment upload failed for $(basename "$file"): $response"
+              exit 1
+            fi
+            echo "Uploaded $(basename "$file"): $url"
+          done
+          echo "Mirror complete: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/tag/${TAG}"

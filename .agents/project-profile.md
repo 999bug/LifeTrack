@@ -55,7 +55,7 @@ push_policy: on-request            # 只提交，push 等用户授权
 ## 4. 交付与发布
 
 ```yaml
-deploy_target: GitHub Releases      # 通过 Release 分发签名 APK，无服务端
+deploy_target: GitHub Releases（权威）+ Gitee Releases（国内分发镜像）  # 同一份签名 APK，CI 同步附件，无服务端
 release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
 version_scheme: 语义化 semver       # versionName 0.4.0 / versionCode 4，已发布 v0.1.0、v0.2.0、v0.3.0、v0.4.0
 registry: none
@@ -65,7 +65,7 @@ pages: no
 ## 5. 敏感信息
 
 ```yaml
-secrets_location: GitHub Repository secrets   # 尚未配置 Actions/secrets，见 §9
+secrets_location: GitHub Repository secrets   # 4 个签名 secret + GITEE_TOKEN（Gitee 私人令牌），见 §9
 never_commit:
   - local.properties               # 本机 SDK 路径
   - captures/                      # 设备截图
@@ -122,7 +122,7 @@ overrides:
 - **构建工具链已升级到 AGP 9（2026-11-06 修复，勿回退）**：现象 → `:app:checkDebugAarMetadata` 报 28 项 AAR 元数据错误，Compose BOM 2026.09.00（compose-ui 1.12.1）、Navigation 2.10.2、Lifecycle 2.11.0 要求 AGP ≥ 9.1.0 且 compileSdk ≥ 37。根因 → 工程原先固定 AGP 8.13.2 / compileSdk 36.1，与当前 AndroidX 依赖的元数据要求不匹配。修复 → AGP 9.3.1 + Gradle 9.6.1 + compileSdk 37，移除 `org.jetbrains.kotlin.android`（AGP 9 内置 Kotlin），Kotlin 2.4.21 通过根 `buildscript` classpath 覆盖，KSP 升到 2.3.13。教训 → AGP 9.3.1 硬性要求 Gradle ≥ 9.5.0（9.4.1 会直接失败）；KSP 必须 ≥ 2.3.1 才能配合 built-in Kotlin；升级这批依赖时先看 AAR 元数据里的 AGP/compileSdk 下限。
 - **`gradle/wrapper/` 已是官方 Wrapper（含 `gradle-wrapper.jar`）**：旧的 `gradlew` / `gradlew.bat` 是自制下载引导脚本，硬编码 Gradle 8.13 且只认 `~/.gradle/life-track-bootstrap/`，升级版本时必须同步改脚本里的 `VERSION`。现已替换为官方脚本，改版本只改 `gradle-wrapper.properties` 的 `distributionUrl`。
 - **数据库未加密**：不得声称 Room 已加密；应用私有目录只是沙箱隔离。面向真实用户发布前必须先完成加密选型、Android Keystore 密钥管理、导出文件加密与备份/迁移评审（见 README「安全边界」）。
-- **Manifest 的 INTERNET 权限例外（已评审）**：原本 Local First 硬约束是「不申请 INTERNET」，但应用内「检查更新」需要联网查询 GitHub Releases 并下载 APK，已作为**唯一例外**放开——新增 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限（见 `app/src/main/AndroidManifest.xml`）。该网络能力仅用于更新（HTTPS GET `api.github.com/repos/999bug/LifeTrack/releases/latest` + 下载 APK），不携带任何用户数据/设备标识/遥测；对应的 README「本地存储」「安全边界」第 6 条与隐私评审已同步更新。新增任何其它网络能力仍需回到本约束重新评审。
+- **Manifest 的 INTERNET 权限例外（已评审）**：原本 Local First 硬约束是「不申请 INTERNET」，但应用内「检查更新」需要联网查询 Release 清单并下载 APK，已作为**唯一例外**放开——新增 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限（见 `app/src/main/AndroidManifest.xml`）。该网络能力仅用于更新（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`，失败时回退 `api.github.com/repos/999bug/LifeTrack/releases/latest`，以及下载 APK），不携带任何用户数据/设备标识/遥测；对应的 README「本地存储」「安全边界」第 6 条与隐私评审已同步更新。新增任何其它网络能力仍需回到本约束重新评审。
 - **`allowBackup=false`，主动导出 / 恢复已实现但未加密**：设置页「备份与恢复」走 SAF 导出单个 JSON（schemaVersion 2，可读 v1），恢复在单事务内整体替换；卸载、清除数据或丢机仍会丢数据，备份文件本身是明文，加密与密钥管理见 README「安全边界」与台账 C4–C6。
 - **发布签名密钥由 Repository secrets 注入**：流水线从 `LIFETRACK_KEYSTORE*` 环境变量读取，首次发版前需按 docs/release-guide.md 配置 4 个 secrets；keystore 与口令绝不入库，密钥丢失后用户只能卸载重装且数据全丢。
 - **CI 不能用 `android-actions/setup-android@v3`（2026-11-09 修复）**：现象 → `Set up Android SDK` 步骤 15 秒失败，日志 `Warning: Failed to find package 'tools'` 与 `sdkmanager failed with exit code 1`。根因 → 该 action 固定执行 `sdkmanager tools`，而 2026 年 ubuntu-latest 预装的 cmdline-tools 16.0 已移除 `tools` 包。修复 → 去掉 action，直接定位 `$ANDROID_HOME/cmdline-tools/*/bin/sdkmanager`，并把 ANDROID_HOME 写进 GITHUB_ENV、显式校验安装目录。教训 → 第三方 setup action 会随 runner 镜像漂移，优先用镜像自带工具并验证结果目录存在。
@@ -152,6 +152,8 @@ overrides:
 - **系统文件选择器的「Large files」筛选会把小文件藏起来（2026-11-09 B7 验收）**：现象 → 从备份恢复时打开 SAF，Downloads 里明明有刚导出的 1.8 KB JSON，界面却显示「No matches in Downloads」。根因 → 上一轮误点了筛选 chip「Large files」，该筛选会把小于阈值的文件过滤掉，且选中态只在 chip 上显示一个小勾。修复 → 取消筛选后文件立刻出现，正常选中即可；自动化时不要盲点卡片区域，先按文本定位。教训 → 系统选择器不是只读列表，顶部筛选/视图切换会改变可见文件；写 UI 走查脚本前先 dump 一遍节点，别假设列表结构。
 - **Compose 的 `clickable` 不携带选中态，分段控件要用 `selectable`（2026-11-09 B3）**：现象 → 自绘的周/月/年切换用 `Modifier.clickable` 实现，读屏无法知道哪一档被选中，uiautomator 里也看不到 `selected`。修复 → 改用 `Modifier.selectable(selected, role = Role.Tab)`，uiautomator 能读到 `selected="true"` 且随点击转移；同时把整条高度抬到 48dp 满足触摸目标。教训 → 任何「多选一」的控件都用 `selectable` / `toggleable`，不要用裸 `clickable` 自己维护状态。
 - **图表类 Composable 要给一句汇总语义（2026-11-09 B3）**：现象 → Canvas 画的分段柱图对读屏是一堆无意义节点，或逐个念出坐标轴标签。修复 → 外层用 `clearAndSetSemantics { contentDescription = "形态分布，已填写 N / 共 M 条；布里斯托 …" }` 包住，读屏只念一句。教训 → 图表先想「读屏用户需要知道什么结论」，再把它写成一句话；`clearAndSetSemantics` 比补 `contentDescription` 更干净，能避免子节点噪声。
+- **Gitee 仓库镜像不同步 Release 附件（2026-11-10）**：现象 → 配好 Gitee「仓库镜像管理」后代码分支和 tag 都同步了，APK 附件却没过去，App 检查更新找不到下载地址。根因 → 官方镜像只同步分支、标签、提交记录，Release 附件不在同步范围。修复 → `release.yml` 增加 `mirror-gitee` job，复用同一份 `release-apk` artifact，调 Gitee OpenAPI 创建 Release 并上传 APK 与 `.sha256`。教训 → 「镜像仓库」不等于「镜像发布产物」；分发链路必须自己上传二进制，并在 CI 里校验返回的 `browser_download_url`。
+- **Gitee `/releases/latest` 指向最后创建的 Release（2026-11-10）**：现象 → 补发旧版本或创建顺序错乱时，API 返回的不是语义版本最高的 Release。根因 → Gitee 没有「设为 latest」的 API，按创建时间取最后创建的一个。修复 → 按版本递增正常发版、不补发旧版本；客户端 `isNewer()` 再比一次版本号，最坏提示「已是最新」，不会误装旧包。教训 → 依赖第三方 `latest` 语义时，客户端必须自己做版本比较兜底。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

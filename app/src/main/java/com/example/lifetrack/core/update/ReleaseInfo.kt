@@ -1,7 +1,7 @@
 package com.example.lifetrack.core.update
 
 /**
- * GitHub Releases 解析出的版本信息。
+ * Release 清单解析出的版本信息（Gitee 与 GitHub 的 `releases/latest` 结构一致）。
  *
  * @param version 去掉前导 `v` 后的纯版本号，如 `0.2.0`
  * @param tagName 原始 tag，如 `v0.2.0`

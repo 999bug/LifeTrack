@@ -1,8 +1,8 @@
 # 发布与签名指南
 
-> 适用版本 0.4.0 · 分发渠道：GitHub Releases · 流水线：`.github/workflows/release.yml`
+> 适用版本 0.4.0 · 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
 
-这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases，以及为什么签名密钥一旦丢失就无法挽回。
+这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases 并同步到 Gitee，以及为什么签名密钥一旦丢失就无法挽回。代码开发与发布始终以 GitHub 为准，Gitee 只承担国内手机的更新下载。
 
 ---
 
@@ -119,6 +119,15 @@ keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storety
 - **不要加 `-J-Duser.language=en`**：PowerShell 会把它拆成 `.language=en`，keytool 报「非法选项」并退出 1，脚本会误导成「口令错了」。中文 JDK 输出里 `SHA256:` 标签仍是英文，上面的脚本已做中英兼容；同一命令在 Git Bash 下反而正常。
 - 出现 `FAILED: keytool exit=N` 时先看脚本打印出的真实报错，不要据此改口令或重生成密钥；密钥轮换 = 用户卸载重装 = 数据全丢。
 
+### 1.4 配置 Gitee 国内分发（一次性）
+
+1. 在 Gitee 建公开仓库（本项目为 `saul999/LifeTrack`），初始化 `main` 分支即可，**不需要把代码推过去**。
+2. Gitee → 设置 → 私人令牌，生成只勾选 `projects` 权限的令牌。
+3. 在 GitHub 仓库 `Settings → Secrets and variables → Actions` 添加 Repository secret `GITEE_TOKEN`，值为上一步令牌。可选：用 Repository variables `GITEE_OWNER` / `GITEE_REPO` / `GITEE_BRANCH` 覆盖默认值（`saul999` / `LifeTrack` / `main`）。
+4. 检查：`gh secret list --repo 999bug/LifeTrack` 应列出 5 项（4 个签名 secret + `GITEE_TOKEN`）。Secret 值无法再读出，只能覆盖。
+
+令牌只存在 GitHub Secrets，绝不写进 workflow、文档或仓库；App 读取公开仓库的 `releases/latest` 不需要任何令牌。
+
 ---
 
 ## 2. 每次发版
@@ -127,7 +136,8 @@ keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storety
 2. 如改过 Room schema，先导出 schema 并写 `Migration` + 迁移测试；README 与本文档的版本号同步。
 3. 提交并推送到 `main`（流水线以触发时 `main` 的代码为准）。
 4. 打开 `Actions → Release APK → Run workflow`，填 `version`，格式 `v<versionName>`，例如 `v0.1.1`。
-5. 流水线依次执行：单元测试 → 构建 release APK → `apksigner` 验签并拒绝 debug 证书 → 生成 `.sha256` → 校验 tag 未被占用 → 创建 Release 并上传两个附件。
+5. `release` job 依次执行：单元测试 → 构建 release APK → `apksigner` 验签并拒绝 debug 证书 → 生成 `.sha256` → 校验 tag 未被占用 → 创建 GitHub Release 并上传两个附件。
+6. 随后 `mirror-gitee` job 下载同一份 `release-apk` artifact，创建同名 tag 的 Gitee Release 并上传 APK 与 `.sha256`。该 job 失败会让 workflow 标红，但**不会回滚已发布的 GitHub Release**；此时按 §6 人工补传，不要重复打 tag。
 
 流水线入口：https://github.com/999bug/LifeTrack/actions/workflows/release.yml
 
@@ -135,12 +145,15 @@ keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storety
 
 ## 3. 下载与校验
 
-Release 页面：https://github.com/999bug/LifeTrack/releases
+Release 页面（权威）：https://github.com/999bug/LifeTrack/releases
+国内分发镜像：https://gitee.com/saul999/LifeTrack/releases
 
 附件：
 
 - `LifeTrack-<versionName>-release.apk`：正式签名包，Android 8.0（API 26）及以上可直接安装，系统可能要求允许「安装未知应用」。
 - `LifeTrack-<versionName>-release.apk.sha256`：SHA-256 校验值。
+
+两端附件来自同一次构建的同一个文件，签名证书相同，可互相替代安装。
 
 Windows 校验：
 
@@ -158,16 +171,30 @@ Get-FileHash .\LifeTrack-0.4.0-release.apk -Algorithm SHA256
 - 需要回退时，发一个**更高 `versionCode`** 的回退版本，别让用户降级安装（Android 不允许）。
 - 覆盖安装前确认 Room `version` 与 `Migration` 已就位，否则启动即崩。
 - 密钥轮换意味着用户必须卸载重装 → 数据全丢，非必要不做。
+- **Gitee 同步失败不回滚 GitHub Release**：`mirror-gitee` 失败时 GitHub 侧已发布成功，流水线标红只是提示国内镜像缺失；按 §6 人工补传，不要重跑整个 workflow（会撞同名 tag）。
 
 ---
 
 ## 5. 发布前检查清单
 
-- [ ] 4 个 Repository secrets 齐备
+- [ ] 4 个签名 secret + `GITEE_TOKEN` 齐备
 - [ ] 按 §1.3 核对本地 keystore 证书指纹与已发布包一致（换密钥 = 用户数据全丢）
 - [ ] `versionCode` 递增、`versionName` 与 tag 一致
 - [ ] `./gradlew :app:testDebugUnitTest :app:assembleDebug` 本地通过
 - [ ] README / 本文档版本号已同步
 - [ ] Room schema 与 Migration 已就绪（若改表）
 - [ ] 真机做过一次「旧版 → 新版」覆盖安装，确认数据完整
-- [ ] Release 页面两个附件可下载，`Get-FileHash` 与 `.sha256` 一致
+- [ ] 两端 Release 页面附件可下载，`Get-FileHash` 与 `.sha256` 一致
+- [ ] 真机跑一次应用内「检查更新」，确认命中 Gitee 且下载后能调起安装器
+
+---
+
+## 6. 国内分发（Gitee）的设计与限制
+
+- **为什么不用 Gitee 仓库镜像**：官方「仓库镜像管理」只同步分支、标签和提交记录，不同步 Release 附件。APK 必须由 `release.yml` 的 `mirror-gitee` job 调 OpenAPI 上传。
+- **代码不落地 Gitee**：Gitee 仓库只作为 Release 附件的载体，`target_commitish` 指向其 `main` 分支即可；本地与 CI 都不向 Gitee 推代码。
+- **App 查询链路**：优先 HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`（公开仓库免令牌）；请求失败、暂无 Release 或 Release 未附 APK 时回退 GitHub。主源命中时不会请求 GitHub，避免国内网络多等一次超时。
+- **Gitee 的 `latest` 指向「最后创建」的 Release，不是语义版本最高的**：按版本递增正常发版不会出问题；客户端 `isNewer()` 还会再比一次版本号，最坏是提示「已是最新」，不会误装旧包。不要补发旧版本。
+- **附件配额**：社区版单附件 ≤100MB、单仓库附件总量 ≤1GB（GVP 分别 200MB / 5GB）。APK 只走 Release 附件，不要提交进 git（git 单文件上限 50MB、单仓 500MB）。长期发版需定期清理旧 Release 的附件。
+- **下载内容校验**：`ApkDownloader` 会拒绝 `text/html` 响应，写盘后校验 ZIP 魔数与最小体积，防止网关返回登录页却被当成 APK 交给安装器。这层校验不替代系统对 APK 签名的校验。
+- **未验证项**：Gitee 上传附件的 `browser_download_url` 在国内手机网络下能否免登录直连下载，需在首次真实发版后用真机端到端验证；CI 只保证附件上传成功。

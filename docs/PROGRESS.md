@@ -42,6 +42,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | B3 / B7 语义与备份验收 | 2026-11-09 | 统计/历史分段切换改 `selectable + Role.Tab`（48dp，选中态可被读屏识别），月历格 48dp 并朗读「几月几日几次」，形态/时段图各收敛为一句汇总；模拟器完成 SAF 导出→改数据→恢复全链路与飞行模式持久化验证 |
 | 发布 v0.4.0 | `24b4624` / Release `v0.4.0` | versionCode 4、versionName 0.4.0；流水线 4m 全绿（含 lint），签名证书仍为 `6A6CC4…59D9` 可覆盖安装；APK 13.8 MiB + `.sha256`，sha256 `9c1ed1d2…6023e8` 与 API digest 一致；`releases/latest` 返回 v0.4.0；发布说明为中文，含设置页重构与无障碍改进 |
 | 记录详情弹窗 | 2026-11-10 | `RecordDetailPresentation` 纯函数 + `RecordDetailSheet` 底部弹窗 + `RecordRow` 整卡点击链路；11 项新单测（共 126 项）；模拟器验证点编辑不误弹详情、四类型字段、浅 / 深色、200% 字体堆叠与滚动、360dp 窄屏；Room、备份格式与数据模型均未改动 |
+| 应用内更新切换国内分发源 | 2026-11-10 | 代码与发布仍留 GitHub；Gitee Release 作为国内分发镜像，由 `release.yml` 用同一份签名 APK 同步附件；App 检查更新 Gitee 优先、GitHub 兜底，下载增加 HTML / ZIP 头校验；15 项新单测（共 141 项） |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

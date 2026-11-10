@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * 应用内「检查更新 / 下载安装」的状态机与入口。
  * 持有 [StateFlow] 供 UI 观察；同一进程内启动自动检查只跑一次。
+ * 版本查询走 [ReleaseFetcher]：Gitee 优先，不可用时回退 GitHub。
  */
 class UpdateRepository(private val appContext: Context) {
 
@@ -36,7 +37,7 @@ class UpdateRepository(private val appContext: Context) {
         if (_state.value is Status.Checking) return
         _state.value = Status.Checking
         runCatching {
-            val latest = GitHubReleaseChecker.fetchLatest()
+            val latest = ReleaseFetcher.fetchLatest()
             if (latest == null) {
                 _state.value = Status.UpToDate
                 return@runCatching

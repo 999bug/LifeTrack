@@ -102,7 +102,7 @@ internal fun UpdateSection(viewModel: MainViewModel) {
         is UpdateRepository.Status.Error -> {
             SettingsDivider()
             Text(
-                "仅向 GitHub Releases 查询版本号与下载本应用 APK，不携带任何用户数据。",
+                "优先向 Gitee 查询版本号与下载本应用 APK，不可用时回退 GitHub Releases；不携带任何用户数据。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)

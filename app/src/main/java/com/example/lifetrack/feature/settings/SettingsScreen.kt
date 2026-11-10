@@ -254,8 +254,9 @@ fun SettingsScreen(
                     )
                     Text(
                         "为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限" +
-                            "（REQUEST_INSTALL_PACKAGES）；该权限仅用于查询 GitHub Releases 上的最新版本与下载本应用" +
-                            "安装包，不收集、不上传任何用户数据、设备标识或遥测。",
+                            "（REQUEST_INSTALL_PACKAGES）；该权限仅用于查询 Gitee Releases 上的最新版本" +
+                            "（Gitee 不可用时回退 GitHub Releases）与下载本应用安装包，" +
+                            "不收集、不上传任何用户数据、设备标识或遥测。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

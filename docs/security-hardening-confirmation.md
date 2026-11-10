@@ -316,24 +316,74 @@
 
 **未验证**：真机指纹 / 面容（模拟器只有设备凭据路径）；API 26–29 的 Keyguard 分支只有代码路径，未在旧系统实跑；深色模式锁屏的视觉截图（FLAG_SECURE 全黑）；旋转 / 分屏下的锁状态与 TalkBack 实机朗读。
 
-### C8 备份 / 迁移 / ROM 评审 — ⬜（依赖 C3，与 B8 合并）
+### C8 备份 / 迁移 / ROM 评审 — 🟡 配置复核与模拟换机完成，真机 ROM 走查待做（依赖 C3，与 B8 合并）
 
-1. 复核 `allowBackup=false` + `fullBackupContent` + `dataExtractionRules` 对加密库 + Keystore 的组合影响
-2. 真机走查：设备迁移、换机恢复（用加密备份）、卸载重装、厂商 ROM 差异
-3. 结论写进 README 安全边界；台账 B8 / R1 同步销项
+**复核结论**
 
-### C9 隐私审查 — ⬜（依赖 C7）
+| 项 | 结论 |
+| --- | --- |
+| `allowBackup=false` | 系统云备份与设备迁移都不会带走应用数据；卸载即丢失，这是已有行为 |
+| `fullBackupContent`（legacy） | `database` / `sharedpref` / `file` / `external` / `root` 五个域全部排除 |
+| `dataExtractionRules`（Android 12+） | `cloud-backup` 与 `device-transfer` 分别把五个域全部排除，不依赖「只写一个就够」的默认行为 |
+| 加密库 | 位于 `databases/`，被上述规则排除；即使被系统带走，没有 Keystore 密钥也打不开，规则等于双保险 |
+| Keystore 密钥 | 由系统管理，不属于应用数据目录，不进入任何备份；卸载应用即失效 |
+| DataStore | `files/datastore/`，被 `file` 域排除；里面只有主题、应用锁与加密后的数据库口令信封 |
+| `.plaintext.bak` | 位于 `databases/`，同样被排除；首次成功读取后删除，失败自动还原 |
+| 可携带数据 | 只有用户主动导出的备份文件（默认 v3 加密，口令派生密钥，不依赖设备 Keystore），换机后可恢复 |
 
-1. **SQLCipher 默认把日志送 Logcat** → 生产构建设 `Logger.setTarget(NoopTarget())`（上游 README 明确）
-2. 审查崩溃报告、剪贴板、通知内容、最近任务预览、临时文件与 `.plaintext.bak` 清理
-3. 确认 `INTERNET` 仍只用于检查更新，无遥测；确认备份口令不进日志
+**模拟换机实测（模拟器 `Medium_Phone_API_37.0`）**
 
-### C10 发布前安全回归 — ⬜（依赖 C1–C9）
+1. 加密导出 3 条记录（`Migrate-2026`）。
+2. `adb uninstall` 后重新安装：启动 0 条记录，数据库文件头为随机字节（`5e 2d 86 89 …`），确认系统没有把旧数据带回来。
+3. 在新安装（全新 Keystore 密钥）上恢复该加密备份：确认框「备份 3 条 / 当前 0 条」→ 恢复成功，说明备份不依赖设备密钥，换机路径成立。
+4. 应用锁设置随卸载重置为关闭，符合 `allowBackup=false` 的预期。
 
-1. 全链路：141+ 项单测、仪器测试、lint、`assembleRelease`、真机、深浅色 / 200% 字体 / 宽屏
-2. **许可证义务**：设置页「关于」加用户可访问的 SQLCipher Community Edition 归属与许可证文本入口，README 补第三方许可章节（BSD-style 要求，见 §2.2）
-3. README「安全边界」从「没有实现数据库加密」改写为「已实现 + 边界说明」，5 项评审逐条销项；`project-profile.md §9` 补雷区
-4. 版本号 0.6.0 / versionCode 6，发布前真机灰度、记录回滚路径
+**未验证（真机项，需用户设备）**：Google / 厂商云备份的实际行为、设备到设备迁移（含厂商迁移工具）、不同 ROM 对 `dataExtractionRules` 的支持差异。模拟器只能证明规则声明与卸载重装路径。
+
+**对 R1 / B8 的影响**：R1 仍成立（加密代码未发版，用户设备还是明文库）；B8 从 ⬜ 改为 🟡，与 C8 共享同一批真机走查。
+
+### C9 隐私审查 — ✅ 已完成（2026-11-10，依赖 C7）
+
+| 审查项 | 结果与证据 |
+| --- | --- |
+| SQLCipher Logcat | 非 debug 构建 `Logger.setTarget(NoopTarget())`（`LifeTrackApplication.kt:72`），C3 已落地 |
+| 应用日志 | 全仓只有 3 条 `Log`：密钥失效原因枚举、迁移失败消息、`database ready` 的版本与表行数；**不含记录内容、口令、密钥** |
+| 崩溃报告 | 未接入 Firebase / Crashlytics / Sentry 等任何上报 SDK；系统 tombstone 由 OS 管理 |
+| 剪贴板 | 无 `ClipboardManager` / `setPrimaryClip` 调用，应用不读也不写剪贴板 |
+| 通知 | 无通知渠道、无 `NotificationManager` 调用 |
+| 最近任务预览 | 应用锁开启时 `FLAG_SECURE`；关闭时保持系统默认（这是用户选择，不是遗漏） |
+| 临时文件 | 无 `createTempFile` / 缓存导出；备份只写用户通过 SAF 选择的位置 |
+| `.plaintext.bak` | 迁移成功且首次 DAO 读取后删除；失败路径会还原明文并保留备份，下一次启动重试 |
+| FileProvider | `exported=false`，只暴露 `external-files-path updates`（下载的 APK），不暴露数据库或备份 |
+| 网络 | 仅 `gitee.com` / `api.github.com` 的 Releases 查询与 APK 下载，无遥测；备份口令不参与任何网络请求 |
+| 口令日志 | 全仓 grep `passphrase` + `log/print` 无命中 |
+
+**结论**：没有发现需要改代码的隐私问题；应用锁的预览遮蔽把 C7 的「最近任务」项一并销账。OS 级崩溃日志不受应用控制，README 已注明。
+
+### C10 发布前安全回归 — 🟡 代码与文档就绪，真机灰度 / 发版待用户（依赖 C1–C9）
+
+**已完成**
+
+| 项 | 结果 |
+| --- | --- |
+| 许可证义务 | 新增 `ThirdPartyNotices.kt` 与设置页「关于 → 开源许可」全屏可滚动弹窗（BSD-style 版权声明 + 全文 + 依赖组件）；README 增加「第三方许可」章节与原文链接 |
+| README 安全边界 | 从「没有实现数据库加密」改写为「已实现 + 发版边界」；5 项评审逐条标注（4 项 ✅，系统迁移项 🟡 待真机）；补「系统备份 / 迁移边界」段 |
+| 版本 | `versionCode 6` / `versionName 0.6.0`；README 标注「代码就绪，尚未发布」，release-guide 同步 |
+| 单测 | **191 项全绿**（C1–C7 累计新增 40 项） |
+| 仪器测试 | **14 项全绿**（`connectedDebugAndroidTest`，C3 的迁移 / Keystore 用例仍通过） |
+| lint / release | `lintDebug` 无 error（9 条既有版本 / 图标 warning）；`assembleRelease` 成功，`LifeTrack-0.6.0-release.apk` 22,275,155 B |
+| 包体 | debug 29,080,410 B；release 22.3 MB（0.5.0 release 为 14.5 MB，SQLCipher 四 ABI 增量约 7.8 MB，按 D5 保留全 ABI） |
+| 200% 字体 | 开源许可弹窗标题 / 版权 / 正文 / 关闭按钮均在屏内，正文可滚动到底 |
+| profile | §9 补 C4–C7 六条雷区；数据库 / 备份状态描述同步 |
+
+**未完成（需用户设备 / 操作）**
+
+1. 真机 0.5.0 → 0.6.0 覆盖安装与首次启动迁移实测（C3 只在模拟器用 0.4.0 明文库验证）。
+2. 真机灰度与回滚路径确认：加密库不可降级回 0.5.0，出问题只能发更高 versionCode。
+3. `git push`、打 tag `v0.6.0`、触发 `release.yml`、核对 GitHub / Gitee 双端附件。
+4. 深色模式许可证弹窗未单独截图（弹窗全部使用主题色，未引入硬编码颜色）；宽屏 / 横屏沿用设置页 640dp 限宽。
+
+**建议发版前顺序**：真机装 0.6.0 覆盖 0.5.0 → 确认记录数与详情、WAL 数据、应用锁默认关 → 导出 v3 备份并用 0.5.0 验证「读不了」的提示 → 再走 tag / CI。
 
 ---
 
@@ -357,7 +407,7 @@
 ## 6. 顺序与验收
 
 ```
-C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 ✅ → C5 ✅ → C6 ✅ → C7 ✅ → C8（合 B8）→ C9 → C10 → 发 0.6.0
+C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 ✅ → C5 ✅ → C6 ✅ → C7 ✅ → C8 🟡（真机 ROM 走查待做）→ C9 ✅ → C10 🟡（代码 / 文档就绪，待真机与发版）
                                     └─ C1–C3 完成才解禁 A9 / A10
 ```
 

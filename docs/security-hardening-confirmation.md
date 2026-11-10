@@ -280,12 +280,41 @@
 
 **未验证**：真机上单次 PBKDF2 派生耗时对冷却体验的影响（模拟器可完成但未计时）；节流对脚本化点击的实际拦截效果未做自动化压测。
 
-### C7 应用锁 + 预览遮蔽 — ⬜（依赖 C2）
+### C7 应用锁 + 预览遮蔽 — ✅ 已完成（2026-11-10，依赖 C2）
 
-1. `BiometricPrompt` + 设备凭据兜底，默认关（D4），超时策略即时 / 1 分钟 / 5 分钟
-2. 锁屏开启时 `FLAG_SECURE` 遮住最近任务预览；进程被杀后重新验证
-3. 生命周期：`onPause` 记时、`onResume` 判定；200% 字体 / 深浅色回归
-4. 设置页开关与状态文案；无障碍语义（读屏不能念出锁屏内容）
+**交付**：`core/model/AppLockTimeout.kt`、`core/security/AppLockPolicy.kt`、`feature/lock/AppLockAuthenticator.kt`、`feature/lock/AppLockGate.kt`；`SettingsRepository` 增加开关与超时，`MainViewModel` 持有锁状态，`MainActivity` 绑定 `FLAG_SECURE`，设置页新增「安全」分区。
+
+| 关键点 | 实现 |
+| --- | --- |
+| 认证 | API 30+ 用平台 `BiometricPrompt`，`BIOMETRIC_WEAK + DEVICE_CREDENTIAL` 合并成一个系统弹窗；API 26–29 用 `KeyguardManager` 系统凭据页兜底（平台旧版不支持把设备凭据并进同一弹窗） |
+| 默认与超时 | 默认关（D4）；可选立即 / 1 分钟 / 5 分钟，立即为默认值 |
+| 锁状态 | ViewModel 持有 `Boolean?`：null = 设置未读出，true = 锁定。冷启动 / 进程被杀后只要开关是开的就先锁；开关关闭立即解除 |
+| 生命周期 | `ON_STOP` 记后台时间，`ON_START` 按策略判定；读设置前拿到 null 时不解锁（这条曾导致冷启动绕过，已修） |
+| 预览遮蔽 | 开关开启即给 Activity 加 `FLAG_SECURE`，关闭即清除；最近任务与截屏都拿不到内容 |
+| 锁屏实现 | 全屏 `Dialog` 盖住正文，同时给正文 `clearAndSetSemantics {}`：视觉挡住、读屏读不到；正文里的 `AlertDialog` 是独立窗口，普通遮罩压不住，后创建的 Dialog 天然在上层 |
+| 不销毁正文 | 正文保持 composition，避免 `rememberCoroutineScope` 被取消导致 SAF 导出写到一半；用户解锁后看到的是原页面与原状态 |
+| 返回键 | 锁屏期间 `BackHandler` 拦截，避免在系统验证弹窗上按返回把 Activity 直接结束 |
+| 兜底 | 设备锁屏被移除时无法验证，锁屏页给出明确文案与「关闭应用锁并进入」，避免把自己永久锁在门外 |
+| 无障碍 | 锁屏只暴露「生活记 / 应用已锁定 / 解锁」等 4 个节点；uiautomator 验证锁定状态下读不到设置页任何文本 |
+
+**偏差说明**
+
+1. **未引入 `androidx.biometric`**：稳定版仍是 2021 年的 1.1.0，新版只有 beta；平台 `BiometricPrompt` 在 API 30+ 已能满足「生物识别 + 设备凭据」合并弹窗，API 30 以下用系统凭据页，不额外增加依赖。
+2. **锁屏用 Dialog 而不是销毁正文**：安全性上「销毁」更彻底，但会取消 SAF 流程中的协程，可能把导出文件写成半截；Dialog + 语义清除在保证不可见 / 不可读的同时保住进行中的写盘。
+3. **FLAG_SECURE 的代价**：开启应用锁后，`adb screencap` 与系统截屏都会得到黑图，锁屏页的深色 / 浅色只能靠控件树与主题取值核对，无法截图留证。
+4. **生命周期用 `ON_STOP` / `ON_START`，不是 `onPause` / `onResume`**：`onPause` 会被权限弹窗、SAF 选择器等短暂遮挡触发，按「立即」策略会在用户选文件时反复上锁；`ON_STOP` 才代表真正离开前台。代价是下拉通知栏等「部分遮挡」不会上锁，这是有意取舍。
+
+**验证（模拟器 `Medium_Phone_API_37.0`，设备 PIN 1234）**
+
+- 单测 **191 项全绿**（新增 `AppLockPolicyTest` 6 项：立即 / 1 分钟 / 5 分钟边界、缺后台时间、时钟回拨、超时映射）。
+- 开启：设置页「安全 → 应用锁」打开后状态变「已开启」，出现「自动锁定」行；`dumpsys window` 中 Activity 窗口 `fl` 含 `SECURE`。
+- 冷启动 / 强停后重开：先出系统「解锁生活记」凭据弹窗，取消后停留在锁屏页；输入 PIN 后回到原页面。锁屏页 uiautomator 只有 4 个文本节点，`导出备份` 等正文文本数量为 0。
+- 超时：切后台 3 秒回来（1 分钟策略）不锁定；改回「立即」后切后台再回来进入锁屏；返回键被拦截，不会退出 Activity。
+- 关锁：清除设备 PIN 后点「解锁」，出现「系统锁屏已关闭…」与「关闭应用锁并进入」；点击后回到正文，设置变「未开启」，窗口 `SECURE` 标志被清除。
+- 200% 字体：锁屏标题 / 说明 / 解锁按钮均在屏内，无重叠（标题 y 956–1099，按钮 y 1441–1540）。
+- `lintDebug` 无新增问题、`assembleDebug` / `installDebug` 通过；首轮漏加 `USE_BIOMETRIC` 导致 `canAuthenticate` 抛 `SecurityException`，已补权限并复测通过。
+
+**未验证**：真机指纹 / 面容（模拟器只有设备凭据路径）；API 26–29 的 Keyguard 分支只有代码路径，未在旧系统实跑；深色模式锁屏的视觉截图（FLAG_SECURE 全黑）；旋转 / 分屏下的锁状态与 TalkBack 实机朗读。
 
 ### C8 备份 / 迁移 / ROM 评审 — ⬜（依赖 C3，与 B8 合并）
 
@@ -328,7 +357,7 @@
 ## 6. 顺序与验收
 
 ```
-C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 ✅ → C5 ✅ → C6 ✅ → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
+C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 ✅ → C5 ✅ → C6 ✅ → C7 ✅ → C8（合 B8）→ C9 → C10 → 发 0.6.0
                                     └─ C1–C3 完成才解禁 A9 / A10
 ```
 

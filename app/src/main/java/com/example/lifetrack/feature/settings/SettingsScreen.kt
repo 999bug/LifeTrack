@@ -51,10 +51,12 @@ import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
+import com.example.lifetrack.core.model.AppLockTimeout
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.RetryBackoff
 import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.lock.canUseAppLock
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +80,8 @@ fun SettingsScreen(
 ) {
     val darkTheme by viewModel.darkTheme.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
+    val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -88,6 +92,8 @@ fun SettingsScreen(
     var pendingCount by remember { mutableIntStateOf(0) }
     var currentCount by remember { mutableIntStateOf(0) }
     var privacyExpanded by remember { mutableStateOf(false) }
+    var timeoutDialogVisible by remember { mutableStateOf(false) }
+    var appLockError by remember { mutableStateOf<String?>(null) }
 
     // 导出：先选加密方式；加密要两次口令，明文要过一道风险确认。
     var exportChoiceVisible by remember { mutableStateOf(false) }
@@ -362,6 +368,41 @@ fun SettingsScreen(
             )
         }
 
+        SettingsSection(title = "安全") {
+            SettingsRow(
+                title = "应用锁",
+                subtitle = when (appLockEnabled) {
+                    true -> "已开启 · 切到后台后需验证"
+                    false -> "未开启 · 打开应用时不需要验证"
+                    null -> "正在读取设置…"
+                },
+                role = Role.Switch,
+                onClick = {
+                    val enable = appLockEnabled != true
+                    if (enable && !canUseAppLock(context)) {
+                        appLockError = "请先在系统设置中设置锁屏密码（PIN、图案或密码），再开启应用锁。"
+                    } else {
+                        viewModel.setAppLockEnabled(enable)
+                    }
+                },
+                trailing = {
+                    Switch(checked = appLockEnabled == true, onCheckedChange = null)
+                }
+            )
+            if (appLockEnabled == true) {
+                SettingsDivider()
+                SettingsRow(
+                    title = "自动锁定",
+                    subtitle = appLockTimeout.label(),
+                    onClick = { timeoutDialogVisible = true },
+                    trailing = { ChevronTrailing() }
+                )
+            }
+            SettingsNote(
+                text = "开启后最近任务预览与截屏会被隐藏；解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
+            )
+        }
+
         SettingsSection(title = "关于") {
             SettingsRow(
                 title = "版本",
@@ -407,6 +448,12 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
+                        "应用锁使用系统生物识别权限（USE_BIOMETRIC）调用指纹或锁屏密码验证，" +
+                            "不读取、不上传、不保存任何生物特征数据。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
                         "系统自动云备份与设备迁移已通过 Manifest 与规则文件排除应用数据；卸载或清除数据仍可能丢失记录，建议定期导出备份。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -430,13 +477,13 @@ fun SettingsScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    BackupOptionRow(
+                    RadioOptionRow(
                         selected = exportAsEncrypted,
                         title = "加密（推荐）",
                         subtitle = "需要口令才能恢复；口令遗失无法找回",
                         onClick = { exportAsEncrypted = true }
                     )
-                    BackupOptionRow(
+                    RadioOptionRow(
                         selected = !exportAsEncrypted,
                         title = "明文（不推荐）",
                         subtitle = "任何拿到文件的人都能查看全部记录",
@@ -818,6 +865,40 @@ fun SettingsScreen(
         )
     }
 
+    if (timeoutDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { timeoutDialogVisible = false },
+            title = { Text("自动锁定") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AppLockTimeout.entries.forEach { option ->
+                        RadioOptionRow(
+                            selected = appLockTimeout == option,
+                            title = option.label(),
+                            subtitle = option.description(),
+                            onClick = { viewModel.setAppLockTimeout(option) }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { timeoutDialogVisible = false }) { Text("完成") }
+            }
+        )
+    }
+
+    val lockMessage = appLockError
+    if (lockMessage != null) {
+        AlertDialog(
+            onDismissRequest = { appLockError = null },
+            title = { Text("无法开启应用锁") },
+            text = { Text(lockMessage) },
+            confirmButton = {
+                TextButton(onClick = { appLockError = null }) { Text("知道了") }
+            }
+        )
+    }
+
     val payload = pending
     if (payload != null) {
         AlertDialog(
@@ -918,6 +999,18 @@ private fun backupFileName(suffix: String? = null): String {
     return "LifeTrack-backup-$stamp$tag.json"
 }
 
+private fun AppLockTimeout.label(): String = when (this) {
+    AppLockTimeout.IMMEDIATE -> "立即"
+    AppLockTimeout.ONE_MINUTE -> "1 分钟"
+    AppLockTimeout.FIVE_MINUTES -> "5 分钟"
+}
+
+private fun AppLockTimeout.description(): String = when (this) {
+    AppLockTimeout.IMMEDIATE -> "切到后台就锁定，最严格"
+    AppLockTimeout.ONE_MINUTE -> "离开 1 分钟内回来不用重新解锁"
+    AppLockTimeout.FIVE_MINUTES -> "适合频繁在应用之间切换"
+}
+
 /** 口令强度文案：空输入给规则提示，有输入才评强弱，避免一打开就报「偏弱」。 */
 private fun passphraseHint(quality: PassphraseQuality.Result, empty: Boolean): String = when {
     empty -> "至少 ${PassphraseQuality.MIN_LENGTH} 位，建议用一句话，避免生日和手机号"
@@ -930,7 +1023,7 @@ private fun passphraseHint(quality: PassphraseQuality.Result, empty: Boolean): S
 }
 
 @Composable
-private fun BackupOptionRow(
+private fun RadioOptionRow(
     selected: Boolean,
     title: String,
     subtitle: String,

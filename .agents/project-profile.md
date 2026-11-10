@@ -164,6 +164,10 @@ overrides:
 - **软键盘会把 Compose 对话框顶起，自动化点击坐标必须重新 dump（2026-11-10 C4 验收）**：现象 → 用固定坐标点第二个口令框，键盘弹起后布局上移，实际又点回第一个框，口令被输入两遍。修复 → 每次输入后 `keyevent 4` 收起键盘并重新 `uiautomator dump`，再按新 bounds 点击。教训 → 有输入框的界面不要复用键盘弹出前的坐标；先 dump 再点，别靠截图估算。
 - **SAF 没有原子 rename，改备份口令要另存新文件（2026-11-10 C5）**：现象 → 计划里的「解旧 → 重加密 → 原子替换」在 SAF 上做不到：`DocumentFile` 不支持 rename，用 `openOutputStream(uri, "wt")` 就地覆盖时进程被杀或写满会留下半截文件，且没有回滚路径。修复 → 轮换结果通过 `CreateDocument` 另存为 `...-rekeyed.json`，原文件保持不变，文案要求用户确认新文件能恢复后再删旧文件。教训 → 涉及「覆盖用户唯一备份」的操作，先问「失败后旧数据还在吗」；SAF 场景下宁可多一个文件，也不要赌一次覆盖成功。
 - **口令强度不能只按「有没有大写 / 数字」打分（2026-11-10 C6）**：现象 → 初版规则若要求大小写与数字混合，一句 12 个汉字的口令会被判「偏弱」，中文用户被逼去记无意义的 `Abc123!`。修复 → 把非 ASCII 也算一种字符类，分数 = 长度 + 2 × 种类数，12 字中文落在「可用」、16 字以上「较强」。教训 → 面向中文用户的口令策略必须以「长度」为主、字符种类为辅；强度提示是建议不是门槛，别把合法口令拦在门外。
+- **`BiometricManager.canAuthenticate` 缺 `USE_BIOMETRIC` 会直接崩（2026-11-10 C7）**：现象 → 设置页点「应用锁」开关，应用闪退回桌面，`AndroidRuntime` 里是 `SecurityException`，栈顶在 `AuthService.checkPermission`。根因 → 只按 API 级别判断能力，忘了 `canAuthenticate` 需要 `android.permission.USE_BIOMETRIC`（普通权限，无运行时弹窗）。修复 → Manifest 补权限并复测。教训 → 系统生物识别 API 的权限不是「调用 authenticate 才要」，查询能力同样要；新增系统能力先在真机/模拟器点一遍入口。
+- **锁状态里 `null` 不能当 `false`（2026-11-10 C7）**：现象 → 开启应用锁后强停重开，应用直接进正文，锁根本没出现。根因 → `ON_START` 时读 `appLockEnabled.value`，DataStore 还没订阅到，拿到 null，代码把它当「已关闭」把 `appLocked` 置为 false；随后设置读出 true 也不会重新上锁。修复 → null 直接 return，只有明确 false 才解锁；冷启动由 collector 把锁状态置 true。教训 → 三态设置（未知 / 开 / 关）必须显式处理「未知」，安全开关的默认方向永远是锁。
+- **锁屏不能靠销毁正文来「藏内容」（2026-11-10 C7）**：现象 → 用 `if (locked) LockScreen else content` 实现后，开启应用锁再从 SAF 选备份文件，返回时 composition 被拆掉，`rememberCoroutineScope` 取消，导出/恢复协程停在半路。修复 → 正文保持组合，用全屏 Dialog 盖住并 `clearAndSetSemantics {}`；正文里的 `AlertDialog` 是独立窗口，普通 Box 遮罩压不住，后创建的 Dialog 窗口才能盖住。教训 → 「安全」和「可用」冲突时先找不丢数据的实现；涉及 SAF 的页面，别把生命周期绑在会被锁状态切换的 composition 上。
+- **开启 `FLAG_SECURE` 后截图全黑，验收要靠控件树（2026-11-10 C7）**：现象 → 应用锁开启后 `adb exec-out screencap` 得到纯黑图，无法用截图证明锁屏页排版。修复 → 用 `uiautomator dump` 的 bounds 验证标题 / 按钮在屏内、正文文本数量为 0，并用 `dumpsys window` 的 `fl=...SECURE` 证明标志生效。教训 → 安全标志会挡住自己的验收手段，提前准备替代证据（控件树、窗口标志、日志），不要为了截图临时关掉安全能力。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

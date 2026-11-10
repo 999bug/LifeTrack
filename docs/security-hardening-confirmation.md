@@ -93,6 +93,50 @@
 
 ---
 
+## 2.7 备份格式 v3（加密）与兼容性矩阵（C4 起生效）
+
+> 背景：0.5.0 及更早只认识 v1 / v2 明文备份。C4 引入 v3 加密容器后，新版必须永久保留读取旧格式的能力，旧版则不可能认识新格式。
+
+| 版本 | 导出的备份 | 能恢复的备份 |
+| --- | --- | --- |
+| 0.1.0–0.3.0 | v1 明文 | v1 |
+| 0.4.0–0.5.0 | v2 明文 | v1 / v2 |
+| 0.6.0（C3 + C4） | **默认 v3 加密**，可显式选 v2 明文 | v1 / v2 明文 + v3 加密 |
+| 0.7.0+ | 同 0.6.0；C5 只增加口令轮换，不改容器 | 同 0.6.0 |
+
+**v3 容器结构**
+
+```json
+{
+  "app": "LifeTrack",
+  "schemaVersion": 3,
+  "exportedAt": "<ISO-8601>",
+  "kdf": "PBKDF2WithHmacSHA256",
+  "iterations": 210000,
+  "salt": "<Base64, 16 B>",
+  "iv": "<Base64, 12 B>",
+  "cipher": "AES-256-GCM",
+  "payload": "<Base64, 密文 + 16 B GCM tag>"
+}
+```
+
+- **正文是完整的 v2 明文 JSON**：解密后直接复用 `BackupCodec` 现有校验链，不维护第二套 DTO；v3 只是外壳。
+- **AAD** 为 `app|schemaVersion|exportedAt|kdf|iterations|salt|iv|cipher`，改任何一个头部字段都会让 GCM 校验失败；`exportedAt` 也绑定，防止把头部时间换成别的值。
+- **判定顺序**：先按 `schemaVersion == 3` 认加密容器，再要求 `payload` 非空；v3 缺 payload 属于文件损坏（`INVALID_ENVELOPE`），不是「版本不支持」。
+- **不做嵌套**：解密出来的正文只接受 v1 / v2，出现 v3 直接拒绝，避免递归。
+- **上限**：明文 ≤ 5 MiB（Base64 后约 6.8 MiB），导出后再校验整份文本 ≤ `BackupIo.MAX_BYTES`（8 MiB），保证「本应用导出的文件本应用一定能读回」。
+- **口令策略**：每次导出 / 恢复由用户输入，不落盘、不进日志；UI 要求 ≥ 8 位并二次确认。口令遗失没有后门，这是 D2 的必然代价。
+- **明文互操作**：只有需要与 0.5.0 及更早版本互换备份时才选明文导出，且必须经过红色风险确认。
+
+四条硬约束：
+
+1. v1 / v2 明文的读取能力**永不删除**；新增格式只能加分支，不能改旧分支。
+2. 加密失败与明文校验失败必须给出不同原因；GCM 认证失败统一提示「口令错误，或文件已损坏、被改动过」，不猜是哪一种。
+3. 迭代次数限定 100000–600000：低于下限等于没加固，高于上限的畸形文件可在 KDF 阶段拖死恢复流程。
+4. 口令只以 `CharArray` 在内存中传递，用完立即清零；不得写入 DataStore、SharedPreferences、日志或崩溃报告。
+
+---
+
 ## 3. 需要拍板的决策（已给推荐值）
 
 | 编号 | 决策 | 推荐值 | 理由 |
@@ -158,16 +202,39 @@
 
 **版本边界**：C3 阶段**未改备份格式**，0.5.0 与当前 main 的备份仍双向可读；加密改造尚未升版本号、未发版，正式发布为 0.6.0 / versionCode 6。
 
-### C4 导出文件加密 — ⬜（依赖 C2 A5）
+### C4 导出文件加密 — ✅ 已完成（2026-11-10，依赖 C2 A5）
 
-1. 新格式 envelope（建议 `schemaVersion = 3` 或外层包装，须与 v1/v2 白名单共存）：KDF 参数、salt、IV、密文、AAD 绑定文件头
-2. `PBKDF2WithHmacSHA256`（迭代 ≥ 210000，salt 16 B 随机）+ `AES-256-GCM`（IV 12 B 随机），口令不落盘
-3. 兼容：仍可恢复 v1/v2 明文备份；导出默认加密，明文导出必须二次确认
-4. 单测：错误口令、密文篡改、文件截断、旧格式兼容、超大文件拒绝（`BackupIo.MAX_BYTES` 仍生效）
+**交付**：`core/security/BackupCrypto.kt`、`core/backup/BackupEnvelope.kt`；`BackupCodec` 增加 v3 编解码，`MainViewModel` 透传口令，`SettingsScreen` 增加导出方式选择、口令输入与恢复口令弹窗。
+
+| 关键点 | 实现 |
+| --- | --- |
+| 容器 | v3 外层 JSON：`app` / `schemaVersion` / `exportedAt` / `kdf` / `iterations` / `salt` / `iv` / `cipher` / `payload`；正文仍是完整 v2 明文 JSON，解密后走原校验链 |
+| KDF | `PBKDF2WithHmacSHA256`，210000 次（允许 100000–600000），随机盐 16 B；256 位密钥 |
+| 加密 | `AES/GCM/NoPadding`，随机 IV 12 B，128 位 tag；头部全部字段参与 AAD，`exportedAt` 也绑定 |
+| 错误 | 新增 `WRONG_PASSPHRASE` / `INVALID_ENVELOPE` / `UNSUPPORTED_ENCRYPTION` / `EMPTY_PASSPHRASE` / `BACKUP_TOO_LARGE`；GCM 失败不区分口令错与篡改 |
+| 导出 UI | 默认「加密（推荐）」，口令 ≥ 8 位并二次确认；选「明文」需过红色风险确认；取消 SAF 时清零口令 |
+| 恢复 UI | 读到 v3 先返回 `PassphraseRequired`，弹口令框；错误口令在框内提示且不清空输入；v1 / v2 明文不询问口令 |
+| 上限 | 明文 ≤ 5 MiB；整份加密文本再校验 ≤ `BackupIo.MAX_BYTES`（8 MiB），避免自产文件读不回 |
+| 口令生命周期 | 只用 `CharArray` 传递，用后 `fill('\u0000')`；不落盘、不写日志、不进崩溃信息 |
+
+**与计划的偏差（如实记录）**：C4 一并把恢复端的口令输入做了最小可用版本（否则「能导出、不能恢复」等于制造数据丢失）；C6 仍保留强度提示、重试节流与状态文案打磨。C5 的「AAD 覆盖头部」在 C4 已提前落地，C5 只剩口令轮换与交叉恢复用例。
+
+**验证（模拟器 `Medium_Phone_API_37.0`）**
+
+- 单测 **169 项全绿**（新增 18 项：`BackupCryptoTest` 7 + `BackupEncryptedCodecTest` 11），覆盖往返、错误口令、密文篡改、AAD 篡改、密文截断、参数越界、超大明文、明文 v2 兼容、v3 缺 payload、迭代次数越界在 KDF 前拒绝。
+- `lintDebug` 通过，9 条 warning 均为既有版本 / 图标提示，无新增；`installDebug` 成功。
+- 加密导出实测：3 条记录 → 4,190 B 文件，头部 `schemaVersion=3` / `iterations=210000` / `AES-256-GCM`，正文与备注明文均未出现；状态提示「已导出 3 条加密记录」。
+- 加密恢复实测：错误口令 → 提示「口令错误，或备份文件已损坏、被改动过」；正确口令 → 确认框「备份包含 3 条，当前 4 条」→ 恢复成功，记录数回到 3。
+- 明文导出与恢复实测：风险确认 → 2.92 kB v2 文件；导入时不询问口令，直接进入恢复确认。
+- 200% 字体：导出对话框内容完整、按钮可见（内容可滚动）；深色模式：对话框与输入框对比度正常，无 M3 默认紫色。
+
+**未验证**：真机上的 PBKDF2 210000 次派生耗时与恢复体验（模拟器可完成但未计时）；> 5 MiB 大备份只做了单测拒绝，未用真实大库实测；中文 / 表情口令只做了 JVM 往返，未验证 Android 与 JVM 的 `PBEKeySpec` 编码一致性（发版前用真机补一次跨端恢复）；口令遗忘后的恢复路径按设计不存在。
 
 ### C5 完整性校验与密钥轮换 — ⬜（依赖 C4）
 
-1. GCM tag + AAD 覆盖头部，任何字节改动都能检出并给出明确原因
+> C4 已落地 GCM tag + AAD 覆盖头部（原第 1 项），本项只剩口令轮换与交叉恢复。
+
+1. ~~GCM tag + AAD 覆盖头部，任何字节改动都能检出并给出明确原因~~（C4 ✅）
 2. 设置页「更换备份口令」：解旧 → 用新口令重加密 → 原子替换；旧备份仍可用旧口令恢复
 3. 单测：轮换前后交叉恢复、篡改头字段被拒
 
@@ -211,7 +278,7 @@
 | --- | --- |
 | 构建 | `app/build.gradle.kts`（2 行依赖；D5 决定后可能加 `abiFilters`） |
 | 数据库 | `core/database/AppDatabase.kt`、`LifeTrackApplication.kt`；新增 `core/database/DatabaseEncryption.kt` |
-| 新增安全模块 | `core/security/DatabaseKeyStore.kt`、`DatabasePassphrase.kt`、`KeyUnavailableException.kt`、`BackupCrypto.kt` |
+| 新增安全模块 | `core/security/DatabaseKeyStore.kt`、`DatabasePassphrase.kt`、`KeyUnavailableException.kt`、`core/security/BackupCrypto.kt`、`core/backup/BackupEnvelope.kt` |
 | 备份 | `core/backup/BackupCodec.kt`、`BackupPayload.kt`、`BackupIo.kt` |
 | UI / 状态 | `MainViewModel.kt`（导出恢复）、`SettingsScreen.kt`（应用锁、口令、明文警告、许可证入口） |
 | 测试 | `app/src/test/` 新增加密与 envelope 单测；`app/src/androidTest/` 新增 Keystore 与迁移测试 |
@@ -225,7 +292,7 @@
 ## 6. 顺序与验收
 
 ```
-C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
+C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 ✅ → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
                                     └─ C1–C3 完成才解禁 A9 / A10
 ```
 

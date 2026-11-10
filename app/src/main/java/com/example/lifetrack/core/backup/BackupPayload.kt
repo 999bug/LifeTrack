@@ -29,7 +29,21 @@ enum class BackupError {
     UNSUPPORTED_DETAIL_TYPE,
     DETAIL_TYPE_MISMATCH,
     INVALID_DETAIL_FIELD,
-    DETAIL_NOT_ALLOWED
+    DETAIL_NOT_ALLOWED,
+
+    /** 口令错误，或密文 / 头部被改动。GCM 认证失败无法区分两者，提示时不要替用户下结论。 */
+    WRONG_PASSPHRASE,
+
+    /** 加密容器的结构不合法：Base64 损坏、盐 / IV 长度不对、密文被截断。 */
+    INVALID_ENVELOPE,
+
+    /** KDF / 加密算法或迭代次数超出当前版本支持范围。 */
+    UNSUPPORTED_ENCRYPTION,
+
+    EMPTY_PASSPHRASE,
+
+    /** 记录过多，加密后的文件会超过 [BackupIo.MAX_BYTES]。 */
+    BACKUP_TOO_LARGE
 }
 
 sealed interface BackupDecodeResult {
@@ -37,4 +51,7 @@ sealed interface BackupDecodeResult {
 
     /** [detail] 用来指出是哪一条记录出问题，便于用户定位被改坏的文件。 */
     data class Invalid(val error: BackupError, val detail: String? = null) : BackupDecodeResult
+
+    /** v3 加密备份：需要用户输入口令后带口令再解一次。 */
+    data object PassphraseRequired : BackupDecodeResult
 }

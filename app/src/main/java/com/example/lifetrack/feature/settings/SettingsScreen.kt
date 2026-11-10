@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,13 +40,17 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.BuildConfig
+import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
+import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.feature.home.MainViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -77,28 +85,54 @@ fun SettingsScreen(
     var currentCount by remember { mutableIntStateOf(0) }
     var privacyExpanded by remember { mutableStateOf(false) }
 
+    // 导出：先选加密方式；加密要两次口令，明文要过一道风险确认。
+    var exportChoiceVisible by remember { mutableStateOf(false) }
+    var exportAsEncrypted by remember { mutableStateOf(true) }
+    var exportPassphrase by remember { mutableStateOf("") }
+    var exportPassphraseConfirm by remember { mutableStateOf("") }
+    var exportPassphraseError by remember { mutableStateOf<String?>(null) }
+    var pendingExportPassphrase by remember { mutableStateOf<CharArray?>(null) }
+    var plainExportWarningVisible by remember { mutableStateOf(false) }
+
+    // 恢复：加密备份先读文本，拿到口令后再解一次。
+    var pendingEncryptedText by remember { mutableStateOf<String?>(null) }
+    var importPassphrase by remember { mutableStateOf("") }
+    var importPassphraseError by remember { mutableStateOf<String?>(null) }
+
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        val passphrase = pendingExportPassphrase
+        pendingExportPassphrase = null
+        if (uri == null) {
+            passphrase?.fill('\u0000')
+            return@rememberLauncherForActivityResult
+        }
         scope.launch {
             busy = true
             status = null
             failure = null
-            runCatching {
-                val payload = viewModel.buildBackupJson()
+            try {
+                val payload = viewModel.buildBackupJson(passphrase)
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         BackupIo.writeUtf8(output, payload)
                     } ?: error("无法写入所选位置")
                 }
-                viewModel.countAllRecords()
-            }.onSuccess { count ->
-                status = "已导出 $count 条记录。"
-            }.onFailure {
-                failure = "导出失败：${it.message ?: "无法写入所选位置"}"
+                val count = viewModel.countAllRecords()
+                status = if (passphrase == null) {
+                    "已导出 $count 条明文记录。"
+                } else {
+                    "已导出 $count 条加密记录，请牢记口令。"
+                }
+            } catch (e: BackupCrypto.Failure) {
+                failure = "导出失败：${e.reason.exportMessage()}"
+            } catch (e: Exception) {
+                failure = "导出失败：${e.message ?: "无法写入所选位置"}"
+            } finally {
+                passphrase?.fill('\u0000')
+                busy = false
             }
-            busy = false
         }
     }
 
@@ -125,10 +159,13 @@ fun SettingsScreen(
                     }
 
                     is BackupDecodeResult.Invalid -> {
-                        failure = buildString {
-                            append(result.error.message())
-                            result.detail?.let { append("（记录 $it）") }
-                        }
+                        failure = result.describe()
+                    }
+
+                    BackupDecodeResult.PassphraseRequired -> {
+                        importPassphrase = ""
+                        importPassphraseError = null
+                        pendingEncryptedText = text
                     }
                 }
             }
@@ -168,18 +205,20 @@ fun SettingsScreen(
         SettingsSection(title = "数据") {
             SettingsRow(
                 title = "导出备份",
-                subtitle = "全部记录与详情，导出为单个 JSON 文件",
+                subtitle = "默认加密导出，恢复时需要口令",
                 enabled = !busy,
                 onClick = {
-                    exportLauncher.launch(
-                        "LifeTrack-backup-${LocalDateTime.now().format(backupStampFormatter)}.json"
-                    )
+                    exportAsEncrypted = true
+                    exportPassphrase = ""
+                    exportPassphraseConfirm = ""
+                    exportPassphraseError = null
+                    exportChoiceVisible = true
                 }
             )
             SettingsDivider()
             SettingsRow(
                 title = "从备份恢复",
-                subtitle = "会用备份替换当前全部记录，无法撤销",
+                subtitle = "支持加密与明文备份，会替换当前全部记录",
                 titleColor = MaterialTheme.colorScheme.error,
                 enabled = !busy,
                 onClick = {
@@ -199,7 +238,7 @@ fun SettingsScreen(
                 )
             }
             SettingsNote(
-                text = "备份文件不加密，能读到该文件的人就能查看全部记录，请自行妥善保管。",
+                text = "加密备份需要口令才能恢复，口令遗失无法找回，请与备份文件分开保管。明文备份不加密，能读到文件的人就能查看全部记录。",
                 isWarning = true
             )
         }
@@ -270,6 +309,226 @@ fun SettingsScreen(
         }
     }
 
+    if (exportChoiceVisible) {
+        AlertDialog(
+            onDismissRequest = {
+                exportChoiceVisible = false
+                exportPassphrase = ""
+                exportPassphraseConfirm = ""
+                exportPassphraseError = null
+            },
+            title = { Text("导出备份") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    BackupOptionRow(
+                        selected = exportAsEncrypted,
+                        title = "加密（推荐）",
+                        subtitle = "需要口令才能恢复；口令遗失无法找回",
+                        onClick = { exportAsEncrypted = true }
+                    )
+                    BackupOptionRow(
+                        selected = !exportAsEncrypted,
+                        title = "明文（不推荐）",
+                        subtitle = "任何拿到文件的人都能查看全部记录",
+                        onClick = { exportAsEncrypted = false }
+                    )
+                    if (exportAsEncrypted) {
+                        OutlinedTextField(
+                            value = exportPassphrase,
+                            onValueChange = {
+                                exportPassphrase = it
+                                exportPassphraseError = null
+                            },
+                            label = { Text("备份口令") },
+                            supportingText = {
+                                Text("至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位，建议用一句话，避免生日和手机号")
+                            },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = exportPassphraseConfirm,
+                            onValueChange = {
+                                exportPassphraseConfirm = it
+                                exportPassphraseError = null
+                            },
+                            label = { Text("再输一次口令") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        exportPassphraseError?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        if (!exportAsEncrypted) {
+                            exportChoiceVisible = false
+                            exportPassphrase = ""
+                            exportPassphraseConfirm = ""
+                            plainExportWarningVisible = true
+                            return@TextButton
+                        }
+                        val error = when {
+                            exportPassphrase.length < BackupCodec.MIN_PASSPHRASE_LENGTH ->
+                                "口令至少 ${BackupCodec.MIN_PASSPHRASE_LENGTH} 位。"
+
+                            exportPassphrase != exportPassphraseConfirm -> "两次输入的口令不一致。"
+                            else -> null
+                        }
+                        if (error != null) {
+                            exportPassphraseError = error
+                        } else {
+                            pendingExportPassphrase = exportPassphrase.toCharArray()
+                            exportChoiceVisible = false
+                            exportPassphrase = ""
+                            exportPassphraseConfirm = ""
+                            exportLauncher.launch(backupFileName())
+                        }
+                    }
+                ) { Text(if (exportAsEncrypted) "导出" else "下一步") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    exportChoiceVisible = false
+                    exportPassphrase = ""
+                    exportPassphraseConfirm = ""
+                    exportPassphraseError = null
+                }) { Text("取消") }
+            }
+        )
+    }
+
+    if (plainExportWarningVisible) {
+        AlertDialog(
+            onDismissRequest = { plainExportWarningVisible = false },
+            title = { Text("确认明文导出？") },
+            text = {
+                Text(
+                    "明文备份不加密：拿到文件的任何人（包括云盘、聊天工具、电脑上的其他应用）" +
+                        "都能看到全部记录。加密导出只需要记一个口令，建议改用加密。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    plainExportWarningVisible = false
+                    exportLauncher.launch(backupFileName())
+                }) {
+                    Text("仍要明文导出", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    plainExportWarningVisible = false
+                    exportAsEncrypted = true
+                    exportChoiceVisible = true
+                }) { Text("改用加密") }
+            }
+        )
+    }
+
+    val encryptedText = pendingEncryptedText
+    if (encryptedText != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!busy) {
+                    pendingEncryptedText = null
+                    importPassphrase = ""
+                    importPassphraseError = null
+                }
+            },
+            title = { Text("输入备份口令") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("该备份已加密，需要导出时设置的口令才能恢复。")
+                    OutlinedTextField(
+                        value = importPassphrase,
+                        onValueChange = {
+                            importPassphrase = it
+                            importPassphraseError = null
+                        },
+                        label = { Text("备份口令") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    importPassphraseError?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        if (importPassphrase.isBlank()) {
+                            importPassphraseError = "请输入口令。"
+                            return@TextButton
+                        }
+                        scope.launch {
+                            busy = true
+                            val passphrase = importPassphrase.toCharArray()
+                            try {
+                                when (val result = viewModel.decodeBackupJson(encryptedText, passphrase)) {
+                                    is BackupDecodeResult.Success -> {
+                                        pending = result.payload
+                                        pendingCount = result.payload.events.size
+                                        pendingEncryptedText = null
+                                        importPassphrase = ""
+                                        importPassphraseError = null
+                                    }
+
+                                    is BackupDecodeResult.Invalid -> {
+                                        importPassphraseError = result.describe()
+                                    }
+
+                                    BackupDecodeResult.PassphraseRequired -> {
+                                        importPassphraseError = "请输入口令。"
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                importPassphraseError = "解密失败：${e.message ?: "无法读取备份"}"
+                            } finally {
+                                passphrase.fill('\u0000')
+                                busy = false
+                            }
+                        }
+                    }
+                ) { Text("解密") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingEncryptedText = null
+                    importPassphrase = ""
+                    importPassphraseError = null
+                }) { Text("取消") }
+            }
+        )
+    }
+
     val payload = pending
     if (payload != null) {
         AlertDialog(
@@ -330,4 +589,64 @@ private fun BackupError.message(): String = when (this) {
     BackupError.DETAIL_TYPE_MISMATCH -> "记录的详情类型与事件类型不一致。"
     BackupError.INVALID_DETAIL_FIELD -> "记录的详情字段不合法或取值超出范围。"
     BackupError.DETAIL_NOT_ALLOWED -> "备份中的详情字段与记录类型或备份版本不匹配。"
+    BackupError.WRONG_PASSPHRASE -> "口令错误，或备份文件已损坏、被改动过。请确认口令后重试。"
+    BackupError.INVALID_ENVELOPE -> "加密备份的结构不完整或已损坏，无法解密。"
+    BackupError.UNSUPPORTED_ENCRYPTION -> "备份使用了当前版本不支持的加密参数，请升级应用后再恢复。"
+    BackupError.EMPTY_PASSPHRASE -> "请输入备份口令。"
+    BackupError.BACKUP_TOO_LARGE -> "记录过多，加密后的备份会超过大小上限。"
+}
+
+private fun BackupDecodeResult.Invalid.describe(): String = buildString {
+    append(error.message())
+    // 只有「定位到某条记录」的细节才对用户有意义；算法名、payload 之类的技术细节留在日志里。
+    val technical = error == BackupError.INVALID_ENVELOPE ||
+        error == BackupError.UNSUPPORTED_ENCRYPTION ||
+        error == BackupError.UNSUPPORTED_VERSION
+    if (!technical) detail?.let { append("（记录 $it）") }
+}
+
+private fun BackupCrypto.Reason.exportMessage(): String = when (this) {
+    BackupCrypto.Reason.EMPTY_PASSPHRASE -> "口令不能为空。"
+    BackupCrypto.Reason.PLAINTEXT_TOO_LARGE ->
+        "记录过多，加密后的文件超过 ${BackupIo.MAX_BYTES / 1024 / 1024} MB 上限。"
+
+    BackupCrypto.Reason.UNAVAILABLE -> "当前设备不支持所需的加密算法。"
+    BackupCrypto.Reason.INVALID_ITERATIONS,
+    BackupCrypto.Reason.INVALID_SALT,
+    BackupCrypto.Reason.INVALID_IV,
+    BackupCrypto.Reason.CIPHERTEXT_TOO_SHORT,
+    BackupCrypto.Reason.DECRYPT_FAILED -> "加密失败，请重试。"
+}
+
+private fun backupFileName(): String =
+    "LifeTrack-backup-${LocalDateTime.now().format(backupStampFormatter)}.json"
+
+@Composable
+private fun BackupOptionRow(
+    selected: Boolean,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

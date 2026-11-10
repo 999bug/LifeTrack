@@ -5,12 +5,15 @@ import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.security.BackupCrypto
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Base64
 import kotlin.math.abs
 
 /**
@@ -23,6 +26,8 @@ import kotlin.math.abs
  *   完全相等会把合法但年代久远的记录判死。
  * - v1 / v2 共用一个 DTO：v1 的 `poop` 字段在 v2 里原样保留，只新增通用 `detail` 通道，
  *   因此旧备份无需第二套解析器；校验按版本号收紧，避免旧格式被塞入无法落库的数据。
+ * - v3 只是加密外壳：正文仍是完整的 v2 JSON，解密后走同一套校验，
+ *   不维护第二套业务 DTO；v1 / v2 明文的读取分支永久保留。
  */
 object BackupCodec {
 
@@ -30,7 +35,13 @@ object BackupCodec {
     const val LEGACY_SCHEMA_VERSION = 1
     const val SCHEMA_VERSION = 2
     val SUPPORTED_VERSIONS = setOf(LEGACY_SCHEMA_VERSION, SCHEMA_VERSION)
+
+    /** v3 是加密容器：外层头部明文 + 内部仍是 v2 明文 JSON，因此恢复链路不需要第二套 DTO。 */
+    const val ENCRYPTED_SCHEMA_VERSION = 3
     const val MAX_EVENTS = 100_000
+
+    /** 导出 UI 的口令下限。core 只拒绝空口令，避免把外部生成的短口令备份判死。 */
+    const val MIN_PASSPHRASE_LENGTH = 8
 
     private const val BASE_TYPE = "poop"
 
@@ -59,10 +70,168 @@ object BackupCodec {
         return json.encodeToString(BackupFileDto.serializer(), file)
     }
 
+    /**
+     * v3 导出：先按 v2 序列化正文，再整体加密。正文仍是标准备份 JSON，
+     * 因此加密文件的「内容」与明文备份同构，解密后走同一套校验。
+     *
+     * 口令只在本方法内使用，不缓存、不写文件；失败时抛 [BackupCrypto.Failure]。
+     */
+    fun encodeEncrypted(
+        types: List<TrackTypeEntity>,
+        events: List<BackupRecord>,
+        passphrase: CharArray,
+        now: Instant = Instant.now()
+    ): String {
+        val plaintext = encode(types, events, now).toByteArray(StandardCharsets.UTF_8)
+        val salt = BackupCrypto.newSalt()
+        val iv = BackupCrypto.newIv()
+        val saltText = encode64(salt)
+        val ivText = encode64(iv)
+        val exportedAt = now.toString()
+        val aad = BackupEnvelope.aad(
+            app = APP_ID,
+            schemaVersion = ENCRYPTED_SCHEMA_VERSION,
+            exportedAt = exportedAt,
+            kdf = BackupCrypto.KDF_ALGORITHM,
+            iterations = BackupCrypto.DEFAULT_ITERATIONS,
+            salt = saltText,
+            iv = ivText,
+            cipher = BackupCrypto.CIPHER_NAME
+        )
+        val ciphertext = try {
+            BackupCrypto.seal(
+                plaintext = plaintext,
+                passphrase = passphrase,
+                salt = salt,
+                iv = iv,
+                iterations = BackupCrypto.DEFAULT_ITERATIONS,
+                aad = aad
+            )
+        } finally {
+            plaintext.fill(0)
+        }
+
+        val file = EncryptedBackupFileDto(
+            app = APP_ID,
+            schemaVersion = ENCRYPTED_SCHEMA_VERSION,
+            exportedAt = exportedAt,
+            kdf = BackupCrypto.KDF_ALGORITHM,
+            iterations = BackupCrypto.DEFAULT_ITERATIONS,
+            salt = saltText,
+            iv = ivText,
+            cipher = BackupCrypto.CIPHER_NAME,
+            payload = encode64(ciphertext)
+        )
+        val text = json.encodeToString(EncryptedBackupFileDto.serializer(), file)
+        // 与导入端共用同一个上限：绝不让本应用导出自己读不了的文件。
+        if (text.toByteArray(StandardCharsets.UTF_8).size > BackupIo.MAX_BYTES) {
+            throw BackupCrypto.Failure(BackupCrypto.Reason.PLAINTEXT_TOO_LARGE)
+        }
+        return text
+    }
+
+    /**
+     * 兼容入口：v1 / v2 明文备份直接解析；v3 加密备份需要 [passphrase]。
+     * 未给口令时返回 [BackupDecodeResult.PassphraseRequired]，由 UI 弹口令输入。
+     */
     fun decode(
         text: String,
         now: Instant = Instant.now(),
-        options: BackupDecodeOptions = BackupDecodeOptions.Default
+        options: BackupDecodeOptions = BackupDecodeOptions.Default,
+        passphrase: CharArray? = null
+    ): BackupDecodeResult {
+        val envelope = runCatching {
+            json.decodeFromString(EncryptedBackupFileDto.serializer(), text)
+        }.getOrNull()
+        if (envelope != null && envelope.schemaVersion == ENCRYPTED_SCHEMA_VERSION) {
+            if (envelope.app != APP_ID) {
+                return BackupDecodeResult.Invalid(BackupError.NOT_LIFETRACK_FILE)
+            }
+            // v3 只可能是加密容器：缺 payload 属于文件损坏，不是「版本不支持」。
+            if (envelope.payload.isBlank()) {
+                return BackupDecodeResult.Invalid(BackupError.INVALID_ENVELOPE, "payload")
+            }
+            return decodeEncrypted(envelope, passphrase, now, options)
+        }
+        return decodePlaintext(text, now, options)
+    }
+
+    private fun decodeEncrypted(
+        envelope: EncryptedBackupFileDto,
+        passphrase: CharArray?,
+        now: Instant,
+        options: BackupDecodeOptions
+    ): BackupDecodeResult {
+        if (envelope.app != APP_ID) {
+            return BackupDecodeResult.Invalid(BackupError.NOT_LIFETRACK_FILE)
+        }
+        if (passphrase == null) return BackupDecodeResult.PassphraseRequired
+        if (envelope.kdf != BackupCrypto.KDF_ALGORITHM || envelope.cipher != BackupCrypto.CIPHER_NAME) {
+            return BackupDecodeResult.Invalid(
+                BackupError.UNSUPPORTED_ENCRYPTION,
+                "${envelope.kdf.take(32)}/${envelope.cipher.take(32)}"
+            )
+        }
+        if (envelope.iterations !in BackupCrypto.MIN_ITERATIONS..BackupCrypto.MAX_ITERATIONS) {
+            return BackupDecodeResult.Invalid(
+                BackupError.UNSUPPORTED_ENCRYPTION,
+                "iterations=${envelope.iterations}"
+            )
+        }
+
+        val salt = decode64(envelope.salt)
+            ?: return BackupDecodeResult.Invalid(BackupError.INVALID_ENVELOPE, "salt")
+        val iv = decode64(envelope.iv)
+            ?: return BackupDecodeResult.Invalid(BackupError.INVALID_ENVELOPE, "iv")
+        val ciphertext = decode64(envelope.payload)
+            ?: return BackupDecodeResult.Invalid(BackupError.INVALID_ENVELOPE, "payload")
+
+        val aad = BackupEnvelope.aad(
+            app = envelope.app,
+            schemaVersion = envelope.schemaVersion,
+            exportedAt = envelope.exportedAt,
+            kdf = envelope.kdf,
+            iterations = envelope.iterations,
+            salt = envelope.salt,
+            iv = envelope.iv,
+            cipher = envelope.cipher
+        )
+        val plaintext = try {
+            BackupCrypto.open(
+                ciphertext = ciphertext,
+                passphrase = passphrase,
+                salt = salt,
+                iv = iv,
+                iterations = envelope.iterations,
+                aad = aad
+            )
+        } catch (e: BackupCrypto.Failure) {
+            return BackupDecodeResult.Invalid(e.reason.toBackupError())
+        }
+
+        return try {
+            // 解密后的正文只允许 v1 / v2：嵌套 v3 一律按版本不支持拒绝，避免递归。
+            decodePlaintext(String(plaintext, StandardCharsets.UTF_8), now, options)
+        } finally {
+            plaintext.fill(0)
+        }
+    }
+
+    private fun BackupCrypto.Reason.toBackupError(): BackupError = when (this) {
+        BackupCrypto.Reason.EMPTY_PASSPHRASE -> BackupError.EMPTY_PASSPHRASE
+        BackupCrypto.Reason.INVALID_SALT,
+        BackupCrypto.Reason.INVALID_IV,
+        BackupCrypto.Reason.CIPHERTEXT_TOO_SHORT -> BackupError.INVALID_ENVELOPE
+        BackupCrypto.Reason.INVALID_ITERATIONS,
+        BackupCrypto.Reason.UNAVAILABLE -> BackupError.UNSUPPORTED_ENCRYPTION
+        BackupCrypto.Reason.PLAINTEXT_TOO_LARGE -> BackupError.BACKUP_TOO_LARGE
+        BackupCrypto.Reason.DECRYPT_FAILED -> BackupError.WRONG_PASSPHRASE
+    }
+
+    private fun decodePlaintext(
+        text: String,
+        now: Instant,
+        options: BackupDecodeOptions
     ): BackupDecodeResult {
         val file = runCatching { json.decodeFromString(BackupFileDto.serializer(), text) }.getOrNull()
             ?: return BackupDecodeResult.Invalid(BackupError.NOT_JSON)
@@ -246,6 +415,14 @@ object BackupCodec {
             BackupDetailDto(typeCode = it.typeCode, fields = it.fields)
         }
     )
+
+    private fun encode64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
+
+    private fun decode64(text: String): ByteArray? = try {
+        Base64.getDecoder().decode(text)
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 }
 
 @Serializable

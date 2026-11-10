@@ -218,13 +218,22 @@ class MainViewModel(
         historyFilter.value = null
     }
 
-    suspend fun buildBackupJson(): String = withContext(Dispatchers.IO) {
+    /** [passphrase] 为空时导出 v2 明文；非空时导出 v3 加密备份。 */
+    suspend fun buildBackupJson(passphrase: CharArray? = null): String = withContext(Dispatchers.IO) {
         val payload = repository.readBackup()
-        BackupCodec.encode(payload.types, payload.events)
+        if (passphrase == null) {
+            BackupCodec.encode(payload.types, payload.events)
+        } else {
+            BackupCodec.encodeEncrypted(payload.types, payload.events, passphrase)
+        }
     }
 
-    suspend fun decodeBackupJson(text: String): BackupDecodeResult = withContext(Dispatchers.IO) {
-        BackupCodec.decode(text)
+    /** 未给口令时，加密备份会返回 `PassphraseRequired`，由设置页弹口令输入。 */
+    suspend fun decodeBackupJson(
+        text: String,
+        passphrase: CharArray? = null
+    ): BackupDecodeResult = withContext(Dispatchers.IO) {
+        BackupCodec.decode(text, passphrase = passphrase)
     }
 
     suspend fun restoreBackup(payload: BackupPayload) {

@@ -1,14 +1,16 @@
 name: Release APK
 
-# 发布走手动触发：在 Actions 页面填版本号，避免每次 push 都产出 Release。
+# 发布走手动触发，日常不需要填任何版本号：
+#   CI 从仓库里最高的 vX.Y.Z tag 推 patch+1、从 app/build.gradle.kts 读 versionCode+1，
+#   在 runner 内改 build.gradle.kts 后构建；全部成功后才把版本改动提交回 main、
+#   打 tag、发 Release。仅当需要跳 minor/major 时才手填 version（如 v0.7.0）。
 # 仓库只保留这一条发布流水线，不另起第二条打 tag 的流水线。
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release tag, e.g. v0.1.0 (must be v + versionName)'
-        required: true
-        default: v0.1.0
+        description: '留空自动递增（v0.6.0 → v0.6.1）；想跳 minor/major 时手填，如 v0.7.0'
+        required: false
         type: string
 
 permissions:
@@ -21,8 +23,12 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      sha: ${{ steps.bump.outputs.sha }}
     env:
-      TAG: ${{ inputs.version }}
       SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
       LIFETRACK_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
       LIFETRACK_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
@@ -30,6 +36,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 要读到全部历史 tag 才能算出下一个版本号；默认的浅克隆只有当前提交。
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -79,23 +88,94 @@ jobs:
           printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lifetrack-release.jks"
           echo "LIFETRACK_KEYSTORE=$RUNNER_TEMP/lifetrack-release.jks" >> "$GITHUB_ENV"
 
-      - name: Check tag and version
+      # 版本号由 CI 决定，源码里只把 versionCode 当作「当前已用最大值」。
+      # 这一步只算数、不写文件；任何一项不合规都在花几分钟构建之前就失败。
+      - name: Resolve version
+        id: version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED: ${{ inputs.version }}
         run: |
-          if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Tag must look like v0.1.0, got: $TAG"
+          set -euo pipefail
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error::发布只能从 main 分支手动触发，当前 ref 是 ${GITHUB_REF}"
             exit 1
           fi
-          VERSION_NAME=$(sed -n 's/^[[:space:]]*versionName = "\(.*\)"/\1/p' app/build.gradle.kts | head -1)
-          if [ "v$VERSION_NAME" != "$TAG" ]; then
-            echo "::error::Tag $TAG does not match versionName $VERSION_NAME in app/build.gradle.kts"
+
+          CURRENT_CODE=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$CURRENT_CODE" ]; then
+            echo "::error::无法从 app/build.gradle.kts 读取 versionCode"
+            exit 1
+          fi
+          NEXT_CODE=$((CURRENT_CODE + 1))
+
+          # 基线取仓库里最高的 vX.Y.Z tag（fetch-depth: 0 保证 tag 齐全）。
+          LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "::error::仓库里没有 vX.Y.Z 格式的 tag，无法确定递增基线"
+            exit 1
+          fi
+          BASE=${LATEST_TAG#v}
+          IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+          AUTO_TAG="v${MAJOR}.${MINOR}.$((10#${PATCH} + 1))"
+
+          if [ -n "${REQUESTED:-}" ]; then
+            TAG="$REQUESTED"
+            if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::手填版本格式应为 v0.7.0，收到: $TAG"
+              exit 1
+            fi
+            HIGHEST=$(printf '%s\n%s\n' "$LATEST_TAG" "$TAG" | sort -V | tail -1)
+            if [ "$HIGHEST" != "$TAG" ] || [ "$TAG" = "$LATEST_TAG" ]; then
+              echo "::error::手填版本 $TAG 必须高于最新 tag $LATEST_TAG"
+              exit 1
+            fi
+          else
+            TAG="$AUTO_TAG"
+          fi
+          VERSION_NAME=${TAG#v}
+
+          # tag / Release 一律不复用：避免撞车、覆盖旧附件或让 versionCode 倒退。
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+            echo "::error::Tag $TAG 已存在，拒绝重复发布"
             exit 1
           fi
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > /dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists. Bump versionName/versionCode and use a new tag."
+            echo "::error::远端 Tag $TAG 已存在，拒绝重复发布"
             exit 1
           fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::Release $TAG 已存在，拒绝覆盖"
+            exit 1
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "version_name=$VERSION_NAME"
+            echo "version_code=$NEXT_CODE"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "TAG=$TAG"
+            echo "VERSION_NAME=$VERSION_NAME"
+            echo "VERSION_CODE=$NEXT_CODE"
+            echo "BASE_SHA=$GITHUB_SHA"
+          } >> "$GITHUB_ENV"
+          echo "本次发布: $TAG (versionName=$VERSION_NAME, versionCode=$NEXT_CODE; 基线 $LATEST_TAG)"
+
+      # 先在 runner 的工作副本里改版本号，再用新版本构建，保证 APK 文件名、
+      # APK 内 versionCode / versionName、tag 三者一致。此时尚未推送，失败不会留下垃圾提交。
+      - name: Bump version in build file
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^([[:space:]]*versionCode = )[0-9]+/\1${VERSION_CODE}/" app/build.gradle.kts
+          sed -i -E "s/^([[:space:]]*versionName = )\"[^\"]*\"/\1\"${VERSION_NAME}\"/" app/build.gradle.kts
+          GOT_CODE=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts | head -1)
+          GOT_NAME=$(sed -nE 's/^[[:space:]]*versionName = "([^"]*)".*/\1/p' app/build.gradle.kts | head -1)
+          if [ "$GOT_CODE" != "$VERSION_CODE" ] || [ "$GOT_NAME" != "$VERSION_NAME" ]; then
+            echo "::error::版本写入校验失败: versionCode=$GOT_CODE versionName=$GOT_NAME"
+            exit 1
+          fi
+          git diff -- app/build.gradle.kts
 
       - name: Build and test
         run: |
@@ -141,6 +221,33 @@ jobs:
             ${{ steps.apk.outputs.apk }}
             ${{ steps.apk.outputs.checksum }}
 
+      # 放在所有可能失败的构建 / 验签步骤之后：构建没过就不产生版本提交。
+      # 用 checkout 注入的 GITHUB_TOKEN 推送，GitHub 不会再因此触发新的 workflow；
+      # commit message 里的 [skip ci] 是第二重保险。
+      - name: Commit version bump to main
+        id: bump
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: release $TAG (versionCode $VERSION_CODE) [skip ci]"
+
+          # 构建期间 main 若被推进，不做 rebase / merge（也不碰任何人的本地仓库），
+          # 直接中止让人工确认后重跑，避免把版本提交叠在没测过的代码上。
+          REMOTE_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$REMOTE_SHA" != "$BASE_SHA" ]; then
+            echo "::error::main 在发布期间有新提交（$BASE_SHA → $REMOTE_SHA），版本改动未推送；请确认后重新 Run workflow。"
+            exit 1
+          fi
+          if ! git push origin HEAD:main; then
+            echo "::error::版本改动推送失败。若 main 启用了分支保护，需允许 github-actions[bot] 直接推送，或为该规则添加 bypass。"
+            exit 1
+          fi
+          NEW_SHA=$(git rev-parse HEAD)
+          echo "sha=$NEW_SHA" >> "$GITHUB_OUTPUT"
+          echo "版本改动已推送到 main: $NEW_SHA"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -148,7 +255,7 @@ jobs:
           gh release create "$TAG" \
             "${{ steps.apk.outputs.apk }}" \
             "${{ steps.apk.outputs.checksum }}" \
-            --target "$GITHUB_SHA" \
+            --target "${{ steps.bump.outputs.sha }}" \
             --title "$TAG" \
             --generate-notes
           echo "Published $TAG: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
@@ -168,7 +275,7 @@ jobs:
       contents: read
       actions: read
     env:
-      TAG: ${{ inputs.version }}
+      TAG: ${{ needs.release.outputs.tag }}
       GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
       GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
       GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}

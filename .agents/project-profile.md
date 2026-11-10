@@ -56,8 +56,8 @@ push_policy: on-request            # 只提交，push 等用户授权
 
 ```yaml
 deploy_target: GitHub Releases（权威）+ Gitee Releases（国内分发镜像）  # 同一份签名 APK，CI 同步附件，无服务端
-release_trigger: manual            # Actions workflow_dispatch 手动填版本号触发
-version_scheme: 语义化 semver       # versionName 0.6.0 / versionCode 6（待发布），已发布 v0.1.0 ~ v0.5.0
+release_trigger: manual            # Actions workflow_dispatch 手动触发；版本号由 CI 自动递增（可手填覆盖）
+version_scheme: 语义化 semver       # 已发布 v0.1.0 ~ v0.6.0（versionCode 1~6）；下次由 CI 自动升到 0.6.1 / 7
 registry: none
 pages: no
 ```
@@ -121,7 +121,7 @@ overrides:
 
 - **构建工具链已升级到 AGP 9（2026-11-06 修复，勿回退）**：现象 → `:app:checkDebugAarMetadata` 报 28 项 AAR 元数据错误，Compose BOM 2026.09.00（compose-ui 1.12.1）、Navigation 2.10.2、Lifecycle 2.11.0 要求 AGP ≥ 9.1.0 且 compileSdk ≥ 37。根因 → 工程原先固定 AGP 8.13.2 / compileSdk 36.1，与当前 AndroidX 依赖的元数据要求不匹配。修复 → AGP 9.3.1 + Gradle 9.6.1 + compileSdk 37，移除 `org.jetbrains.kotlin.android`（AGP 9 内置 Kotlin），Kotlin 2.4.21 通过根 `buildscript` classpath 覆盖，KSP 升到 2.3.13。教训 → AGP 9.3.1 硬性要求 Gradle ≥ 9.5.0（9.4.1 会直接失败）；KSP 必须 ≥ 2.3.1 才能配合 built-in Kotlin；升级这批依赖时先看 AAR 元数据里的 AGP/compileSdk 下限。
 - **`gradle/wrapper/` 已是官方 Wrapper（含 `gradle-wrapper.jar`）**：旧的 `gradlew` / `gradlew.bat` 是自制下载引导脚本，硬编码 Gradle 8.13 且只认 `~/.gradle/life-track-bootstrap/`，升级版本时必须同步改脚本里的 `VERSION`。现已替换为官方脚本，改版本只改 `gradle-wrapper.properties` 的 `distributionUrl`。
-- **数据库加密代码已落地但尚未发版**：main 分支已接入 SQLCipher 4.20.0（`SupportOpenHelperFactory`）+ Keystore 口令信封，0.6.0 首发；0.5.0 及更早仍是明文库。不得对外声称「已发布版本已加密」，也不得把应用私有目录的沙箱隔离说成静态加密。剩余评审项见 README「安全边界」与台账 C5–C10。
+- **数据库加密已随 0.6.0 发布（2026-11-10）**：`main` 分支 SQLCipher 4.20.0（`SupportOpenHelperFactory`）+ Keystore 口令信封已上线，用户真机覆盖安装与明文库加密迁移确认通过；0.5.0 及更早仍是明文库，且**加密库无法被旧版打开**（回退前必须导出备份）。不得把应用私有目录的沙箱隔离说成静态加密。C8 / B8 真机厂商 ROM 迁移走查仍为 🟡，见 README「安全边界」与台账。
 - **Manifest 的 INTERNET 权限例外（已评审）**：原本 Local First 硬约束是「不申请 INTERNET」，但应用内「检查更新」需要联网查询 Release 清单并下载 APK，已作为**唯一例外**放开——新增 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限（见 `app/src/main/AndroidManifest.xml`）。该网络能力仅用于更新（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`，失败时回退 `api.github.com/repos/999bug/LifeTrack/releases/latest`，以及下载 APK），不携带任何用户数据/设备标识/遥测；对应的 README「本地存储」「安全边界」第 6 条与隐私评审已同步更新。新增任何其它网络能力仍需回到本约束重新评审。
 - **`allowBackup=false`，主动导出 / 恢复默认加密**：设置页「数据」走 SAF 导出单个 JSON，默认 v3 加密容器（PBKDF2-HMAC-SHA256 210000 次 + AES-256-GCM，头部纳入 AAD），可显式选 v2 明文但要过风险确认；恢复支持 v1 / v2 明文与 v3 加密。卸载、清除数据或丢机仍会丢数据；v3 文件无法被 0.5.0 及更早版本读取。
 - **发布签名密钥由 Repository secrets 注入**：流水线从 `LIFETRACK_KEYSTORE*` 环境变量读取，首次发版前需按 docs/release-guide.md 配置 4 个 secrets；keystore 与口令绝不入库，密钥丢失后用户只能卸载重装且数据全丢。
@@ -165,6 +165,7 @@ overrides:
 - **SAF 没有原子 rename，改备份口令要另存新文件（2026-11-10 C5）**：现象 → 计划里的「解旧 → 重加密 → 原子替换」在 SAF 上做不到：`DocumentFile` 不支持 rename，用 `openOutputStream(uri, "wt")` 就地覆盖时进程被杀或写满会留下半截文件，且没有回滚路径。修复 → 轮换结果通过 `CreateDocument` 另存为 `...-rekeyed.json`，原文件保持不变，文案要求用户确认新文件能恢复后再删旧文件。教训 → 涉及「覆盖用户唯一备份」的操作，先问「失败后旧数据还在吗」；SAF 场景下宁可多一个文件，也不要赌一次覆盖成功。
 - **口令强度不能只按「有没有大写 / 数字」打分（2026-11-10 C6）**：现象 → 初版规则若要求大小写与数字混合，一句 12 个汉字的口令会被判「偏弱」，中文用户被逼去记无意义的 `Abc123!`。修复 → 把非 ASCII 也算一种字符类，分数 = 长度 + 2 × 种类数，12 字中文落在「可用」、16 字以上「较强」。教训 → 面向中文用户的口令策略必须以「长度」为主、字符种类为辅；强度提示是建议不是门槛，别把合法口令拦在门外。
 - **`BiometricManager.canAuthenticate` 缺 `USE_BIOMETRIC` 会直接崩（2026-11-10 C7）**：现象 → 设置页点「应用锁」开关，应用闪退回桌面，`AndroidRuntime` 里是 `SecurityException`，栈顶在 `AuthService.checkPermission`。根因 → 只按 API 级别判断能力，忘了 `canAuthenticate` 需要 `android.permission.USE_BIOMETRIC`（普通权限，无运行时弹窗）。修复 → Manifest 补权限并复测。教训 → 系统生物识别 API 的权限不是「调用 authenticate 才要」，查询能力同样要；新增系统能力先在真机/模拟器点一遍入口。
+- **手填版本号撞已存在的 tag 会让发版在第一步就失败（2026-11-10 18:04）**：现象 → `v0.6.0` 已于 16:42 发布，18:04 再次触发时仍填 `v0.6.0`，`Check tag and version` 14 秒报错，`Build and test` / `mirror-gitee` 全 skipped。根因 → 旧流程要求人工同时维护「tag 输入」与 gradle 的 `versionCode` / `versionName` 三处，任一滞后就撞号或版本不一致。修复 → `release.yml` 改为 CI 自动递增：从最高 `vX.Y.Z` tag 推 patch+1、从 gradle 读 `versionCode+1`，在 runner 内改 `app/build.gradle.kts` 后用新版本构建，构建成功后才把版本改动提交回 `main` 并打 tag；`mirror-gitee` 的 `TAG` 改读 `needs.release.outputs.tag`。教训 → Android 的 `versionCode` / `versionName` 决定覆盖安装、APK 文件名与「检查更新」，**必须落回源码**，不能只在 CI 里算一个 tag；CI 推了版本提交后本地 `main` 会落后，下次开发前 `git pull --ff-only`；`main` 若开分支保护要放行 `github-actions[bot]`。详见 `docs/release-guide.md` §2。
 - **锁状态里 `null` 不能当 `false`（2026-11-10 C7）**：现象 → 开启应用锁后强停重开，应用直接进正文，锁根本没出现。根因 → `ON_START` 时读 `appLockEnabled.value`，DataStore 还没订阅到，拿到 null，代码把它当「已关闭」把 `appLocked` 置为 false；随后设置读出 true 也不会重新上锁。修复 → null 直接 return，只有明确 false 才解锁；冷启动由 collector 把锁状态置 true。教训 → 三态设置（未知 / 开 / 关）必须显式处理「未知」，安全开关的默认方向永远是锁。
 - **锁屏不能靠销毁正文来「藏内容」（2026-11-10 C7）**：现象 → 用 `if (locked) LockScreen else content` 实现后，开启应用锁再从 SAF 选备份文件，返回时 composition 被拆掉，`rememberCoroutineScope` 取消，导出/恢复协程停在半路。修复 → 正文保持组合，用全屏 Dialog 盖住并 `clearAndSetSemantics {}`；正文里的 `AlertDialog` 是独立窗口，普通 Box 遮罩压不住，后创建的 Dialog 窗口才能盖住。教训 → 「安全」和「可用」冲突时先找不丢数据的实现；涉及 SAF 的页面，别把生命周期绑在会被锁状态切换的 composition 上。
 - **启用高敏感模块后 `adb screencap` 全黑，视觉回归要先临时停用模块（2026-11-10 A10）**：现象 → A10 启用期间 `adb exec-out screencap -p` 只得到约 15 KB 全黑图，且 L1 的 `clearAndSetSemantics` 让 `uiautomator dump` 里详情字段文本全部消失，「详情弹窗视觉是否正常」两条通道同时失效。根因 → `MainActivity` 在「应用锁开启 **或** intimacy 已启用」时无条件加 `FLAG_SECURE`，连 adb 系统截图也被遮挡；`clearAndSetSemantics` 只清语义树、不影响绘制，但 uiautomator 读的正是语义树。修复 → 临时在「设置 → 记录项目」停用该模块（不动应用锁），`combine` 会立即清掉 FLAG_SECURE，截图恢复；验完还原启用状态并删除测试记录。教训 → 黑屏本身就是安全设计生效的验收证据，别当成截图工具坏了；验证「视觉可见、读屏不念」的功能必须同时走 dump（读屏口径）与截图（视觉口径）两条通道。Git Bash 下给 adb 传 `/sdcard/...` 一律加 `MSYS_NO_PATHCONV=1`，本节已有同类记录。

@@ -9,15 +9,17 @@
 
 | 状态 | 任务 | 进度 | 下一步 |
 | --- | --- | --- | --- |
-| 🔄 进行中 | A 模块扩展包 | A1–A8、A10、A11、A12 已完成并验收（五类记录全闭环、统计类型筛选、字段校验收口）；A10 按 L1 隐私收敛落地；仅 A9 月经按用户指示保留后置 | A9 待后续指示 |
+| 🔄 进行中 | A 模块扩展包 | A1–A8、A10、A11、A12 已完成并验收（五类记录全闭环、统计类型筛选、字段校验收口）；A10 按 L1 隐私收敛落地，**已合入 `main` 但尚未发版**（0.6.0 不含）；仅 A9 月经按用户指示保留后置 | A10 随下一次发版进入 Release；A9 待后续指示 |
 | ✅ 已完成 | 应用内检查更新（另一会话） | `33ef32d`：GitHub Releases 版本检查、APK 下载与安装、设置页 UpdateCard、自动检查一次 | — |
 | ✅ 已完成 | 并发合并收尾 | 双方改动全部进入 HEAD，`testDebugUnitTest` 90 项 + `assembleDebug` 全绿；A6 代码无需再补提交 | — |
 | ✅ 已完成 | 子任务台账建立 | 全部剩余工作已拆为 A/B/C 三包共 33 项 | — |
 | 🔄 进行中 | B 测试与质量收尾包（11 项） | B1、B2、B4、B5、B6、B9、B10、B11 已完成；B3 语义树达标（缺 TalkBack 实机）；B7 仅剩「卸载重装丢数据」真机验证；B8 随 C8 | B7 真机剩余项 → B3 TalkBack 实机 → B8 随 C8 |
-| ✅ 已完成 | C 安全加固包（10 项） | **C1–C10 已完成**：2026-11-10 用户反馈「0.6.0 安装成功」，真机覆盖安装与加密库迁移通过；许可证入口、README 安全边界、versionCode 6 齐备 | tag / CI 发版状态待用户确认（README「尚未发布」文案待同步） |
+| ✅ 已完成 | C 安全加固包（10 项） | **C1–C10 已完成**：0.6.0 于 2026-11-10 发布（GitHub + Gitee 双端 Release、tag `v0.6.0`），用户真机覆盖安装与加密库迁移确认通过；许可证入口、README 安全边界、versionCode 6 齐备 | C8 / B8 真机厂商 ROM 走查仍为 🟡 |
 | ✅ 已完成 | 记录详情弹窗 | 2026-11-10 新增：今天 / 历史卡片整行可点 → 只读底部弹窗；126 项单测、lint、assembleDebug 全绿；模拟器验证浅 / 深色、200% 字体、360dp 窄屏 | — |
 | ✅ 已完成 | 发布 0.5.0（含 Gitee 国内分发） | versionCode 5 / versionName 0.5.0；GitHub + Gitee 双端 Release 与 APK / `.sha256` 附件齐备；Actions run `42751727141` 全绿（含 `mirror-gitee` job，16m54s） | — |
 | ✅ 已完成 | 0.5.0 真机验收 | 用户 2026-11-10 反馈：应用内「检查更新」正常完成且走国内网络；0.4.0 → 0.5.0 覆盖安装升级成功 | — |
+| ✅ 已完成 | 发布 0.6.0（加密首发） | 2026-11-10 16:42 由用户自行触发：GitHub Release `v0.6.0` + Gitee 同名 Release，`LifeTrack-0.6.0-release.apk`（22,283,347 B）+ `.sha256` 齐备，tag `v0.6.0` → `3b5ea49`；用户反馈真机安装与加密迁移成功。18:04 另一次触发因手填 `v0.6.0` 撞已存在 tag 在 `Check tag and version` 失败（head `40ee2ba`，未产出 Release） | 下一次发版带入 A10 |
+| ✅ 已完成 | 发版版本号自动递增 | 2026-11-10 改造 `release.yml`：CI 从最高 tag 推 patch+1、从 gradle 推 `versionCode+1`，runner 内改 `build.gradle.kts` 后构建，成功后把版本改动提交回 `main`、打 tag、发 Release；`mirror-gitee` 改读 `needs.release.outputs.tag`。YAML 解析、11 段 shell 语法与 5 类版本分支已本地模拟验证 | 首次真实运行待用户触发；`main` 若开分支保护需放行 `github-actions[bot]` |
 
 A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5（备份 v2、Room 仍 v1），第三批 A6（首次升 Room v2，新增通用详情表 + 饮水闭环），第四批 A7（只注册类型与规格，咖啡 / 茶闭环）。A7/A8 已验证「加类型不必升 Room」的扩展点；后续模块沿用同一路径。
 
@@ -57,8 +59,9 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | C7 应用锁与预览遮蔽 | 2026-11-10 | 新增 `AppLockTimeout` / `AppLockPolicy` / `AppLockAuthenticator` / `AppLockGate`；设置页「安全」分区（开关 + 立即/1/5 分钟），API 30+ 系统 BiometricPrompt 合并设备凭据，API 26–29 走 Keyguard；锁定用全屏 Dialog 盖住正文并清空语义树，正文不销毁以保住 SAF 写盘；Activity 绑定 `FLAG_SECURE`，进程被杀后冷启动必锁。191 项单测全绿（新增 6 项）；模拟器实测 PIN 解锁、返回键拦截、1 分钟不误锁、锁屏无正文泄漏、移除锁屏后的兜底、200% 字体布局 |
 | C8 备份 / 迁移评审 | 2026-11-10 | 复核 `allowBackup=false` + `fullBackupContent` + `dataExtractionRules`：五个数据域在云备份与设备迁移两条链路全部排除；Keystore 密钥不属于应用数据；`.plaintext.bak` 同在 `databases/` 且首次读取后删除。模拟换机：卸载重装后 0 条记录、新库文件头为随机密文；用加密备份在新 Keystore 上恢复 3 条成功。真机 ROM 走查待做（B8 同步改 🟡） |
 | C9 隐私审查 | 2026-11-10 | 非 debug 构建已关 SQLCipher Logcat；全仓仅 3 条日志（失效枚举 / 迁移失败 / 版本与行数），无记录内容、口令或密钥；无崩溃上报 SDK、无剪贴板、无通知、无临时导出文件；FileProvider 仅暴露更新 APK 且 `exported=false`；网络只走 Gitee / GitHub Releases；`.plaintext.bak` 清理路径复核。无需改代码 |
-| C10 发布前回归（代码就绪） | 2026-11-10 | 新增 `ThirdPartyNotices` 与设置页「关于 → 开源许可」可滚动全文（BSD-style），README 补第三方许可章节；安全边界 5 项逐条改写；`versionCode 6` / `versionName 0.6.0`。191 项单测 + 14 项仪器测试全绿，lint 无 error，`assembleRelease` 成功（22,275,155 B）；200% 字体许可证弹窗无截断。真机覆盖安装由用户 2026-11-10 确认通过；tag / CI 发版状态待用户 |
-| A10 亲密关系模块 | 2026-11-10 | 按 `docs/intimacy-module-confirmation.md` V1–V10 推荐值落地：默认停用、三项可空字段、L1 列表级收敛与读屏一句汇总、启用期间无条件 `FLAG_SECURE`、首次启用提示、明文导出加强提示；Room 仍 v2、备份 v1/v2/v3 不变；A9 月经保留 ⛔，未动排便专用链路 |
+| C10 发布前回归（代码就绪） | 2026-11-10 | 新增 `ThirdPartyNotices` 与设置页「关于 → 开源许可」可滚动全文（BSD-style），README 补第三方许可章节；安全边界 5 项逐条改写；`versionCode 6` / `versionName 0.6.0`。191 项单测 + 14 项仪器测试全绿，lint 无 error，`assembleRelease` 成功（22,275,155 B）；200% 字体许可证弹窗无截断。真机覆盖安装由用户 2026-11-10 确认通过；0.6.0 已发布 |
+| A10 亲密关系模块 | 2026-11-10 | 按 `docs/intimacy-module-confirmation.md` V1–V10 推荐值落地：默认停用、三项可空字段、L1 列表级收敛与读屏一句汇总、启用期间无条件 `FLAG_SECURE`、首次启用提示、明文导出加强提示；Room 仍 v2、备份 v1/v2/v3 不变；A9 月经保留 ⛔，未动排便专用链路。204 项单测全绿，`40ee2ba` 提交 |
+| 发布机制改造（自动递增） | 2026-11-10 | `release.yml` 去掉必填版本号：新增 `Resolve version`（最高 tag + patch、gradle versionCode +1、tag / Release 冲突与分支校验）、`Bump version in build file`、`Commit version bump to main`（构建成功后才推送，`[skip ci]`，并发时中止）、`Create GitHub Release` 改指向版本提交；`mirror-gitee` 的 `TAG` 改读 job outputs。`docs/release-guide.md` §2 重写 | 未在真实 CI 跑过；需 `main` 允许 bot 推送 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 
@@ -109,7 +112,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | C7 | 应用锁 + 预览遮蔽 | BiometricPrompt / 系统凭据、超时策略、`FLAG_SECURE` 遮住最近任务预览 | C2 | ✅ |
 | C8 | 备份 / 迁移 / ROM 评审 | 自动备份、设备迁移、卸载重装、换机恢复、`allowBackup` 策略复核（与 B8 合并） | C3 | 🟡 配置复核与模拟换机完成，真机 ROM 走查待做 |
 | C9 | 隐私审查 | 日志（SQLCipher 默认输出 Logcat，C3 已提前关闭生产日志）、崩溃报告、剪贴板、通知内容、最近任务屏幕预览 | C7 | ✅ |
-| C10 | 发布前安全回归 | 全链路回归 + 应用内可访问的 SQLCipher 许可证归属入口 + README「安全边界」从「未实现」改写为「已实现 + 边界说明」+ 升 0.6.0 / versionCode 6 | C1–C9 | ✅ 用户 2026-11-10 反馈「0.6.0 安装成功」，真机覆盖安装与加密迁移通过；tag / CI 发版状态待确认 |
+| C10 | 发布前安全回归 | 全链路回归 + 应用内可访问的 SQLCipher 许可证归属入口 + README「安全边界」从「未实现」改写为「已实现 + 边界说明」+ 升 0.6.0 / versionCode 6 | C1–C9 | ✅ 0.6.0 已发布，用户真机覆盖安装与加密迁移确认通过；C8 / B8 真机 ROM 走查仍 🟡 |
 
 ## 5. 依赖与推荐顺序
 
@@ -117,14 +120,14 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 - A4 / A5 依赖 A1 的类型模型稳定；**B1 依赖 A6 的 Room v2**（备份 schemaVersion v2 不等于 Room 迁移，A5 未改数据库）；C4 依赖 A5 的备份格式。A6 已完成，`1.json` / `2.json` 双基线齐备，B1 已完成并通过模拟器实跑。
 - C3 依赖 C1/C2；C4/C5/C6/C7 依赖 C2；C10 依赖 C1–C9。
 - B3–B6 不是一次性任务，每个新模块合并后都要回归一次。
-- **推荐顺序（2026-11-10 更新）**：A1–A8、A11、A12、B1、B2、B4、B5、B6、B9、B10、B11 已完成；设置页重构与 v0.5.0 发布（含真机验收）已完成 → 剩 B7（真机剩余项）→ B3 读屏实机 →（B8 随 C8）。**C 包按 C1 ✅ → C2 ✅ → C3 ✅ → C4 ✅ → C5 ✅ → C6 ✅ → C7 ✅ → C8 🟡 → C9 ✅ → C10 ✅（真机安装验证完成）逐个完成；A10 于 2026-11-10 按 V1–V10 推荐值交付；A9 保留 ⛔。每个子任务构建 + 测试通过再进下一步。**
+- **推荐顺序（2026-11-10 更新）**：A1–A8、A11、A12、B1、B2、B4、B5、B6、B9、B10、B11 已完成；设置页重构与 v0.5.0 发布（含真机验收）已完成 → 剩 B7（真机剩余项）→ B3 读屏实机 →（B8 随 C8）。**C 包按 C1 ✅ → C2 ✅ → C3 ✅ → C4 ✅ → C5 ✅ → C6 ✅ → C7 ✅ → C8 🟡 → C9 ✅ → C10 ✅（0.6.0 已发布，真机安装验证完成）逐个完成；A10 于 2026-11-10 按 V1–V10 推荐值交付并合入 `main`，随下一次发版进入 Release；发版机制已改为 CI 自动递增版本；A9 保留 ⛔。每个子任务构建 + 测试通过再进下一步。**
 - 一包一交付：每包先出设计前确认单，确认后再写代码，验收通过后更新本台账并单独提交。A/B 收尾包用户曾明确「逐个完成不需要确认」（见 `docs/module-remaining-confirmation.md`）；C 包按 2026-11-10 指示逐个完成，关键取舍与兼容性矩阵集中在 `docs/security-hardening-confirmation.md`。
 
 ## 6. 风险与已知遗留
 
 | 编号 | 风险 | 说明 |
 | --- | --- | --- |
-| R1 | **已发布但未加密** | v0.1.0 起已发布 5 个版本。C3 已在 main 落地加密，但**加密改造尚未发版**，用户设备上的 0.5.0 仍是明文；README「安全边界」5 项评审要到 C10 才逐条销项。加密随 0.6.0 发布，发版前需真机灰度。 |
+| R1 | ~~已发布但未加密~~ **已解除** | 0.6.0（2026-11-10）已发布，加密库迁移由用户真机确认通过；0.5.0 及更早的历史版本仍是明文库，但不能覆盖安装到已加密的库上。 |
 | R2 | 备份兼容性 | ~~A5 升 `schemaVersion` 会让旧备份失效~~ → 已缓解：v1/v2 共用一个 DTO、版本白名单兼容，v1 旧备份实测恢复成功。C3 未改备份格式；**C4 起默认导出 v3 加密备份，0.5.0 及更早版本无法读取 v3**，需要与旧版互换时显式选明文导出。新版永久保留读取 v1 / v2 明文备份的能力，README 已标注单向风险。 |
 | R3 | ~~schema 与加密迁移撞车~~ 已澄清 | Room v2 已于 A6 落地（只加 `event_detail` 表）。C1 选型确认：明文 → 加密只换文件格式与 openHelper，schema 不变、密钥材料放 DataStore，因此 **C3 不升 Room 版本、仍为 v2**，少一次不可逆迁移；详见确认单 §2.5。已实测 v1 库保留 `user_version=1`。 |
 | R8 | ~~存量库 1→2 升级未实测~~ 已缓解 | B1 用 `MigrationTestHelper` 按 `1.json` 建真实 v1 库跑迁移并逐字段校验，模拟器 2 项迁移用例全绿；真机存量升级仍归 B7。 |
@@ -133,6 +136,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | R4 | 通用事件模型膨胀 | 每加一个类型都要动 DAO / Repository / 备份 / 统计四处，A3/A4 的抽象不做干净会返工。A8 实测只需加类型 + 规格 + 编辑器 + 分派，DAO/备份/统计已无需改动。 |
 | R5 | ~~200% 字体遗留~~ 已修复 | 统计页 `PeriodSwitcher` 与历史页 `ViewSwitcher` 改为按字号抬高的自适应切换条，类型筛选 chips 改 `FlowRow`；200% 字体实测首页、历史、统计、运动编辑器均无截断（B4）。 |
 | R11 | **CI 的仪器测试任务未实跑** | `ci.yml` 的 build job 已在 `df10075`、`2fc7e5a` 两次 push 上 success（单测 + lint + assembleDebug）；instrumented job 按设计 skipped。`reactivecircus/android-emulator-runner@v2` + API 36 镜像 + KVM 这条链路仍未真正执行，需手动 dispatch 或给 PR 打 `run-instrumented` 标签验证。本地 `connectedDebugAndroidTest` 14 项已全绿。 |
-| R12 | **加密后不可降级** | 0.6.0 起的加密库无法被 0.5.0 及更早版本打开；Android 不允许降 `versionCode`，但用户卸载后重装旧 APK 会命中。README 与 C10 发布说明必须写明「需要回退请先导出备份」。 |
+| R12 | **加密后不可降级** | 0.6.0 起的加密库无法被 0.5.0 及更早版本打开；Android 不允许降 `versionCode`，但用户卸载后重装旧 APK 会命中。README 已写明「需要回退请先导出备份」，0.6.0 发布说明需同步。 |
+| R13 | **CI 自动提交版本改动** | 发版流水线会把 `chore: release …` 提交推回 `main`，本地会落后一个提交，下次开发前须 `git pull --ff-only`；`main` 若启用分支保护要放行 `github-actions[bot]`。构建失败发生在版本提交之前时无副作用；若版本提交已推送而 Release 未建，重跑会再升一次 `versionCode`，须先看日志。详见 `docs/release-guide.md` §2.2 / §2.3。 |
 | R6 | 台账维护 | 中断恢复只认本文件；进度只在会话里说、不写进来，下次会话必然重议。 |
 | R7 | `track_type` 首次启动为空 | 初版只在第一次打卡时 `insertIgnore(DEFAULT_POOP_TYPE)`，模块管理页首次打开会是空列表。已用 `ensureDefaultTypes()` 在 ViewModel 初始化时补内置类型（`IGNORE` 不覆盖用户的启用/排序设置），恢复备份的兜底也改为补齐 `DEFAULT_TYPES`。 |

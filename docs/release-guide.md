@@ -1,6 +1,6 @@
 # 发布与签名指南
 
-> 适用版本 0.6.0（待发布；最新已发布 0.5.0）· 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
+> 最新已发布：0.6.0（2026-11-10，versionCode 6）· 下次发版由 CI 自动递增，无需手填版本号 · 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
 
 这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases 并同步到 Gitee，以及为什么签名密钥一旦丢失就无法挽回。代码开发与发布始终以 GitHub 为准，Gitee 只承担国内手机的更新下载。
 
@@ -132,14 +132,43 @@ keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storety
 
 ## 2. 每次发版
 
-1. 改 `app/build.gradle.kts`：`versionCode` **单调递增**，`versionName` 改成与 tag 一致（如 `0.1.1`）。
-2. 如改过 Room schema，先导出 schema 并写 `Migration` + 迁移测试；README 与本文档的版本号同步。
-3. 提交并推送到 `main`（流水线以触发时 `main` 的代码为准）。
-4. 打开 `Actions → Release APK → Run workflow`，填 `version`，格式 `v<versionName>`，例如 `v0.1.1`。
-5. `release` job 依次执行：单元测试 → 构建 release APK → `apksigner` 验签并拒绝 debug 证书 → 生成 `.sha256` → 校验 tag 未被占用 → 创建 GitHub Release 并上传两个附件。
-6. 随后 `mirror-gitee` job 下载同一份 `release-apk` artifact，创建同名 tag 的 Gitee Release 并上传 APK 与 `.sha256`。该 job 失败会让 workflow 标红，但**不会回滚已发布的 GitHub Release**；此时按 §6 人工补传，不要重复打 tag。
+**你只需要做两件事：把代码推到 `main`，然后在 Actions 页面点一次 `Run workflow`。版本号不用填。**
+
+CI 自己完成：
+
+1. 从仓库里最高的 `vX.Y.Z` tag 推 `patch + 1`（当前基线 `v0.6.0` → 下次 `v0.6.1`）；
+2. 从 `app/build.gradle.kts` 读当前 `versionCode` 并 `+1`（6 → 7）；
+3. 在 runner 的工作副本里把这两个数字写回 `app/build.gradle.kts`，**用新版本构建** release APK——所以 APK 文件名、包内版本号、tag 三者一致；
+4. 单测 / lint / 构建 / 验签全部通过后，把版本改动以 `chore: release v0.6.1 (versionCode 7) [skip ci]` 提交并推回 `main`，再以该提交为 target 创建 tag 与 GitHub Release；
+5. `mirror-gitee` job 通过 `needs.release.outputs.tag` 拿到同一个 tag，下载同一份 `release-apk` artifact，创建 Gitee Release 并上传 APK 与 `.sha256`。
+
+想跳小版本时（例如想发 `0.7.0` 而不是 `0.6.1`），在 Run workflow 的 `version` 输入框里手填 `v0.7.0`；**留空就是自动递增**。手填值必须是 `vX.Y.Z` 且严格高于最新 tag，否则流水线在花几分钟构建之前就报错。
+
+> **不要手工改 `app/build.gradle.kts` 里的版本号**。它是 CI 计算 `versionCode` 的唯一输入，手改会和已发布 tag 脱节。发版成功后本地 `main` 会落后 CI 推的那个版本提交，开始下一轮开发前先 `git pull --ff-only`。
 
 流水线入口：https://github.com/999bug/LifeTrack/actions/workflows/release.yml
+
+### 2.1 为什么版本号必须写回源码
+
+Android 的 `versionCode` 必须严格递增，否则系统拒绝覆盖安装；`versionName` 决定 APK 文件名，也是应用内「检查更新」比较 `releases/latest` 时用的版本号。所以不能只在 CI 里算一个 tag 而不改 gradle——那样装到手机上还是旧版本，检查更新会错乱。这也正是 2026-11-10 18:04 那次触发失败的根因：手填 `v0.6.0` 撞上了已存在的 tag，而 gradle 仍是 `0.6.0`。改成自动递增后，这类撞号由 CI 在第一步就拦住。
+
+### 2.2 CI 自动提交的前提
+
+- `release.yml` 声明了 `permissions: contents: write`，`git push` 用的是 `actions/checkout` 注入的 `GITHUB_TOKEN`，不需要额外 secret。
+- **如果 `main` 启用了分支保护**，要允许 `github-actions[bot]` 直接推送（或给该规则加 bypass），否则推送步骤会失败并打印提示。
+- 只允许从 `main` 手动触发；从其它分支 Run workflow 会在第一步被拒绝，避免把版本提交叠在没测过的代码上。
+- 构建期间 `main` 若出现新提交，流水线**不会** rebase / merge，而是中止并提示重跑（并发由 `concurrency: release-apk` 再兜一层）。
+- 版本提交带 `[skip ci]`，且 `GITHUB_TOKEN` 产生的 push 本身不会再触发 workflow，不会形成循环。
+
+### 2.3 失败落在哪一步，怎么补
+
+| 失败位置 | 后果 | 处理 |
+| --- | --- | --- |
+| 版本推算 / SDK / 签名配置 / 构建 / 验签 | 未推送任何东西，`main` 与 tag 都不变 | 修好问题后直接重跑，版本号不变 |
+| `Commit version bump to main` | 版本提交可能已推送，但 tag / Release 还没建 | 先看 `main` 与 Actions 日志再决定；重跑会算出更高的 `versionCode`，不要盲点 |
+| `Create GitHub Release` 之后、`mirror-gitee` 失败 | GitHub 侧已发布成功，Gitee 缺附件 | 按 §6 人工补传，**不要重跑整个 workflow**（会撞 tag） |
+
+`mirror-gitee` 失败会让 workflow 标红，但**不会回滚已发布的 GitHub Release**。
 
 ---
 
@@ -158,7 +187,7 @@ Release 页面（权威）：https://github.com/999bug/LifeTrack/releases
 Windows 校验：
 
 ```powershell
-Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256
+Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256
 ```
 
 把输出与 `.sha256` 文件内容比对。`sha256` 只证明下载完整，安装包身份由系统在校验 APK 签名时保证。
@@ -167,8 +196,9 @@ Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256
 
 ## 4. 回滚与约束
 
-- **不复用版本号 / tag**：流水线检测到同名 tag 已存在会直接失败；不要用 `gh release upload --clobber` 覆盖旧附件。
-- 需要回退时，发一个**更高 `versionCode`** 的回退版本，别让用户降级安装（Android 不允许）。
+- **不复用版本号 / tag**：CI 自动取「最高 tag 的 patch+1」；若手填，流水线会在构建前校验同名 tag / Release 不存在。不要用 `gh release upload --clobber` 覆盖旧附件。
+- 需要回退时，再跑一次流水线发一个**更高 `versionCode`** 的回退版本，别让用户降级安装（Android 不允许）。
+- **发版失败后先看 `main` 有没有多出 `chore: release …` 提交**，再决定能否直接重跑，详见 §2.3。
 - 覆盖安装前确认 Room `version` 与 `Migration` 已就位，否则启动即崩。
 - 密钥轮换意味着用户必须卸载重装 → 数据全丢，非必要不做。
 - **Gitee 同步失败不回滚 GitHub Release**：`mirror-gitee` 失败时 GitHub 侧已发布成功，流水线标红只是提示国内镜像缺失；按 §6 人工补传，不要重跑整个 workflow（会撞同名 tag）。
@@ -179,9 +209,11 @@ Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256
 
 - [ ] 4 个签名 secret + `GITEE_TOKEN` 齐备
 - [ ] 按 §1.3 核对本地 keystore 证书指纹与已发布包一致（换密钥 = 用户数据全丢）
-- [ ] `versionCode` 递增、`versionName` 与 tag 一致
+- [ ] **没有手工改过 `app/build.gradle.kts` 的版本号**（由 CI 递增）；本地 `main` 已 `pull --ff-only` 到最新
+- [ ] `main` 允许 `github-actions[bot]` 推送（若启用了分支保护）
+- [ ] 待发布代码已推到 `main`，本次从 `main` 触发
 - [ ] `./gradlew :app:testDebugUnitTest :app:assembleDebug` 本地通过
-- [ ] README / 本文档版本号已同步
+- [ ] README / 本文档的版本状态已同步
 - [ ] Room schema 与 Migration 已就绪（若改表）
 - [ ] 真机做过一次「旧版 → 新版」覆盖安装，确认数据完整
 - [ ] 两端 Release 页面附件可下载，`Get-FileHash` 与 `.sha256` 一致

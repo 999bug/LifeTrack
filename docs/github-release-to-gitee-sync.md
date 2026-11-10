@@ -144,12 +144,14 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 
 ## 5. 每次发版的标准操作
 
-以下按本项目的 `workflow_dispatch` 手动触发方式描述；若你的项目是「推 tag 触发」，把第 3–4 步换成 `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`，其余不变。
+以下按 `workflow_dispatch` 手动触发方式描述；若你的项目是「推 tag 触发」，把第 3–4 步换成 `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`，其余不变。
 
-1. **改版本号**：`versionCode` 单调递增，`versionName` 与 tag 严格一致（`v` + `versionName`）。改过数据库 schema 时先备好 Migration。同步更新 README 与发布文档里的版本号。
+> **本项目现状（2026-11-10 起）**：`release.yml` 已改为「不填版本号、CI 自动递增」——第 1 步由 CI 从最高 tag 推 patch+1、从 gradle 推 `versionCode+1` 并写回 `app/build.gradle.kts`；第 4 步只需在 `main` 上点 `Run workflow`，`version` 输入框留空（想跳 minor/major 才手填）。下面第 1 / 4 步保留的是**通用手工写法**，供其它项目套用；本项目以 `docs/release-guide.md` §2 为准。
+
+1. **改版本号**（本项目已由 CI 自动完成，不要再手改）：`versionCode` 单调递增，`versionName` 与 tag 严格一致（`v` + `versionName`）。改过数据库 schema 时先备好 Migration。同步更新 README 与发布文档里的版本号。
 2. **本地门禁**：跑项目自己的构建 + 测试 + lint，例如 `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease`。
 3. **提交并推送到主分支**（发布流水线以触发时的代码为准）。
-4. **触发发布**：`Actions → Release APK → Run workflow`，填 `version`，格式 `vX.Y.Z`。
+4. **触发发布**：`Actions → Release APK → Run workflow`，填 `version`，格式 `vX.Y.Z`（本项目现在留空即可，由 CI 自动算）。
 5. **发布 job 依次做**：校验 tag 格式与未被占用 → 校验签名配置齐备 → 构建与验签（拒绝 unsigned / debug 证书）→ 生成 `.sha256` → 上传 artifact → 创建 GitHub Release 并挂附件。
 6. **镜像 job 接着做**（`needs: 发布 job`）：下载同一份 artifact → 检查令牌与产物 → 列出已有 Release 并拒绝同名 → 创建 Gitee Release → 逐个上传附件并校验 `browser_download_url`。
 7. **按第 9 节验证**。不要以「流水线绿了」作为发布成功的证据。
@@ -169,7 +171,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 
 ### 6.1 镜像 job（挂在你现有的发布 workflow 后面）
 
-这是给新项目套用的参数化骨架，`<...>` 按 6.2 节替换。本仓库**不需要改动**——现有 `release.yml` 已经是这份形状的实现。
+这是给新项目套用的参数化骨架，`<...>` 按 6.2 节替换。本仓库 `release.yml` 已是这份形状；注意 2026-11-10 起本项目的 `TAG` 不再读 `inputs.version`，而是读 `${{ needs.release.outputs.tag }}`（版本号由发布 job 自动推算后输出），模板里保留的是通用写法。
 
 ```yaml
   mirror-gitee:
@@ -180,7 +182,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
       contents: read
       actions: read
     env:
-      TAG: ${{ inputs.version }}       # 手动触发；若用 tag 触发改为 ${{ github.ref_name }}
+      TAG: ${{ inputs.version }}       # 通用写法；本项目现为 ${{ needs.release.outputs.tag }}
       GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
       GITEE_OWNER: ${{ vars.GITEE_OWNER }}
       GITEE_REPO: ${{ vars.GITEE_REPO }}
@@ -260,7 +262,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 | 占位符 | 含义 | 本项目实际值 |
 |---|---|---|
 | `<RELEASE_JOB_ID>` | 现有发布 job 的 id | `release` |
-| `TAG` 表达式 | tag 来源 | `${{ inputs.version }}`（手动填版本号）；推 tag 触发则改为 `${{ github.ref_name }}` |
+| `TAG` 表达式 | tag 来源 | **本项目**：`${{ needs.release.outputs.tag }}`（发布 job 自动递增后输出）；通用模板：`${{ inputs.version }}`（手填）或 `${{ github.ref_name }}`（推 tag 触发） |
 | `<ARTIFACT_NAME>` | 发布 job 上传的 artifact 名 | `release-apk` |
 | `<ASSET_GLOB>` | 主产物文件名匹配 | `LifeTrack-*-release.apk` |
 | `<GH_OWNER>/<GH_REPO>` | GitHub 仓库 | `999bug/LifeTrack` |

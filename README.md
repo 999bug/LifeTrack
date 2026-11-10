@@ -1,6 +1,6 @@
 # 生活记（LifeTrack）Android 工程骨架
 
-> 版本：0.6.0（代码就绪，尚未发布）· 文档核对日期：2026-11-10 · 许可证：MIT
+> 最新已发布：0.6.0（2026-11-10，versionCode 6）· `main` 分支含 A10 亲密关系模块，尚未发版 · 文档核对日期：2026-11-10 · 许可证：MIT
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水、咖啡 / 茶、运动、亲密关系五类事件：排便走专用 `poop_detail` 表，其余四类走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，为后续月经模块预留扩展点（新增类型只需注册类型与字段规格，不必再升 Room 版本）。亲密关系为高敏感模块，**默认停用**，需在「设置 → 记录项目」主动开启。
 
@@ -11,10 +11,11 @@
 
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件；两端是同一份 CI 产物，签名一致。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
-- 当前代码版本 `0.6.0`（versionCode 6，**尚未发布**）；最新已发布版本为 `0.5.0`。校验示例：`Get-FileHash .\LifeTrack-0.5.0-release.apk -Algorithm SHA256`。
+- 最新已发布版本 `0.6.0`（versionCode 6，2026-11-10）；校验示例：`Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256`。
 - 应用内检查更新优先查询 Gitee，Gitee 暂无 Release、未附 APK 或请求失败时回退 GitHub。
+- **发版无需手填版本号**：在 Actions 手动触发 `Release APK`，CI 从最高 tag 自动推 patch+1、从 gradle 推 `versionCode+1`，构建成功后把版本改动提交回 `main`、打 tag 并同步 Gitee。想跳小版本时才在 `version` 输入框手填（如 `v0.7.0`）。详见 [发布与签名指南](docs/release-guide.md) §2。
 
-> 本 README 描述 main 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。
+> 本 README 描述 `main` 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。**目前 0.6.0 不含 A10 亲密关系模块**（该模块已合入 `main`，将在下一次发版进入 Release）。
 
 Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"`，应用内提供 JSON 备份导出 / 恢复（设置页「备份与恢复」）；**升级时不要卸载旧版本**——卸载会永久丢失本地记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
 
@@ -134,11 +135,11 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.6.0-debug.apk`（约 30 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 151 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。
+- `./gradlew :app:testDebugUnitTest` 通过。2026-11-09 基线 151 项：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。2026-11-10 A10 实测 **29 个类 / 204 项 / 0 失败**（新增 `IntimacyFieldsTest` 4、`BackupIntimacyDetailTest` 6，`DetailSpecTest` +1、`RecordDetailPresentationTest` +2，以及 C 包新增用例）。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
 - `./gradlew :app:connectedDebugAndroidTest` 通过，共 14 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2 + `DatabaseKeyStoreTest` 5 + `DatabaseEncryptionTest` 4）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除、Keystore 封装/篡改/密钥缺失、明文 v1/v2 库加密搬迁、中断恢复与错误口令拒绝。
 
-未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补；加密版在真机上的覆盖安装与首次启动迁移待 0.6.0 发版后由用户确认。真机安装、应用内检查更新与 0.4.0 → 0.5.0 覆盖安装已于 2026-11-10 验证通过；模拟器上用 0.4.0 明文库（含未落盘 WAL）做的加密覆盖安装迁移已实测通过。
+未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补。真机安装、应用内检查更新、0.4.0 → 0.5.0 覆盖安装，以及 **0.5.0 → 0.6.0 加密版覆盖安装与首次启动迁移**均已由用户 2026-11-10 确认通过；模拟器上用 0.4.0 明文库（含未落盘 WAL）做的加密覆盖安装迁移也已实测通过。
 
 ## 数据模型
 
@@ -163,14 +164,14 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - **默认导出加密备份（v3）**：`PBKDF2WithHmacSHA256`（210000 次迭代）派生 256 位密钥，`AES-256-GCM` 加密正文；算法、迭代次数、随机盐（16 B）、随机 IV（12 B）与导出时间都纳入 AAD，改动任何头部字段或密文都会导致解密失败。口令不落盘、不进日志，**遗失后无法恢复**；设置页导出时输入两次，恢复时输一次，并按长度与字符种类提示「偏弱 / 可用 / 较强」。连续输错会触发等待（2s → 4s → 8s → 16s → 30s），冷却期间按钮置灰。
 - **明文导出需二次确认**：明文文件不加密，能读到文件的人就能查看全部记录，导出前会给红色风险提示。需要与 0.5.0 及更早版本互通时才建议使用。
 - **更换备份口令**：设置页选一份 v3 加密备份，输入当前口令与新口令，应用会用新口令重新加密（换新的盐与 IV），自检能解回后才通过 SAF 另存为 `...-rekeyed.json`；**原文件不删不改**，确认新文件能恢复后再自行删除。明文备份没有口令可换，会被明确拒绝。
-- **版本兼容性（0.5.0 及更早）**：`main` 分支已接入 SQLCipher 4.20.0 整库加密，但**尚未发版**；已发布到 0.5.0 的版本仍是明文库。加密将随 0.6.0（versionCode 6）发布，首次启动自动把明文 Room v2 库原地加密搬迁，保留 `user_version`、WAL 中未落盘的数据与全部记录，升级不卸载不丢数据；从 Room v1 直接跳过来的用户会自动补跑 `MIGRATION_1_2`。0.6.0 起仍可恢复 v1 / v2 明文备份，但**默认导出的 v3 加密备份无法被 0.5.0 打开**：需要与旧版互通时请显式选择明文导出。**加密库也无法被 0.5.0 或更早版本打开**：需要回退请先导出备份，不要卸载重装旧版。详见 [安全加固设计前确认单](docs/security-hardening-confirmation.md) §2.6 与 §2.7。
+- **版本兼容性（0.5.0 及更早）**：`main` 分支已接入 SQLCipher 4.20.0 整库加密，并已随 0.6.0（versionCode 6，2026-11-10）发布；0.5.0 及更早版本仍是明文库。升级时首次启动自动把明文 Room v2 库原地加密搬迁，保留 `user_version`、WAL 中未落盘的数据与全部记录，升级不卸载不丢数据；从 Room v1 直接跳过来的用户会自动补跑 `MIGRATION_1_2`。0.6.0 起仍可恢复 v1 / v2 明文备份，但**默认导出的 v3 加密备份无法被 0.5.0 打开**：需要与旧版互通时请显式选择明文导出。**加密库也无法被 0.5.0 或更早版本打开**：需要回退请先导出备份，不要卸载重装旧版。详见 [安全加固设计前确认单](docs/security-hardening-confirmation.md) §2.6 与 §2.7。
 - **A10 记录的单向兼容**：含 `intimacy` 详情的备份在 0.6.0 及更早版本会被明确拒绝导入并提示升级，不会静默丢数据；旧版备份在新版恢复时会补进一条默认停用的「亲密关系」类型。需要与旧版互通时，请先导出不含该类记录的备份。
 
 ## 安全边界（重要）
 
-数据库加密已在 `main` 分支落地（SQLCipher 4.20.0 + Android Keystore 密钥管理），但**尚未发版**；0.5.0 及更早版本仍是明文库。导出备份默认加密，应用锁与隐私审查已完成。下列评审项除真机迁移走查外均已销项；未发版前不要把高度敏感的数据交给此开发骨架长期保管。
+数据库加密已随 **0.6.0（2026-11-10）发布**（SQLCipher 4.20.0 + Android Keystore 密钥管理）；0.5.0 及更早版本仍是明文库。导出备份默认加密，应用锁与隐私审查已完成。下列评审项除真机厂商 ROM 迁移走查（C8 / B8）外均已销项。
 
-1. ✅ 数据库静态加密（main 已实现并实测，待 0.6.0 发布）。
+1. ✅ 数据库静态加密（0.6.0 已发布，用户真机覆盖安装与加密库迁移已确认）。
 2. ✅ 数据加密密钥的 Keystore 管理（不绑定生物识别，避免密钥失效导致数据不可读）。
 3. ✅ 主动导出文件加密、完整性校验与口令轮换（v3，AES-256-GCM + AAD；C4–C6）。
 4. 🟡 Android 自动备份、设备迁移、卸载重装、换机恢复：`allowBackup=false` 与两份排除规则已复核，「卸载重装 + 加密备份恢复」已模拟通过；**真机厂商迁移 / ROM 差异仍待走查**（C8 / B8）。
@@ -179,15 +180,14 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 **系统备份 / 迁移边界**：`allowBackup=false`，`fullBackupContent` 与 Android 12+ `dataExtractionRules` 把 `database` / `sharedpref` / `file` / `external` / `root` 五个域在「云备份」与「设备迁移」两条链路都排除。Keystore 密钥不属于应用数据，不会随备份离开设备；因此系统迁移既不会带走加密库，也不会留下「有库没钥匙」的半套数据。换机唯一可靠的路径是**导出加密备份 → 新设备安装 → 输入口令恢复**；卸载或清除数据仍会丢失未导出的记录。
 
-不要在尚未完成上述评审前把真实的敏感数据交给此开发骨架长期保管。
+C8 / B8 的真机厂商 ROM 迁移走查尚未完成，在此之前不要依赖系统备份 / 换机迁移来保管数据；换机请走「导出加密备份 → 新设备安装 → 输入口令恢复」。
 
 ## 当前尚未实现 / 下一阶段清单
 
-> 2026-11-10 更新：安全加固包（C）已完成 C1–C7（数据库加密、备份加密与口令轮换、应用锁），剩 C8 / C9 评审与 C10 发布回归；选型结论、子任务拆解与回滚方案见 [安全加固设计前确认单](docs/security-hardening-confirmation.md)，进度见 [剩余工作子任务台账](docs/PROGRESS.md) 第 4 节。下列功能**仍未实现**。
+> 2026-11-10 更新：安全加固包（C）C1–C10 已完成并随 0.6.0 发布，仅 C8 / B8 的真机厂商 ROM 迁移走查仍为 🟡；选型结论、子任务拆解与回滚方案见 [安全加固设计前确认单](docs/security-hardening-confirmation.md)，进度见 [剩余工作子任务台账](docs/PROGRESS.md) 第 4 节。下列功能**仍未实现**。
 
-- 数据库加密（代码已在 `main` 落地并实测，**尚未发版**；待 C10 安全回归后随 0.6.0 发布）。
-- 备份 / 迁移 / ROM 行为评审与隐私审查（C8 / C9）。
-- 月经模块（排便、饮水、咖啡 / 茶、运动、亲密关系已上线；本模块依赖数据库加密，按 2026-11-10 用户指示继续保留后置，暂无开发计划）。
+- C8 / B8：真机厂商 ROM 的系统备份、设备迁移与换机恢复行为走查（C9 隐私审查已完成）。
+- 月经模块（排便、饮水、咖啡 / 茶、运动、亲密关系五类已在 `main`；加密前置已解除，但按 2026-11-10 用户指示继续保留后置，暂无开发计划）。
 - 无障碍读屏顺序与横屏 / 平板 / 厂商 ROM 的完整回归（字体缩放 200% 已在统计页、历史页与三个编辑器上修复并实测，其余页面仍需逐页复核）。
 - 真机验收（安装、SAF 导出恢复、飞行模式持久化、卸载重装数据丢失验证）。
 
@@ -223,7 +223,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 ## 相关文档
 
 - [本地验证与在线升级方案](docs/local-verification-and-upgrade.md)：改完代码怎么在模拟器上验证、装到手机后怎么升级。
-- [发布与签名指南](docs/release-guide.md)：签名密钥准备、Release 出包步骤、下载校验与回滚。
+- [发布与签名指南](docs/release-guide.md)：签名密钥准备、版本号自动递增与 CI 提交机制、Release 出包步骤、下载校验与回滚。
 - [统计增强包设计前确认单](docs/statistics-enhancement-confirmation.md)：月历视图、形态分布与时段分布的口径、影响面与实施记录。
 - [模块扩展第二批设计前确认单](docs/module-extension-confirmation.md)：通用编辑器壳、通用详情模型、备份 v2 兼容口径与实施记录。
 - [饮水模块试点设计前确认单](docs/water-module-confirmation.md)：Room v2 迁移、通用详情表、water 规格注册与验收结果。

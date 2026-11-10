@@ -68,6 +68,31 @@
 
 ---
 
+## 2.6 0.5.0+ 版本兼容性矩阵（C3 硬约束，用户 2026-11-10 指示）
+
+> 用户原话：「0.5.0 以后版本都要考虑兼容性」。以下边界在 C3 起生效，任何后续改动不得破坏已发布用户的数据通路。
+
+| 维度 | 0.1.0–0.3.0 | 0.4.0–0.5.0 | 0.6.0（C3 加密） | 0.7.0+（C4 起） |
+| --- | --- | --- | --- | --- |
+| 数据库文件 | 明文 SQLite，Room v1 | 明文 SQLite，Room v2 | SQLCipher 加密，**保留原 `user_version`** | 加密，Room schema 迁移照常 |
+| 覆盖安装到 0.6.0 | 先做加密搬迁（保留 v1）→ Room 自动补跑 `MIGRATION_1_2` | 加密搬迁（保留 v2）→ 无需 schema 迁移 | — | — |
+| 导出备份 | 明文 v1 | 明文 v2 | **仍导出明文 v2**（C4 前不改格式） | 加密 v3（需口令） |
+| 恢复备份 | 读 v1 / v2 | 读 v1 / v2 | 读 v1 / v2 明文（含 0.5.0 导出的文件） | 读 v1 / v2 明文 + v3 加密 |
+| 降级回 0.5.0 | — | — | **不支持**：旧版会把加密库当成损坏文件。Android 不允许降 `versionCode`，但卸载后重装旧 APK 会命中 | 不支持 |
+| 卸载重装 | 数据全丢（`allowBackup=false`） | 数据全丢 | 数据全丢 + Keystore 密钥一并丢失 | 同 |
+| 应用内检查更新 | — | 0.5.0 检查更新 → 下载 0.6.0 → 安装 → 首次启动迁移 | 正常 | 正常 |
+
+**四条必须守住的约束**
+
+1. **`user_version` 不能写死**。`sqlcipher_export` 官方文档明确「不会改变目标库的 `user_version`」，必须手动从明文库读出再写回；否则从 0.1.0 直接跳到 0.6.0 的用户会失去 `MIGRATION_1_2` 的触发条件，而写死 2 会让 v1 库被误判为已迁移。
+2. **迁移必须在 Room 打开之前完成**，且明文库备份 `.bak` 一直保留到加密库首次成功读取之后才删。进程被杀 / 断电后，下次启动要能自动回滚或续做，不能停在半加密状态。
+3. **C3 阶段不改备份格式**：0.5.0 与 0.6.0 的备份保持双向可读。加密备份 v3 从 C4 起引入，且新版必须永久保留读取 v1 / v2 明文备份的能力。
+4. **明文 `-wal` / `-shm` 必须在替换前清理**，否则残留的明文 WAL 会被套到加密库上，表现为 `file is not a database`。
+
+**用户可见边界**：README 必须写明「0.6.0 起数据库加密，不能回退到 0.5.0 或更早；需要回退请先导出备份」。
+
+---
+
 ## 3. 需要拍板的决策（已给推荐值）
 
 | 编号 | 决策 | 推荐值 | 理由 |
@@ -107,14 +132,31 @@
 - **未验证**：`DatabaseKeyStoreTest` 5 项仪器测试（真实 Keystore 生成 / 解封 / 篡改 / 密钥缺失）只编译通过，**尚未在设备上实跑**，随 C3 的模拟器验证一起执行；`adb shell run-as` 检查偏好文件只有密文、应用重启后口令仍可读，也一并留到 C3。
 - 一个实现细节：口令长度常量放在纯 JVM 的 `PassphraseEnvelope`，避免 JVM 单测加载引用了 `android.security.keystore` 的类。
 
-### C3 存量明文库迁移 — ⬜（依赖 C1 C2，⚠️ 不可逆）
+### C3 存量明文库迁移 — ✅ 已完成（2026-11-10，依赖 C1 C2）
 
-1. `core/database/DatabaseEncryption.kt`：检测文件头 `SQLite format 3\0` 判断明文；`ATTACH ... KEY` + `sqlcipher_export` 导出到临时加密库
-2. 明文库备份 → 迁移 → 逐表逐字段校验（条数、UUID、字段值）→ 原子替换 → 下一次成功启动后才清理备份；任何一步失败自动还原
-3. `AppDatabase.create` 接入 `SupportOpenHelperFactory`，**Room 保持 version 2**（见 §2.5）；`LifeTrackApplication` 启动顺序调整
-4. 仪器测试：构造 v2 明文库 → 迁移 → 数据比对 → 用口令重开；失败注入（磁盘写满 / 中途中断）验证回滚
-5. 真机 0.5.0 → 0.6.0 覆盖安装验证（需用户配合）
-- **验收**：升级不卸载、不丢数据；迁移失败时 App 仍能打开原明文库；无「恢复成功但数据没了」的路径。
+**交付**：`app/build.gradle.kts` 两行依赖、`core/database/SqliteFileHeader.kt`、`core/database/DatabaseEncryption.kt`；`AppDatabase.create` 走 `SupportOpenHelperFactory`，`LifeTrackApplication` 编排启动顺序，`MainActivity` + `DatabaseUnavailableScreen` 处理密钥失效。
+
+| 关键点 | 实现 |
+| --- | --- |
+| 方向 | `ATTACH DATABASE '<明文>' AS plaintext KEY ''` + `SELECT sqlcipher_export('main','plaintext')`，**第一个参数是目标、第二个是源**（官方文档 Example 5 核实） |
+| `user_version` | `sqlcipher_export` 官方明确不复制；从明文库读出后 `setVersion()` 写回加密库。Room v1 库保持 1，v2 库保持 2，后续 `MIGRATION_1_2` 照常触发 |
+| WAL | 迁移前 `PRAGMA wal_checkpoint(TRUNCATE)`，备份主库 + `-wal` + `-shm`；替换后删除明文的 `-wal` / `-shm` / `-journal` |
+| 原子性 | `dbFile → .swap → .encrypted.tmp → dbFile` 两次 rename；导出阶段失败不动原文件，替换阶段失败自动 `restore()`；原路径缺失但有 `.bak` 时自动恢复并重做（`recovered=true`） |
+| 校验 | 导出前后逐表比对行数（v1 缺 `event_detail` 记 -1，两侧一致即可）+ `user_version`，不一致即回滚抛错 |
+| 备份清理 | `.plaintext.bak` 保留到加密库首次 DAO 读取成功后，由 `confirmEncryptionIfNeeded()` 删除 |
+| 降级 | 密钥失效 → `DatabaseState.Unavailable`，显示终止页，**不新建空库**；迁移失败且明文已还原 → `createPlaintextFallback()` 保证存量用户仍可用，并标 `degraded` |
+| 日志 | 生产构建设 `Logger.setTarget(NoopTarget())`（C9 的日志项提前落地）；启动只记录版本与行数，不含记录内容或密钥 |
+
+**实测（模拟器 `Medium_Phone_API_37.0`）**
+
+- `connectedDebugAndroidTest`：**14 项全绿**（原有 5 + C2 密钥 5 + C3 迁移 4），覆盖 v2 迁移行数/字段保真、v1 保留 `user_version=1`、中断恢复、错误口令打不开、Keystore 生成/解封/篡改/缺失。
+- **真实覆盖安装兼容性验证**：备份模拟器上 0.4.0 的明文 Room v2 库（主库 61,440 B + WAL 16,512 B，WAL 内含一条只写在 WAL 里的记录），卸载后装新 APK、还原明文库、冷启动。日志 `Migrated(originalVersion=2, rowCounts={track_type=4, track_event=3, poop_detail=1, event_detail=1}, recovered=false)` —— **WAL 里的第 3 条记录保住了**，`user_version=2` 保留；主库头变为随机密文；`.plaintext.bak` 已清理；无崩溃。
+- 强停后重启：`AlreadyEncrypted(needsConfirmation=false)`，密钥从 Keystore 正常恢复，无崩溃。
+- 单测 **151 项全绿**（新增 `SqliteFileHeaderTest` 4 项）；`lintDebug` 无 error；`assembleDebug` / `assembleDebugAndroidTest` 通过；debug APK 29,748,054 B。
+
+**未验证**：真机（用户自己的设备）0.5.0 → 0.6.0 覆盖安装，需发版后由用户确认；磁盘写满 / 迁移中途断电的失败注入只做了代码路径与「原路径缺失 + 备份存在」的恢复用例，未做物理断电；大库迁移耗时与 ANR 风险未压测（本次冷启动含迁移约 4.3 s）。
+
+**版本边界**：C3 阶段**未改备份格式**，0.5.0 与当前 main 的备份仍双向可读；加密改造尚未升版本号、未发版，正式发布为 0.6.0 / versionCode 6。
 
 ### C4 导出文件加密 — ⬜（依赖 C2 A5）
 
@@ -183,7 +225,7 @@
 ## 6. 顺序与验收
 
 ```
-C1 ✅ → C2 ✅ → C3（⚠️ 真机灰度）→ C4 → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
+C1 ✅ → C2 ✅ → C3 ✅（⚠️ 真机灰度待发版）→ C4 → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
                                     └─ C1–C3 完成才解禁 A9 / A10
 ```
 

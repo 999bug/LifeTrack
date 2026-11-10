@@ -132,11 +132,11 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.2.0-debug.apk`（约 21 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过，共 147 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6。
+- `./gradlew :app:testDebugUnitTest` 通过，共 151 个用例：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
-- `./gradlew :app:connectedDebugAndroidTest` 通过，共 5 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除。
+- `./gradlew :app:connectedDebugAndroidTest` 通过，共 14 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2 + `DatabaseKeyStoreTest` 5 + `DatabaseEncryptionTest` 4）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除、Keystore 封装/篡改/密钥缺失、明文 v1/v2 库加密搬迁、中断恢复与错误口令拒绝。
 
-未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补。真机安装、应用内检查更新与 0.4.0 → 0.5.0 覆盖安装已于 2026-11-10 验证通过。
+未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补；加密版在真机上的覆盖安装与首次启动迁移待 0.6.0 发版后由用户确认。真机安装、应用内检查更新与 0.4.0 → 0.5.0 覆盖安装已于 2026-11-10 验证通过；模拟器上用 0.4.0 明文库（含未落盘 WAL）做的加密覆盖安装迁移已实测通过。
 
 ## 数据模型
 
@@ -159,6 +159,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 - 自动备份关闭意味着用户不能依靠 Google/厂商备份恢复数据。卸载应用、清除应用数据或丢失手机，都可能导致未主动导出的数据永久丢失。
 - **已实现主动导出 / 恢复（明文 JSON）**：设置页 → 备份与恢复，通过 Storage Access Framework 由用户选择保存位置。文件含 `schemaVersion`、类型表与全部记录（含详情）；恢复时校验应用标识、版本号、事件条数、ID 唯一性、时区、本地日期与字段范围，任一不通过即整体拒绝，替换在单个 Room 事务内完成。
 - **备份文件不加密**：能读到该文件的人就能查看全部记录，导出前 UI 会明确提示。加密备份、完整性校验与密钥轮换仍未实现，见「安全边界」第 3 条。
+- **版本兼容性（0.5.0 及更早）**：`main` 分支已接入 SQLCipher 4.20.0 整库加密，但**尚未发版**；已发布到 0.5.0 的版本仍是明文库。加密将随 0.6.0（versionCode 6）发布，首次启动自动把明文 Room v2 库原地加密搬迁，保留 `user_version`、WAL 中未落盘的数据与全部记录，升级不卸载不丢数据；从 Room v1 直接跳过来的用户会自动补跑 `MIGRATION_1_2`。0.6.0 起仍可恢复 v1 / v2 明文备份，且加密改造阶段导出格式未变，两端备份保持双向可读。**加密库无法被 0.5.0 或更早版本打开**：需要回退请先导出备份，不要卸载重装旧版。详见 [安全加固设计前确认单](docs/security-hardening-confirmation.md) §2.6。
 
 ## 安全边界（重要）
 
@@ -181,7 +182,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 - 加密备份与恢复（当前导出为明文 JSON，尚无密钥管理）。
 - 应用锁（BiometricPrompt / 系统凭据）。
-- 数据库加密。
+- 数据库加密（代码已在 `main` 落地并实测，**尚未发版**；待 C10 安全回归后随 0.6.0 发布）。
 - 月经和亲密关系模块（排便、饮水、咖啡 / 茶、运动已上线；这两个模块依赖数据库加密，后置到安全加固包之后）。
 - 无障碍读屏顺序与横屏 / 平板 / 厂商 ROM 的完整回归（字体缩放 200% 已在统计页、历史页与三个编辑器上修复并实测，其余页面仍需逐页复核）。
 - 真机验收（安装、SAF 导出恢复、飞行模式持久化、卸载重装数据丢失验证）。

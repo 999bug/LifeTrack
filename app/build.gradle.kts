@@ -115,6 +115,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
 
+    // C3：整库静态加密。4.20.0 支持 Room 2 / compileSdk 37 / 16 KB 页对齐，选型见确认单 §2。
+    implementation("net.zetetic:sqlcipher-android:4.20.0@aar")
+    implementation("androidx.sqlite:sqlite:2.7.0")
+
     implementation("androidx.datastore:datastore-preferences:1.2.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")

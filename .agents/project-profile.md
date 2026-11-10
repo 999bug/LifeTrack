@@ -154,6 +154,7 @@ overrides:
 - **图表类 Composable 要给一句汇总语义（2026-11-09 B3）**：现象 → Canvas 画的分段柱图对读屏是一堆无意义节点，或逐个念出坐标轴标签。修复 → 外层用 `clearAndSetSemantics { contentDescription = "形态分布，已填写 N / 共 M 条；布里斯托 …" }` 包住，读屏只念一句。教训 → 图表先想「读屏用户需要知道什么结论」，再把它写成一句话；`clearAndSetSemantics` 比补 `contentDescription` 更干净，能避免子节点噪声。
 - **Gitee 仓库镜像不同步 Release 附件（2026-11-10）**：现象 → 配好 Gitee「仓库镜像管理」后代码分支和 tag 都同步了，APK 附件却没过去，App 检查更新找不到下载地址。根因 → 官方镜像只同步分支、标签、提交记录，Release 附件不在同步范围。修复 → `release.yml` 增加 `mirror-gitee` job，复用同一份 `release-apk` artifact，调 Gitee OpenAPI 创建 Release 并上传 APK 与 `.sha256`。教训 → 「镜像仓库」不等于「镜像发布产物」；分发链路必须自己上传二进制，并在 CI 里校验返回的 `browser_download_url`。
 - **Gitee `/releases/latest` 指向最后创建的 Release（2026-11-10）**：现象 → 补发旧版本或创建顺序错乱时，API 返回的不是语义版本最高的 Release。根因 → Gitee 没有「设为 latest」的 API，按创建时间取最后创建的一个。修复 → 按版本递增正常发版、不补发旧版本；客户端 `isNewer()` 再比一次版本号，最坏提示「已是最新」，不会误装旧包。教训 → 依赖第三方 `latest` 语义时，客户端必须自己做版本比较兜底。
+- **纯 JVM 单测的依赖链上不能出现 Android 框架类，断言也不要当表达式用（2026-11-10 C2）**：现象 → `PassphraseEnvelope.MIN_CIPHERTEXT_LENGTH` 原本引用 `DatabaseKeyStore.PASSPHRASE_LENGTH`，会让本地单测加载带 `android.security.keystore` import 的类；`val restored = assertNotNull(decode(text))` 直接编译失败。根因 → Kotlin 的 `const val` 跨类访问仍会触发目标类初始化；JUnit 4 的 `assertNotNull` 返回 `Unit`，不是被断言的对象。修复 → 口令长度常量下沉到纯 JVM 的 `PassphraseEnvelope`，`DatabaseKeyStore` 反向引用它；断言拆成取值 + `assertNotNull` + `!!`。教训 → 想被 `testDebugUnitTest` 覆盖的类，依赖链必须干净；先取值再断言，别把断言结果赋给变量。
 
 ## 10. 附：从 /init 产物抽取的原文（可选）
 本项目没有安装前的 CLAUDE.md / AGENTS.md 原文需要归档，本节删除。

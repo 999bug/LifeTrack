@@ -91,13 +91,21 @@
 3. ✅ 隔离目录构建级 POC：AGP 9.3.1 + Room 2.8.5 + SQLite 2.7.0 编译通过，包体增量实测
 4. ✅ 出选型结论、收益/代价/回滚，写进本确认单
 
-### C2 Keystore 密钥管理 — ⬜（依赖 C1）
+### C2 Keystore 密钥管理 — ✅ 已完成（2026-11-10，依赖 C1）
 
-1. `core/security/DatabaseKeyStore.kt`：Android Keystore 生成 AES-256-GCM 主密钥（别名固定、不可导出、`setUserAuthenticationRequired(false)`，见 D1）
-2. `core/security/DatabasePassphrase.kt`：随机 32 字节数据库口令 + 主密钥封装后的 envelope（Base64），密文写入现有 `SettingsRepository`（DataStore），**绝不落明文**
-3. `core/security/KeyUnavailableException.kt` 与用户可见错误文案（D3）
-4. 单测：envelope 编解码往返、篡改检测；仪器测试：密钥生成 → 封装 → 解封 → 应用重启后仍可读
-- **验收**：设备文件里 grep 不到口令明文；密钥失效时报错而不是打开一个空库；`adb shell run-as` 拉取的偏好文件只有密文。
+**实际交付**：`core/security/` 下 3 个类 + 1 个 JVM 单测 + 1 个仪器测试。此阶段**不接生产链路**，App 行为完全不变。
+
+| 文件 | 作用 |
+| --- | --- |
+| `PassphraseEnvelope.kt` | 纯 JVM：信封格式 `lt-enc-v1:<base64 IV>:<base64 密文>`，只做结构校验（前缀 / 段数 / Base64 / IV 12 B / 密文 ≥ 口令 32 B + tag 16 B） |
+| `DatabaseKeyStore.kt` | Android Keystore AES-256-GCM 主密钥（不可导出、`setUserAuthenticationRequired(false)` 见 D1、`setRandomizedEncryptionRequired(true)` 让系统生成 IV）；`sealNewPassphrase()` / `unseal()` / `hasKey()` |
+| `DatabaseKeyRepository.kt` | 信封持久化 + `Mutex` 串行化的「取或创建口令」，避免并发生成两份互不相认的口令；`wipe()` 由调用方用完清零 |
+
+- **D3 落地**：失败原因分 4 类（`KEY_MISSING` / `INVALID_ENVELOPE` / `DECRYPT_FAILED` / `KEYSTORE_ERROR`），全部抛 `KeyUnavailableException`，**不静默新建空库**。用户可见文案留到 C6/C7 接入 UI 时写。
+- **与初版计划的两处偏差**（如实记录）：① 没有复用 `SettingsRepository`，改用独立 DataStore `life_track_security`，让密钥材料与主题设置隔离，便于 C9 隐私审查；② 没有单独的 `KeyUnavailableException.kt`，改为 `DatabaseKeyStore` 的嵌套类，减少一次跨文件跳转。
+- **验证**：`testDebugUnitTest` **147 项全绿**（新增 `PassphraseEnvelopeTest` 6 项：往返、8 类畸形信封拒绝、参数校验、明文不泄漏、GCM 篡改与错误密钥检测）；`lintDebug` 无 error；`assembleDebug` 与 `assembleDebugAndroidTest` 均 BUILD SUCCESSFUL。
+- **未验证**：`DatabaseKeyStoreTest` 5 项仪器测试（真实 Keystore 生成 / 解封 / 篡改 / 密钥缺失）只编译通过，**尚未在设备上实跑**，随 C3 的模拟器验证一起执行；`adb shell run-as` 检查偏好文件只有密文、应用重启后口令仍可读，也一并留到 C3。
+- 一个实现细节：口令长度常量放在纯 JVM 的 `PassphraseEnvelope`，避免 JVM 单测加载引用了 `android.security.keystore` 的类。
 
 ### C3 存量明文库迁移 — ⬜（依赖 C1 C2，⚠️ 不可逆）
 
@@ -175,7 +183,7 @@
 ## 6. 顺序与验收
 
 ```
-C1 ✅ → C2 → C3（⚠️ 真机灰度）→ C4 → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
+C1 ✅ → C2 ✅ → C3（⚠️ 真机灰度）→ C4 → C5 → C6 → C7 → C8（合 B8）→ C9 → C10 → 发 0.6.0
                                     └─ C1–C3 完成才解禁 A9 / A10
 ```
 

@@ -386,23 +386,33 @@
   .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
   .cal-week span { text-align: center; font-size: 10.5px; color: var(--text-3); padding-bottom: 6px; }
   .cal-cell {
-    aspect-ratio: 1 / 1.14; border-radius: 9px; border: 1px solid transparent;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; cursor: pointer;
-    transition: background 120ms var(--ease);
+    aspect-ratio: 1 / 1.38; border-radius: 9px; border: 1px solid transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; cursor: pointer;
+    transition: background 120ms var(--ease), border-color 120ms var(--ease);
   }
   .cal-cell:hover { background: var(--surface-2); }
   .cal-cell.is-empty { cursor: default; opacity: 0; }
-  .cal-cell.is-today { background: var(--primary); color: var(--on-primary); font-weight: 650; }
-  .cal-cell.is-today .cal-dot { background: var(--on-primary); opacity: .85; }
-  .cal-dots { display: flex; gap: 2px; height: 4px; }
-  .cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); }
-  .cal-dot[data-type="water"] { background: var(--water); }
-  .cal-dot[data-type="coffee"] { background: var(--coffee); }
-  .cal-dot[data-type="toilet"] { background: var(--toilet); }
-  .cal-legend { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .cal-cell.is-selected { border-color: var(--primary); background: var(--surface-2); }
+  .cal-cell.is-today { background: var(--primary); color: var(--on-primary); font-weight: 650; border-color: transparent; }
+  .cal-mark {
+    width: 11px; height: 11px; flex: 0 0 auto;
+    fill: currentColor; stroke: none;
+  }
+  .cal-marks { display: flex; align-items: center; justify-content: center; gap: 2.5px; height: 12px; }
+  .cal-mark[data-type="water"] { color: var(--water); }
+  .cal-mark[data-type="coffee"] { color: var(--coffee); }
+  .cal-mark[data-type="toilet"] { color: var(--toilet); }
+  .cal-mark[data-type="sport"] { color: var(--sport); }
+  .cal-cell.is-today .cal-mark { color: var(--on-primary); opacity: .92; }
+  .cal-legend { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
   .cal-legend span { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
   .cal-legend i { width: 5px; height: 5px; border-radius: 50%; }
+
+  .day-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .day-sheet-head h2 { margin: 0; }
+  .day-count { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .day-list { margin: 10px -2px 0; padding: 0 2px; max-height: 44vh; overflow-y: auto; }
 
   /* ========== 设置 ========== */
   .group-label { margin: 22px 0 8px 2px; font-size: 11.5px; font-weight: 600; letter-spacing: .05em; color: var(--text-3); }
@@ -613,14 +623,6 @@
                 <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
                 <span class="module-more" data-more>详细</span>
               </button>
-
-              <button class="module is-off is-wide" data-type="intimacy" data-quick="0">
-                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M12 20.2s-7.2-4.5-7.2-9.4A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.2 3.2c0 4.9-7.2 9.4-7.2 9.4z"/></svg></span>
-                <span class="module-name">亲密关系</span>
-                <span class="module-meta" data-count>已停用 · 在设置中启用</span>
-                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-                <span class="module-more" data-more>详细</span>
-              </button>
             </div>
 
             <div class="section-head">
@@ -775,7 +777,7 @@
                 <span><i style="background:var(--water)"></i>饮水</span>
                 <span><i style="background:var(--coffee)"></i>咖啡</span>
                 <span><i style="background:var(--toilet)"></i>排便</span>
-                <span style="margin-left:auto">灰色为其它记录</span>
+                <span style="margin-left:auto">点按日期看当天</span>
               </div>
             </div>
           </section>
@@ -843,7 +845,7 @@
             <div class="list">
               <button class="setting">
                 <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
-                <span class="setting-main"><span class="setting-title">记录项目</span><span class="setting-desc">3 个已启用 · 可调整顺序</span></span>
+                <span class="setting-main"><span class="setting-title">记录项目</span><span class="setting-desc">4 个已启用 · 可调整顺序</span></span>
                 <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
               </button>
               <button class="setting">
@@ -938,6 +940,19 @@
           </div>
         </div>
 
+        <div class="scrim" id="dayScrim"></div>
+        <div class="sheet" id="daySheet" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+          <div class="sheet-handle"></div>
+          <div class="day-sheet-head">
+            <h2 id="dayTitle">11月11日 · 周三</h2>
+            <span class="day-count" id="dayCount">5 次</span>
+          </div>
+          <div class="day-list" id="dayList"></div>
+          <div class="sheet-actions">
+            <button class="btn" id="dayClose">关闭</button>
+          </div>
+        </div>
+
         <nav class="tabbar" id="tabbar" aria-label="主导航">
           <button class="tab" aria-selected="true" data-go="today">
             <svg viewBox="0 0 24 24"><path d="M4 10.6 12 4l8 6.6V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>
@@ -974,10 +989,11 @@
       title: "从「按钮列表」到「打卡台」",
       intro: "首页是最高频页面，一天要打开五到十次。现在它排了五个等宽按钮，常用与低频一样重。新结构把计数与操作合并到同一张卡片上。",
       items: [
-        ["主次分明", "每个模块一张卡，整卡可点即记录。排便与饮水一键 +1，咖啡、运动、亲密关系直接进编辑器（它们没有合理默认值）。"],
+        ["主次分明", "每个模块一张卡，整卡可点即记录。排便与饮水一键 +1，咖啡、运动直接进编辑器（它们没有合理默认值）。"],
         ["计数即入口", "卡片直接显示「今日 3 次 · 750 ml」，不用滚到别处确认，也不必先点开再决定。"],
         ["时间轴取代卡片堆", "记录按时间竖排，省掉每张卡的内边距，一屏能多看两条；色点让类型一眼可辨。"],
-        ["模块识别色", "五个模块各有一个低饱和色，只用在图标底、色点和 3dp 竖条上，不抢文字。"]
+        ["停用的不进首页", "模块被停用后整张卡片从首页消失，入口只在「设置 → 记录项目」保留。首页只呈现当下真正要记的东西，不做灰显占位。"],
+        ["模块识别色", "四个在用的模块各有一个低饱和色，只用在图标底、色点和 3dp 竖条上，不抢文字。"]
       ]
     },
     history: {
@@ -987,7 +1003,8 @@
       items: [
         ["日期头带计数", "「11月11日 · 周三　5 次」——先回答「那天记了多少」，再往下才是条目。"],
         ["行内三要素", "时间、类型、摘要一行读完。去掉了卡片边框，靠分隔线和留白分组。"],
-        ["月历用色点编码", "每天最多三个色点表示类型构成，不用数字堆叠；今天用实心主色块，与列表选中态同源。"],
+        ["月历直接说「记了什么」", "格内用微型图标代替色点：一滴水、一只杯子、一个循环箭头，去重后最多三个，表示当天出现过哪些类型。"],
+        ["点开某天看明细", "点日期弹出当天全部记录（时间 + 类型 + 摘要）；这天没有记录时明确说明，不弹一个空白层。"],
         ["筛选常驻", "类型 chips 固定在列表顶部，切换不用进出页面。"]
       ]
     },
@@ -1183,25 +1200,102 @@
 
   /* ---------- 月历 ---------- */
   var MONTH = { firstWeekday: 6, days: 30, counts: [3,4,2,5,3,1,4,3,3,4,5] };
+  var WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
+  var SLOTS = ["07:30", "09:10", "11:40", "14:20", "18:05"];
+  var CYCLE = ["water", "coffee", "toilet", "water", "water"];
+  var DETAIL_TEXT = { water: "250 ml", coffee: "250 ml · 含咖啡因", toilet: "布里斯托 4 型", sport: "30 分钟" };
+
+  // 与首页时间轴、历史列表逐条对齐的三天，其余日期按 counts 生成
+  var FIXED_DAYS = {
+    9:  [["08:02", "water", "250 ml"], ["13:15", "water", "300 ml"], ["16:40", "coffee", "250 ml"]],
+    10: [["07:40", "toilet", "布里斯托 3 型"], ["08:15", "water", "300 ml"], ["10:05", "coffee", "300 ml · 含咖啡因"], ["15:20", "water", "250 ml"]],
+    11: [["07:12", "toilet", "布里斯托 4 型 · 顺畅"], ["08:05", "water", "250 ml"], ["09:20", "coffee", "250 ml · 含咖啡因"], ["09:40", "water", "300 ml"], ["12:30", "water", "250 ml"]]
+  };
+
+  var MARK_PATH = {
+    water: '<path d="M12 2.8c3.9 4.5 6.4 7.5 6.4 10.8a6.4 6.4 0 0 1-12.8 0C5.6 10.3 8.1 7.3 12 2.8z"/>',
+    coffee: '<path d="M4.8 7.4h10.8V13a5.4 5.4 0 0 1-10.8 0z"/><path d="M16.6 9h1.1a2.1 2.1 0 0 1 0 4.2h-1.1z"/>',
+    toilet: '<path d="M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6zm0 4.4a4.4 4.4 0 1 1 0 8.8 4.4 4.4 0 0 1 0-8.8z"/>',
+    sport: '<path d="M13.4 2.6 5.6 13.8h5.2L10.6 21.4 18.4 10.2h-5.2z"/>'
+  };
+
+  function dayRecords(d) {
+    if (FIXED_DAYS[d]) {
+      return FIXED_DAYS[d].map(function (r) { return { time: r[0], type: r[1], detail: r[2] }; });
+    }
+    var n = MONTH.counts[d - 1] || 0;
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var t = CYCLE[i % CYCLE.length];
+      out.push({ time: SLOTS[i], type: t, detail: DETAIL_TEXT[t] });
+    }
+    return out;
+  }
+
   function renderCalendar() {
     var html = "";
     for (var i = 0; i < MONTH.firstWeekday; i++) html += '<div class="cal-cell is-empty"></div>';
     for (var d = 1; d <= MONTH.days; d++) {
-      var n = MONTH.counts[d - 1] || 0;
+      var recs = dayRecords(d);
       var isToday = d === 11;
-      var dots = "";
-      if (n > 0) {
-        var total = Math.min(n, 3);
-        for (var k = 0; k < total; k++) {
-          var t = k === 0 ? "water" : (k === 1 ? "coffee" : "toilet");
-          dots += '<i class="cal-dot" data-type="' + t + '"></i>';
-        }
-      }
-      html += '<div class="cal-cell' + (isToday ? " is-today" : "") + '" title="' + (n ? n + " 次" : "无记录") + '">'
-        + '<span>' + d + '</span><span class="cal-dots">' + dots + "</span></div>";
+      var seen = [];
+      recs.forEach(function (r) { if (seen.indexOf(r.type) < 0) seen.push(r.type); });
+      var marks = "";
+      seen.slice(0, 3).forEach(function (t) {
+        marks += '<svg class="cal-mark" data-type="' + t + '" viewBox="0 0 24 24">' + MARK_PATH[t] + "</svg>";
+      });
+      html += '<div class="cal-cell' + (isToday ? " is-today" : "") + '" data-date="' + d + '" '
+        + 'title="' + (recs.length ? recs.length + " 次" : "无记录") + '">'
+        + '<span class="cal-day">' + d + "</span>"
+        + '<span class="cal-marks">' + marks + "</span></div>";
     }
     document.getElementById("calGrid").innerHTML = html;
   }
+
+  /* ---------- 某一天的记录 ---------- */
+  var daySheet = document.getElementById("daySheet");
+  var dayScrim = document.getElementById("dayScrim");
+
+  function openDaySheet(d) {
+    var recs = dayRecords(d);
+    document.getElementById("dayTitle").textContent = "11月" + d + "日 · 周" + WEEKDAY[(d + 6) % 7];
+    document.getElementById("dayCount").textContent = recs.length ? recs.length + " 次" : "";
+
+    var list = document.getElementById("dayList");
+    if (!recs.length) {
+      list.innerHTML = '<p class="empty-line">这天没有记录。可在新增记录时把时间改到这一天。</p>';
+    } else {
+      list.innerHTML = recs.map(function (r) {
+        return '<div class="row" data-type="' + r.type + '">'
+          + '<span class="row-time">' + r.time + "</span>"
+          + '<span class="row-main"><span class="row-title"><i class="row-dot"></i>' + TYPE_NAME[r.type] + "</span>"
+          + '<span class="row-sub">' + r.detail + "</span></span></div>";
+      }).join("");
+    }
+    daySheet.classList.add("is-open");
+    dayScrim.classList.add("is-open");
+  }
+
+  function closeDaySheet() {
+    daySheet.classList.remove("is-open");
+    dayScrim.classList.remove("is-open");
+    document.querySelectorAll(".cal-cell.is-selected").forEach(function (c) {
+      c.classList.remove("is-selected");
+    });
+  }
+
+  document.getElementById("calGrid").addEventListener("click", function (e) {
+    var cell = e.target.closest(".cal-cell");
+    if (!cell || !cell.dataset.date) return;
+    document.querySelectorAll(".cal-cell.is-selected").forEach(function (c) {
+      c.classList.remove("is-selected");
+    });
+    cell.classList.add("is-selected");
+    openDaySheet(parseInt(cell.dataset.date, 10));
+  });
+
+  document.getElementById("dayClose").addEventListener("click", closeDaySheet);
+  dayScrim.addEventListener("click", closeDaySheet);
 
   /* ---------- 记录面板 ---------- */
   var SHEET_META = {

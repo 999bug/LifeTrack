@@ -449,20 +449,16 @@ API 始终失败时，在 Gitee 仓库 → 发行版 → 创建发行版，填�
 
 ## 10. 限制与高频坑
 
-| 现象 | 根因 | 修复 / 教训 |
+> 发版流程的踩坑与规则统一维护在 [`docs/release-lessons.md`](release-lessons.md)，按 L1–L12 编号，可直接喂给规范工具。
+> 本节只保留「用这套同步方案本身」最容易踩的三条，避免两处重复维护。
+
+| 现象 | 根因 | 修复 |
 |---|---|---|
-| 仓库镜像配好了，代码和 tag 都同步，APK 却没有 | 官方镜像只同步分支/标签/提交，不含 Release 附件 | 附件必须由 CI 调 OpenAPI 单独上传；「镜像仓库」≠「镜像发布产物」 |
-| `releases/latest` 返回旧版本 | Gitee 的 latest 是「最后创建」，不是语义版本最高 | 按版本递增正常发版、不补发旧版本；客户端自己再比一次版本号 |
-| 建 Release 报 404 / 关联失败 | owner/repo 写错，或 `target_commitish` 用了 GitHub 的 `main` 而 Gitee 默认是 `master` | 显式配置分支变量；先 `GET /releases` 确认仓库可访问 |
-| 建 Release 报 422 | 同名 tag 已存在，或 `prerelease` 写成 `False` / `1` | 拒绝覆盖、查已有 Release；布尔值用小写 `false` / `true` |
-| 上传返回 200 但页面看不到附件 | 只判断了状态码，没解析 `browser_download_url` | 以返回的下载地址为成功凭据，缺失就报错退出 |
-| 上传 401 | 令牌过期或权限不足 | 轮换令牌、确认勾了 `projects`；Secret 更新后重跑镜像 job |
-| 上传 413 / 附件莫名失败 | 超过单附件或仓库总附件额度 | 拆包或清理旧 Release 附件；不要把产物提交进 git |
-| PowerShell 里 `curl -F` 报参数错误 | `curl` 是 `Invoke-WebRequest` 别名 | 一律写 `curl.exe`；同类坑见 `release-guide.md` §1.3 的 keytool 参数传递 |
-| 下载到的是登录页而不是安装包 | 私有仓库 / 未登录时网关返回 HTML | 用公开仓库；客户端拒绝 `text/html` 响应并校验文件魔数与最小体积 |
-| 镜像 job 失败后重跑整个 workflow | 以为能「重试一次就好」 | GitHub 侧已发布，重跑必然撞 tag；按第 8 节只补镜像这一步 |
-| Release 超过 100 个后幂等检查失效 | 列出接口只取了第一页 | 翻页或定期清理旧 Release |
-| 两端哈希不一致 | 镜像端重新构建或人工传错包 | 只复用同一份 artifact，从已发布 Release 下载而不是重新打包 |
+| 仓库镜像配好了，代码和 tag 都同步，APK 却没有 | 官方镜像只同步分支 / 标签 / 提交，不含 Release 附件 | 附件必须由 CI 调 OpenAPI 单独上传（详见 L9） |
+| `releases/latest` 返回旧版本 | Gitee 的 latest 是「最后创建」，不是语义版本最高 | 按版本递增发版，客户端自己再比一次版本号（L10） |
+| 镜像 job 失败后重跑整个 workflow | 以为「重试一次就好」 | GitHub 侧已发布，重跑必然撞 tag；只补失败的那一步（L2） |
+
+其余坑——建 Release 的 404 / 422、上传返回 200 但页面看不到附件、上传 401 / 413、下载到的是登录页、Release 超过 100 个后幂等检查失效、两端哈希不一致——见 `release-lessons.md` 的 L11 / L12 与 `release-guide.md` §6。
 
 ---
 

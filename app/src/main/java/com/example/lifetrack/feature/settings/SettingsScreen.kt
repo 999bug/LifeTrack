@@ -87,10 +87,11 @@ import kotlinx.coroutines.withContext
 private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 
 /**
- * 设置页：按「记录 / 数据 / 外观 / 关于」四段组织，每段一张卡片。
+ * 设置页：按「记录 / 数据 / 外观 / 安全 / 关于 / 更新日志」六段组织，每段一张卡片。
  *
  * 记录项目管理已拆到独立页面（[ModuleManagementScreen]），
- * 更新与隐私收进「关于」，备份改成两行操作 + 一句风险提示，
+ * 更新与隐私收进「关于」，版本变更摘要收在末尾的「更新日志」，
+ * 备份改成两行操作 + 一句风险提示，
  * 避免之前六张卡片各写一套内边距、越加越长的问题。
  */
 @Composable
@@ -535,6 +536,10 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        SettingsSection(title = "更新日志") {
+            VersionHistoryList()
         }
     }
 

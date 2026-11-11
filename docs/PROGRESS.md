@@ -1,6 +1,6 @@
 # 项目进度 · 剩余工作子任务台账
 
-> 维护规则：每完成一个功能先更新本文档再提交代码；进行中的任务标 🔄，完成标 ✅。
+> 维护规则：每完成一个功能先更新本文档再提交代码；进行中的任务标 🔄，完成标 ✅。每次发版同步在 `VersionHistory.kt` 最前面补一条用户可见的变化。
 > 建立日期：2026-11-09。范围：README「当前尚未实现 / 下一阶段清单」+「安全边界」+ 各会话发现的欠账。
 > **历史指示（2026-11-09）：安全加固包（C）优先级最低；月经、亲密关系模块依赖 C，一并后置。**
 > **最新指示（2026-11-10）：C 包解禁，开始做数据库加密，按子任务逐个完成；0.5.0 以后版本都要考虑兼容性。细化清单、选型结论与兼容性矩阵见 `docs/security-hardening-confirmation.md`。**
@@ -67,6 +67,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | 首页模块网格重构 | 2026-11-11 | `TodayScreen` 重写为「页头 + 双列模块卡 + 今日时间轴」，删除顶部大计数卡与按钮列表说明段；新增 `ModuleCard`（整卡即记录：排便/饮水一键落库，咖啡/运动直接进编辑器；右下「详细」为独立入口）、`CompactRecordRow`（时间轴行，编辑/删除收进尾部菜单）、`MainViewModel.quickWaterRecord`（默认一杯 250 ml）；停用模块不再渲染；日期固定 `Locale.CHINA`。200% 字体下模块卡降为单列、`widthIn` 避免「详细」被压成单字。210 项单测与 `lintDebug` 全绿，模拟器验证一键记录 / 详细入口 / 单列布局 | 设置页与统计页的 token 对齐未做 |
 | 设置页主题三档 + 统计页 token 收口 | 2026-11-11 | 新增 `ThemeMode`（浅色 / 深色 / 跟随系统）与 `theme_mode` 持久化，写入时同步旧 `dark_theme` 键，回退到 0.6.x 不丢深色偏好；`MainActivity` 用 `isSystemInDarkTheme()` 解析跟随系统；设置页外观区改三段选择，设置行加 20dp 图标、分组标题改 11.5sp/600 带字距、卡片圆角 18→16；统计页卡片圆角 18→16、指标卡 14→13、柱图非高亮柱 alpha 提高。210 项单测与 lint 全绿，模拟器验证三档切换即时生效 | TalkBack 实机朗读仍未验 |
 | 国内更新改为制品就绪判定 | 2026-11-11 | 修复 Gitee 同步窗口期误报：`ReleaseInfo` 引入 `ReleaseOrigin` / `ApkArtifact`，`.apk` + `.apk.sha256` 齐备才算就绪（sha256 是 CI 最后上传的完成标记）；新增 `UpdatePolicy` / `ArtifactProbe` / `PendingBackoff`，缺附件进 `Pending` 并按 30s→1m→2m→5m 退避重查，`ReleaseFetcher` 缺包不再回退 GitHub 下载、兜底只取版本信息；`ApkDownloader` 把状态码 / 类型 / 长度 / ZIP 头校验全部前置到进度条出现之前，加停滞看门狗与写盘后 sha256 校验；UI 呈现同步中、来源标注与真实错误。236 项单测全绿（更新模块 48 项，夹具用线上真实窗口期响应），`testDebugUnitTest` / `assembleDebug` / `lintDebug` 全绿；模拟器验证启动、自动检查、UpToDate 行渲染、默认与 200% 字体窄屏截图。**未验证**：`Pending` / `Available` / `Downloading` 三态真机截图与国内手机网络端到端下载（本机 debug 0.6.2 与线上最新版本一致，无法自然触发），建议 0.6.3 发版窗口期补验 | 流水线 P1（先传附件后发布 + 末尾自检）本次未做 |
+| 设置页新增更新日志 | 2026-11-11 | 「关于」下方新增「更新日志」分区：`VersionHistory.kt` 集中 0.1.0–0.6.4 每个版本一条（版本号 + 日期 + 一句用户可见变化），当前安装版本标「当前」并染主色；复用 `SettingsSection` / `SettingsRow` / `SettingsDivider`，摘要单独成行以便大字号只向下生长。`compileDebugKotlin` / `assembleDebug` / `lintDebug` 全绿、250 项单测全通过、lint 0 error；模拟器实测默认字体、200% 字体、360dp 窄屏：版本号与日期不重叠、摘要无截断 | 发版时需同步补一条；未做折叠/分页 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

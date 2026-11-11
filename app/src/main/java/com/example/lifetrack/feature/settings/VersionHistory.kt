@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.5",
+        date = "2026-11-11",
+        summary = "设置页按使用频率重新排布，常用入口集中到主卡，数据与备份默认折叠"
+    ),
+    VersionNote(
         version = "0.6.4",
         date = "2026-11-11",
         summary = "截屏遮挡时在设置页显示当前状态与原因，点开即可查看恢复方法"

@@ -78,7 +78,10 @@ fun HistoryScreen(
     val today = remember { LocalDate.now() }
     val colors = rememberStatsColors()
 
-    val grouped = records.groupBy { it.event.localDate }.toSortedMap(compareByDescending { it })
+    // 分组在重组期执行，不 remember 的话每次重组都会重新 groupBy + 建 TreeMap。
+    val grouped = remember(records) {
+        records.groupBy { it.event.localDate }.toSortedMap(compareByDescending { it })
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),

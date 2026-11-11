@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -179,11 +180,16 @@ class MainViewModel(
                     )
                 }
             }
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            emptyStatistics()
-        )
+        }
+            // 这里对 4 个周期做全窗口聚合（StatsAggregator.build），不加 flowOn 时
+            // 它跑在 stateIn 的收集上下文，也就是 viewModelScope 默认的 Main；
+            // 每写入一条记录 Room 都会重发一次，数据攒到几千条就会在主线程掉帧。
+            .flowOn(Dispatchers.Default)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyStatistics()
+            )
 
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.LIGHT)

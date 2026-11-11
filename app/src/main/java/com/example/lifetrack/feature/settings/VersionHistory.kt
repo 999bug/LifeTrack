@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.6",
+        date = "2026-11-11",
+        summary = "安装包体积减至四分之一；设置页可整理数据库；更新检查改为每天一次"
+    ),
+    VersionNote(
         version = "0.6.5",
         date = "2026-11-11",
         summary = "设置页按使用频率重新排布，常用入口集中到主卡，数据与备份默认折叠"

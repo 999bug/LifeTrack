@@ -23,7 +23,7 @@
 
 <!-- BEGIN AUTO-SNAPSHOT -->
 > 由 `scripts/export_release_pipeline.py --write` 从 `.github/workflows/release.yml` 与 `app/build.gradle.kts` 生成，**不要手改**。
-> 输入指纹：`release.yml` = `fdc7c0987049` · `build.gradle.kts` = `016a2eca2a09`。
+> 输入指纹：`release.yml` = `f60b86e5e750` · `build.gradle.kts` = `bec1a251ecde`。
 
 ### 机器可读事实
 
@@ -61,9 +61,9 @@ mirror=gitee_openapi
 mirror_tag_source=needs.release.outputs.tag
 contents_permission=write
 secrets=GITEE_TOKEN,GITHUB_TOKEN,SIGNING_KEYSTORE_BASE64,SIGNING_KEYSTORE_PASSWORD,SIGNING_KEY_ALIAS,SIGNING_KEY_PASSWORD
-workflow_sha256_12=fdc7c0987049
-build_file_sha256_12=016a2eca2a09
-step_count=16
+workflow_sha256_12=f60b86e5e750
+build_file_sha256_12=bec1a251ecde
+step_count=17
 ```
 
 ### 流水线步骤（按 workflow 顺序）
@@ -78,12 +78,13 @@ step_count=16
 8. `Upload lint report`
 9. `Verify signature and write checksum`
 10. `Upload build artifact`
-11. `Commit version bump to main`
-12. `Create GitHub Release`
-13. `Remove decoded keystore`
-14. `Download release APK`
-15. `Check Gitee configuration`
-16. `Create Gitee release and upload attachments`
+11. `Upload R8 mapping`
+12. `Commit version bump to main`
+13. `Create GitHub Release`
+14. `Remove decoded keystore`
+15. `Download release APK`
+16. `Check Gitee configuration`
+17. `Create Gitee release and upload attachments`
 <!-- END AUTO-SNAPSHOT -->
 
 ---

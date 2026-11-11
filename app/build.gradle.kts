@@ -40,6 +40,28 @@ android {
         getByName("release") {
             // 未注入密钥时保持 unsigned；发布流水线用 apksigner verify 兜底拦截，避免误发
             signingConfig = signingConfigs.findByName("release")
+            // R8：剥离未被引用的字节码与资源。material-icons-extended 有 11,105 个
+            // 图标类，代码里只用 32 个，不开 R8 时它们全部进 dex（约 32 MB）。
+            // shrinkResources 依赖 minify，单开无效。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // SQLCipher 的 4 个架构共 7.7 MB，x86/x86_64 占 4.5 MB，而国内 Android
+            // 真机基本只有 arm。只对 release 过滤：debug 保留全 ABI，x86_64 模拟器
+            // 才能继续跑本地回归。
+            //
+            // 本地要验证「开了 R8 的包能不能跑」时加 -Plifetrack.fullAbi：保留全部
+            // 架构但 R8 仍生效，装到 x86_64 模拟器上跑关键路径；CI 不传该属性，
+            // 发布包始终是 arm 双架构。
+            val fullAbi = providers.gradleProperty("lifetrack.fullAbi").isPresent
+            ndk {
+                if (!fullAbi) {
+                    abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+                }
+            }
         }
     }
 

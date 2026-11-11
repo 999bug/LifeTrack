@@ -242,6 +242,16 @@ jobs:
             ${{ steps.apk.outputs.apk }}
             ${{ steps.apk.outputs.checksum }}
 
+      # 开了 R8 之后，线上 release 的崩溃栈是混淆过的，只有 mapping.txt 能还原。
+      # 不归档等于放弃线上问题的定位能力；构建失败时也上传，便于排查。
+      - name: Upload R8 mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+
       # 放在所有可能失败的构建 / 验签步骤之后：构建没过就不产生版本提交。
       # 用 checkout 注入的 GITHUB_TOKEN 推送，GitHub 不会再因此触发新的 workflow；
       # commit message 里的 [skip ci] 是第二重保险。

@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.8",
+        date = "2026-11-11",
+        summary = "内部改进与稳定性修复"
+    ),
+    VersionNote(
         version = "0.6.7",
         date = "2026-11-11",
         summary = "内部改进与稳定性修复"

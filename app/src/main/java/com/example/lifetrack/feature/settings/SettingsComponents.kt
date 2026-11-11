@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -96,7 +97,8 @@ internal fun SettingsRow(
         modifier = interactive
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .alpha(if (enabled) 1f else 0.45f),
-        verticalAlignment = Alignment.CenterVertically,
+        // 大字号下标题会换行，图标必须跟着首行而不是整行居中，否则会飘到两行文字中间
+        verticalAlignment = if (LocalDensity.current.fontScale > 1.3f) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         icon?.let {
@@ -104,7 +106,9 @@ internal fun SettingsRow(
                 imageVector = it,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .padding(top = if (LocalDensity.current.fontScale > 1.3f) 4.dp else 0.dp)
+                    .size(20.dp)
             )
         }
         Column(

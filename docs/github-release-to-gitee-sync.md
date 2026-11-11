@@ -72,7 +72,7 @@
         ↓
   Job B: 检查令牌/产物/同名 Release → 调 API 建 Gitee Release → 逐个上传附件 → 校验 download_url
         ↓
-[验证] 两端附件齐全 → 哈希一致 → 客户端 latest 命中 → 下载链路可用
+[验证] 两端附件齐全 → 哈希一致 → 客户端 latest.json 命中 → 下载链路可用
         ↓
 [异常] Job B 失败：GitHub 已发布成功，不重跑、不重打 tag，按第 8 节人工补传
 ```
@@ -138,7 +138,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 | 发布 job | `contents: write` | 创建 GitHub Release |
 | 镜像 job | `contents: read` + `actions: read` | 读代码 / 下载 artifact |
 | Gitee 令牌 | `projects` | 创建 Release、上传附件 |
-| 客户端读取 | 无需令牌 | 公开仓库的 `releases/latest` 匿名可读 |
+| 客户端读取 | 无需令牌 | 读 Gitee 文件 CDN 上的 `latest.json`（匿名可读），**不再调用**被限流的 `releases/latest` API |
 
 ---
 
@@ -291,7 +291,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 - 创建 Release 时 `tag_name` / `name` / `body` / `target_commitish` 都是必填；`prerelease` 用小写 `false` / `true`。
 - 创建返回 JSON 里的 `id` 是后续上传附件用的 `release_id`，必须解析出来并判空。
 - 上传附件返回 `browser_download_url`，把它当成「上传成功」的唯一凭据；只判断 HTTP 200 不够。
-- `releases/latest` 返回的是**最后创建**的 Release，不是语义版本最高的一个。Gitee 没有「设为 latest」的 API，所以不要补发旧版本；客户端应自己再比一次版本号兜底。
+- `releases/latest` 返回的是**最后创建**的 Release，不是语义版本最高的一个。Gitee 没有「设为 latest」的 API，所以不要补发旧版本；客户端应自己再比一次版本号兜底。**注意：客户端已不再调用本接口**（实测匿名请求会被限流返回 403 Rate Limit），改读 Gitee 文件 CDN 上的 `latest.json`（由 `mirror-gitee` job 写入），同样无需令牌。
 - 常见状态码：`401` 令牌无效 / 过期，`404` owner 或 repo 写错、令牌无该仓库权限，`422` 同名 tag 或参数不合法，`413` 附件超限。
 
 附件额度（[官方帮助页](https://help.gitee.com/repository/release/create)，2026-11-10 核对）：单附件 ≤100 MB（GVP 200 MB），仓库附件总量 ≤1 GB，且总量统计包含仓库附件与 Release 附件；推荐项目 / GVP 有更高分档。额度会调整，接近上限时以官方帮助页为准并实测。本项目 `docs/release-guide.md` §6 记为「GVP 200MB / 5GB」，与官方当前分档表述略有出入，按官方页优先。长期发版要定期清理旧 Release 的附件，别把 APK 提交进 git（git 单文件与单仓上限更低）。
@@ -440,7 +440,7 @@ API 始终失败时，在 Gitee 仓库 → 发行版 → 创建发行版，填�
 - [ ] GitHub Release 与 Gitee Release 同名 tag，附件文件名与数量一致
 - [ ] 两端附件均可下载；`Get-FileHash` / `sha256sum` 结果与 `.sha256` 一致，且两端哈希相同
 - [ ] 签名证书指纹一致（Android 场景：同一 keystore，否则无法覆盖安装）
-- [ ] `GET /releases/latest` 返回的 `tag_name` 是本次版本，且带附件
+- [ ] Gitee `latest.json` 的 `version`/`tag` 是本次版本，`apkUrl`/`sha256Url` 指向刚上传的附件
 - [ ] 客户端「检查更新」在附件同步完成**之前**只显示「安装包同步中」、不出现下载按钮；附件齐备后才提示可下载并能调起安装器；镜像完全不可用时只用 GitHub 提供版本信息，不自动下载
 
 **未验证项要如实记录**：CI 只保证附件上传成功，附件下载 URL 在真实国内手机网络下能否免登录直连，需要首次发版后用真机端到端验证。
@@ -489,7 +489,7 @@ API 始终失败时，在 Gitee 仓库 → 发行版 → 创建发行版，填�
 7. [ ] 按 6.2 节替换 `<RELEASE_JOB_ID>` / `<ARTIFACT_NAME>` / `<ASSET_GLOB>`，并按触发方式改好 `TAG` 表达式。
 8. [ ] 补齐 CI 自检：令牌非空、产物存在、同名 Release 不存在、`id` 与 `browser_download_url` 判空。
 9. [ ] 明确镜像失败的告警策略（推荐标红不回滚）与人工补传步骤（第 8 节），写进项目发布文档。
-10. [ ] 客户端若依赖 `releases/latest`，必须自己做版本号比较兜底，并保留 GitHub 回退链路。
+10. [ ] 客户端改读 Gitee `latest.json`（文件 CDN，避开被限流的 `releases/latest` API），自己做版本号比较兜底，并保留 GitHub 回退链路。
 11. [ ] 核对产物大小与 Gitee 附件额度，定下旧 Release 清理节奏。
 12. [ ] 首次发版后按第 9 节做两端验证 + 真机端到端验证，把「未验证项」如实记进发布记录。
 

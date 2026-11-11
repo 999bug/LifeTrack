@@ -51,7 +51,10 @@ internal fun UpdateSection(viewModel: MainViewModel) {
             is UpdateRepository.Status.Checking -> "当前版本 ${BuildConfig.VERSION_NAME} · 检查中…"
             is UpdateRepository.Status.Preparing -> "正在确认安装包…"
             is UpdateRepository.Status.UpToDate -> "当前版本 ${BuildConfig.VERSION_NAME} · 已是最新"
-            is UpdateRepository.Status.Pending -> "v${s.release.version} 已发布 · 安装包同步中"
+            is UpdateRepository.Status.Pending -> when (s.reason) {
+                PendingReason.FALLBACK_ONLY -> "v${s.release.version} 已发布 · 更新信息获取中"
+                else -> "v${s.release.version} 已发布 · 安装包同步中"
+            }
             is UpdateRepository.Status.Available -> "发现新版本 v${s.release.version} · 来自 Gitee"
             is UpdateRepository.Status.Downloading ->
                 s.progress?.let { "正在下载 ${(it * 100).toInt()}%" } ?: "正在下载…"
@@ -183,7 +186,7 @@ private fun UpdatePending(
             text = when (reason) {
                 PendingReason.ARTIFACT_SYNCING -> "安装包正在同步到国内镜像，同步完成后才能下载。"
                 PendingReason.PROBE_NOT_READY -> "安装包暂时无法访问，稍后会自动重试。"
-                PendingReason.FALLBACK_ONLY -> "国内分发源暂不可用，请稍后重试，或前往发布页手动下载。"
+                PendingReason.FALLBACK_ONLY -> "更新信息暂时获取不到，请稍后重试，或前往发布页手动下载。"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -315,6 +315,7 @@ jobs:
       actions: read
     env:
       TAG: ${{ needs.release.outputs.tag }}
+      VERSION_NAME: ${{ needs.release.outputs.version_name }}
       CHANGELOG_SUMMARY: ${{ needs.release.outputs.changelog_summary }}
       GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
       GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
@@ -387,5 +388,49 @@ jobs:
               exit 1
             fi
             echo "Uploaded $(basename "$file"): $url"
+            case "$(basename "$file")" in
+              *.apk.sha256) SHA_URL="$url" ;;
+              *.apk) APK_URL="$url" ;;
+            esac
           done
+
+          if [ -z "${APK_URL:-}" ] || [ -z "${SHA_URL:-}" ]; then
+            echo "::error::Missing APK or sha256 URL after upload (apk=${APK_URL:-} sha=${SHA_URL:-})"
+            exit 1
+          fi
+
+          # 把版本事实 + Gitee 直链写进 latest.json，供客户端绕过被限流的 Gitee REST API。
+          # 通过 contents API 创建/更新文件（仓库默认分支须已初始化），认证写不受匿名限流影响。
+          MANIFEST=$(jq -n \
+            --arg version "$VERSION_NAME" \
+            --arg tag "$TAG" \
+            --arg notes "${CHANGELOG_SUMMARY:-}" \
+            --arg apk "$APK_URL" \
+            --arg sha "$SHA_URL" \
+            '{version:$version, tag:$tag, notes:$notes, apkUrl:$apk, sha256Url:$sha}')
+          echo "Manifest payload: $MANIFEST"
+          CONTENT=$(printf '%s' "$MANIFEST" | base64 | tr -d '\n')
+
+          CONTENTS_API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/contents/latest.json"
+          EXISTING_SHA=$(curl -sS "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" \
+            | jq -r '.sha // empty')
+          if [ -n "$EXISTING_SHA" ]; then
+            put_resp=$(curl -sS -X PUT "$CONTENTS_API" \
+              --data-urlencode "access_token=${GITEE_TOKEN}" \
+              --data-urlencode "content=${CONTENT}" \
+              --data-urlencode "message=chore: update latest.json for ${TAG}" \
+              --data-urlencode "sha=${EXISTING_SHA}" \
+              --data-urlencode "branch=${GITEE_BRANCH}")
+          else
+            put_resp=$(curl -sS -X POST "$CONTENTS_API" \
+              --data-urlencode "access_token=${GITEE_TOKEN}" \
+              --data-urlencode "content=${CONTENT}" \
+              --data-urlencode "message=chore: update latest.json for ${TAG}" \
+              --data-urlencode "branch=${GITEE_BRANCH}")
+          fi
+          if ! printf '%s' "$put_resp" | jq -e '.content // .sha // empty' > /dev/null; then
+            echo "::error::Failed to write latest.json to Gitee: $put_resp"
+            exit 1
+          fi
+          echo "Wrote latest.json: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/raw/${GITEE_BRANCH}/latest.json"
           echo "Mirror complete: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/tag/${TAG}"

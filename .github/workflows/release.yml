@@ -28,6 +28,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       version_name: ${{ steps.version.outputs.version_name }}
       version_code: ${{ steps.version.outputs.version_code }}
+      changelog_summary: ${{ steps.version.outputs.changelog_summary }}
       sha: ${{ steps.bump.outputs.sha }}
     env:
       SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
@@ -90,7 +91,8 @@ jobs:
           echo "LIFETRACK_KEYSTORE=$RUNNER_TEMP/lifetrack-release.jks" >> "$GITHUB_ENV"
 
       # 版本号由 CI 决定，源码里只把 versionCode 当作「当前已用最大值」。
-      # 这一步只算数、不写文件；任何一项不合规都在花几分钟构建之前就失败。
+      # 这一步只算数、不写文件；版本推算、tag 冲突、更新日志条目任何一项不合规，
+      # 都在花几分钟构建之前就失败。
       - name: Resolve version
         id: version
         env:
@@ -150,15 +152,33 @@ jobs:
             exit 1
           fi
 
+          # 应用内「更新日志」是编译进 APK 的静态列表，CI 递增版本号不会替它补条目。
+          # 首条与本次版本号不一致时，用户装上新包会看到「列表里没有当前版本、也没有
+          # 任何一条标『当前』」的静默失效，所以这里必须拦住。
+          CHANGELOG_FILE="app/src/main/java/com/example/lifetrack/feature/settings/VersionHistory.kt"
+          CHANGELOG_VERSION=$(awk -F'"' '/^[[:space:]]*version = "[0-9]+\.[0-9]+\.[0-9]+",?$/ {print $2; exit}' "$CHANGELOG_FILE")
+          CHANGELOG_SUMMARY=$(awk -F'"' '/^[[:space:]]*summary = "/ {print $2; exit}' "$CHANGELOG_FILE")
+          if [ -z "${CHANGELOG_VERSION:-}" ] || [ -z "${CHANGELOG_SUMMARY:-}" ]; then
+            echo "::error::无法从 $CHANGELOG_FILE 解析首条 version / summary"
+            exit 1
+          fi
+          if [ "$CHANGELOG_VERSION" != "$VERSION_NAME" ]; then
+            echo "::error::VersionHistory.kt 首条是 v$CHANGELOG_VERSION，本次要发 v$VERSION_NAME。"
+            echo "::error::请先在 $CHANGELOG_FILE 的 versionHistory 最前面补一条 $VERSION_NAME，推到 main 后再重新 Run workflow。"
+            exit 1
+          fi
+
           {
             echo "tag=$TAG"
             echo "version_name=$VERSION_NAME"
             echo "version_code=$NEXT_CODE"
+            echo "changelog_summary=$CHANGELOG_SUMMARY"
           } >> "$GITHUB_OUTPUT"
           {
             echo "TAG=$TAG"
             echo "VERSION_NAME=$VERSION_NAME"
             echo "VERSION_CODE=$NEXT_CODE"
+            echo "BASE_TAG=$LATEST_TAG"
             echo "BASE_SHA=$GITHUB_SHA"
           } >> "$GITHUB_ENV"
           echo "本次发布: $TAG (versionName=$VERSION_NAME, versionCode=$NEXT_CODE; 基线 $LATEST_TAG)"
@@ -251,16 +271,22 @@ jobs:
           echo "sha=$NEW_SHA" >> "$GITHUB_OUTPUT"
           echo "版本改动已推送到 main: $NEW_SHA"
 
+      # 说明正文直接复用 VersionHistory.kt 首条的 summary：与应用内「更新日志」同源，
+      # 国内用户在有新版时看到的那行说明也是它。原来 --generate-notes 的 commit 列表
+      # 改为末尾的 compare 链接，需要逐条 commit 时点进去看。
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG_SUMMARY: ${{ steps.version.outputs.changelog_summary }}
         run: |
+          NOTES=$(printf '%s\n\n**完整变更**：https://github.com/%s/compare/%s...%s' \
+            "$CHANGELOG_SUMMARY" "$GITHUB_REPOSITORY" "$BASE_TAG" "$TAG")
           gh release create "$TAG" \
             "${{ steps.apk.outputs.apk }}" \
             "${{ steps.apk.outputs.checksum }}" \
             --target "${{ steps.bump.outputs.sha }}" \
             --title "$TAG" \
-            --generate-notes
+            --notes "$NOTES"
           echo "Published $TAG: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
 
       - name: Remove decoded keystore
@@ -279,6 +305,7 @@ jobs:
       actions: read
     env:
       TAG: ${{ needs.release.outputs.tag }}
+      CHANGELOG_SUMMARY: ${{ needs.release.outputs.changelog_summary }}
       GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
       GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
       GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}
@@ -320,11 +347,16 @@ jobs:
             exit 1
           fi
 
+          # 应用内更新卡只取 Release body 的第一行非空行当「本版改了什么」，
+          # 所以首行必须是 summary，镜像说明退到第二段。
+          GITEE_BODY=$(printf '%s\n\n国内分发镜像，权威发布见 https://github.com/%s/releases/tag/%s' \
+            "${CHANGELOG_SUMMARY:-本次变更见 GitHub Release}" "$GITHUB_REPOSITORY" "$TAG")
+
           created=$(curl -sS -X POST "$API" \
             --data-urlencode "access_token=${GITEE_TOKEN}" \
             --data-urlencode "tag_name=${TAG}" \
             --data-urlencode "name=${TAG}" \
-            --data-urlencode "body=国内分发镜像，权威发布见 https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" \
+            --data-urlencode "body=${GITEE_BODY}" \
             --data-urlencode "target_commitish=${GITEE_BRANCH}" \
             --data-urlencode "prerelease=false")
           release_id=$(printf '%s' "$created" | jq -r '.id // empty')

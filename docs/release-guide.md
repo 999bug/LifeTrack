@@ -132,15 +132,29 @@ keytool -list -v -keystore "$HOME\lifetrack-keys\lifetrack-release.jks" -storety
 
 ## 2. 每次发版
 
-**你只需要做两件事：把代码推到 `main`，然后在 Actions 页面点一次 `Run workflow`。版本号不用填。**
+**你需要做三件事：补一条更新日志 → 把代码推到 `main` → 在 Actions 页面点一次 `Run workflow`。版本号不用填。**
+
+补更新日志这一步不能省。`app/src/main/java/com/example/lifetrack/feature/settings/VersionHistory.kt` 里的 `versionHistory` 是**编译进 APK 的静态列表**，设置页「更新日志」弹窗直接读它，流水线不会替你补条目。在 `listOf(` 后面插一条：
+
+```kotlin
+    VersionNote(
+        version = "0.6.5",
+        date = "2026-11-12",
+        summary = "一句用户能感知的变化"
+    ),
+```
+
+- `version` 必须**正好等于**本次要发的版本号。`release.yml` 的 `Resolve version` 会读这条与 CI 算出的版本号比对，不一致就在构建之前失败。漏写不会报错，但装到手机上时弹窗首条还是上一版、也没有任何一条标「当前」，属于静默失效。
+- 自动递增是确定的：当前最高 tag 是 `v0.6.4`，留空触发下一次就是 `0.6.5`。只有手填 minor/major（如 `v0.7.0`）时才需要照着改。
+- `summary` 会同时成为 GitHub Release 的说明首段和 Gitee Release 的第一行，也就是国内用户在有新版时「应用更新」卡上看到的那句话。写用户能感知的变化，不写内部重构。
 
 CI 自己完成：
 
-1. 从仓库里最高的 `vX.Y.Z` tag 推 `patch + 1`（当前基线 `v0.6.0` → 下次 `v0.6.1`）；
-2. 从 `app/build.gradle.kts` 读当前 `versionCode` 并 `+1`（6 → 7）；
+1. 从仓库里最高的 `vX.Y.Z` tag 推 `patch + 1`（当前基线 `v0.6.4` → 下次 `v0.6.5`）；
+2. 从 `app/build.gradle.kts` 读当前 `versionCode` 并 `+1`（10 → 11）；
 3. 在 runner 的工作副本里把这两个数字写回 `app/build.gradle.kts`，**用新版本构建** release APK——所以 APK 文件名、包内版本号、tag 三者一致；
-4. 单测 / lint / 构建 / 验签全部通过后，把版本改动以 `chore: release v0.6.1 (versionCode 7) [skip ci]` 提交并推回 `main`（同一个提交会自动重生成 `docs/release-pipeline-recipe.md` 的事实快照），再以该提交为 target 创建 tag 与 GitHub Release；
-5. `mirror-gitee` job 通过 `needs.release.outputs.tag` 拿到同一个 tag，下载同一份 `release-apk` artifact，创建 Gitee Release 并上传 APK 与 `.sha256`。
+4. 单测 / lint / 构建 / 验签全部通过后，把版本改动以 `chore: release v0.6.5 (versionCode 11) [skip ci]` 提交并推回 `main`（同一个提交会自动重生成 `docs/release-pipeline-recipe.md` 的事实快照），再以该提交为 target 创建 tag 与 GitHub Release；
+5. `mirror-gitee` job 通过 `needs.release.outputs.tag` 拿到同一个 tag，下载同一份 `release-apk` artifact，创建 Gitee Release 并上传 APK 与 `.sha256`。两个 Release 的说明都取自更新日志首条的 `summary`，所以应用内看到的「本版改了什么」与 Release 页面一致。
 
 想跳小版本时（例如想发 `0.7.0` 而不是 `0.6.1`），在 Run workflow 的 `version` 输入框里手填 `v0.7.0`；**留空就是自动递增**。手填值必须是 `vX.Y.Z` 且严格高于最新 tag，否则流水线在花几分钟构建之前就报错。
 
@@ -166,6 +180,7 @@ Android 的 `versionCode` 必须严格递增，否则系统拒绝覆盖安装；
 | 失败位置 | 后果 | 处理 |
 | --- | --- | --- |
 | 版本推算 / SDK / 签名配置 / 构建 / 验签 | 未推送任何东西，`main` 与 tag 都不变 | 修好问题后直接重跑，版本号不变 |
+| 更新日志校验（在 `Resolve version` 内） | 未推送任何东西，版本号还没算进去 | 按报错提示在 `VersionHistory.kt` 最前面补一条对应版本，推 `main` 后重跑；版本号与上次相同 |
 | `Commit version bump to main` | 版本提交可能已推送，但 tag / Release 还没建 | 先看 `main` 与 Actions 日志再决定；重跑会算出更高的 `versionCode`，不要盲点 |
 | `Create GitHub Release` 之后、`mirror-gitee` 失败 | GitHub 侧已发布成功，Gitee 缺附件 | 按 §6 人工补传，**不要重跑整个 workflow**（会撞 tag） |
 

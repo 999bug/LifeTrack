@@ -15,13 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.security.ScreenCapturePolicy
 import com.example.lifetrack.feature.home.MainViewModel
 
 /**
@@ -50,10 +49,11 @@ fun ModuleManagementScreen(
     onBack: () -> Unit
 ) {
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val stacked = LocalDensity.current.fontScale > 1.3f
     // A10：首次启用高敏感模块时提示一次，不阻断启用动作。
     var intimacyNoticeShown by rememberSaveable { mutableStateOf(false) }
-    var showIntimacyNotice by remember { mutableStateOf(false) }
+    var captureNoticeReasons by remember { mutableStateOf<List<ScreenCapturePolicy.Reason>?>(null) }
 
     Column(
         modifier = Modifier
@@ -100,7 +100,18 @@ fun ModuleManagementScreen(
                             viewModel.setTypeEnabled(code, enabled)
                             if (code == IntimacyFields.TYPE_CODE && enabled && !intimacyNoticeShown) {
                                 intimacyNoticeShown = true
-                                showIntimacyNotice = true
+                                // 回调里 types 还是启用前的值，显式按启用后的状态构造原因
+                                val enabledTypes = types.map {
+                                    if (it.code == IntimacyFields.TYPE_CODE) {
+                                        it.copy(enabled = true)
+                                    } else {
+                                        it
+                                    }
+                                }
+                                captureNoticeReasons = ScreenCapturePolicy.reasons(
+                                    appLockEnabled = appLockEnabled == true,
+                                    types = enabledTypes
+                                )
                             }
                         },
                         onMove = viewModel::moveType
@@ -117,19 +128,11 @@ fun ModuleManagementScreen(
         )
     }
 
-    if (showIntimacyNotice) {
-        AlertDialog(
-            onDismissRequest = { showIntimacyNotice = false },
-            title = { Text("已启用亲密关系记录") },
-            text = {
-                Text(
-                    "这类记录较敏感。建议在「设置 → 安全」开启应用锁；" +
-                        "本模块启用期间，最近任务预览与系统截屏会被遮挡。"
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showIntimacyNotice = false }) { Text("知道了") }
-            }
+    captureNoticeReasons?.let { reasons ->
+        ScreenCaptureNoticeDialog(
+            reasons = reasons,
+            suggestAppLock = true,
+            onDismiss = { captureNoticeReasons = null }
         )
     }
 }

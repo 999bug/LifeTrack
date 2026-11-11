@@ -15,10 +15,9 @@ import com.example.lifetrack.core.navigation.LifeTrackApp
 import com.example.lifetrack.feature.lock.AppLockGate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
-import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.security.ScreenCapturePolicy
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
@@ -28,16 +27,15 @@ class MainActivity : ComponentActivity() {
         val container = (application as LifeTrackApplication).container
 
         // 应用锁开启，或高敏感模块（A10 亲密关系）已启用时，隐藏最近任务预览与截屏。
-        // 不强制改应用锁开关：其余用户与模块的行为保持 0.6.0 原样。
+        // 判定口径与设置页共用 ScreenCapturePolicy，避免「窗口已遮挡、界面却说没遮挡」。
         lifecycleScope.launch {
-            val sensitiveModuleEnabled = container.trackRepository.observeTrackTypes()
-                .map { types -> types.any { it.code == IntimacyFields.TYPE_CODE && it.enabled } }
-                .onStart { emit(false) }
-                .catch { emit(false) }
+            val trackTypes = container.trackRepository.observeTrackTypes()
+                .onStart { emit(emptyList()) }
+                .catch { emit(emptyList()) }
             combine(
                 container.settingsRepository.appLockEnabled,
-                sensitiveModuleEnabled
-            ) { lockEnabled, sensitive -> lockEnabled || sensitive }
+                trackTypes
+            ) { lockEnabled, types -> ScreenCapturePolicy.isBlocked(lockEnabled, types) }
                 .collect { secure ->
                     if (secure) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)

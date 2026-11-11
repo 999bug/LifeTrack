@@ -7,7 +7,6 @@ import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
@@ -22,14 +21,14 @@ import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
 import com.example.lifetrack.feature.history.DayCalendarData
 import com.example.lifetrack.feature.statistics.PeriodStats
-import com.example.lifetrack.feature.statistics.StatsAggregator
+import com.example.lifetrack.feature.statistics.emptyStatistics
+import com.example.lifetrack.feature.statistics.observeStatistics
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -152,35 +151,7 @@ class MainViewModel(
      * 类型筛选为空表示全部类型；形态分布只在排便口径下查询，避免与其他类型的总数串口径。
      */
     val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> =
-        combine(todayDate, statsOffsets, statsTypeFilter) { today, offsets, typeCode ->
-            Triple(today, offsets, typeCode)
-        }.flatMapLatest { (today, offsets, typeCode) ->
-            val windows = StatsPeriod.entries.associateWith { period ->
-                statsWindow(period, offsets[period] ?: 0, today)
-            }
-            val rangeStart = windows.values.minOf { it.previous.start }.toString()
-            val rangeEnd = windows.values.maxOf { it.lastDate }.toString()
-            val details = if (typeCode == DEFAULT_POOP_TYPE.code) {
-                repository.observeStatDetails(rangeStart, rangeEnd)
-            } else {
-                flowOf(emptyList())
-            }
-            combine(
-                repository.observeDailyCounts(rangeStart, rangeEnd, typeCode),
-                repository.observeEventTimestamps(rangeStart, rangeEnd, typeCode),
-                details
-            ) { dailyCounts, timestamps, details ->
-                windows.mapValues { (_, window) ->
-                    StatsAggregator.build(
-                        window = window,
-                        today = today,
-                        dailyCounts = dailyCounts,
-                        timestamps = timestamps,
-                        details = details
-                    )
-                }
-            }
-        }
+        observeStatistics(repository, todayDate, statsOffsets, statsTypeFilter)
             // 这里对 4 个周期做全窗口聚合（StatsAggregator.build），不加 flowOn 时
             // 它跑在 stateIn 的收集上下文，也就是 viewModelScope 默认的 Main；
             // 每写入一条记录 Room 都会重发一次，数据攒到几千条就会在主线程掉帧。
@@ -188,7 +159,7 @@ class MainViewModel(
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
-                emptyStatistics()
+                emptyStatistics(todayDate.value)
             )
 
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
@@ -426,13 +397,6 @@ class MainViewModel(
 
     fun unlockApp() {
         appLockedState.value = false
-    }
-
-    private fun emptyStatistics(): Map<StatsPeriod, PeriodStats> {
-        val today = LocalDate.now(ZoneId.systemDefault())
-        return StatsPeriod.entries.associateWith { period ->
-            StatsAggregator.build(statsWindow(period, 0, today), today, emptyList(), emptyList())
-        }
     }
 
     private fun initialHistoryQuery(): HistoryQuery {

@@ -9,7 +9,8 @@ import kotlinx.coroutines.withContext
  * 向 Gitee Releases 查询最新版本，作为国内网络下的主更新源。
  *
  * 公开仓库的 `releases/latest` 无需令牌；仅做 HTTPS GET，不携带任何用户数据、
- * 设备标识、Cookie 或遥测。失败、暂无 Release 或未附 APK 时由 [ReleaseFetcher] 回退 GitHub。
+ * 设备标识、Cookie 或遥测。请求失败或暂无 Release 时由 [ReleaseFetcher] 回退 GitHub
+ * 取版本信息；Release 已发布但附件未同步时不回退，交由 [UpdatePolicy] 判为 Pending。
  */
 object GiteeReleaseChecker : ReleaseSource {
     private const val ENDPOINT =
@@ -27,7 +28,9 @@ object GiteeReleaseChecker : ReleaseSource {
         try {
             when (connection.responseCode) {
                 HttpURLConnection.HTTP_OK ->
-                    connection.inputStream.bufferedReader().use { ReleasePayloadParser.parse(it.readText()) }
+                    connection.inputStream.bufferedReader().use {
+                        ReleasePayloadParser.parse(it.readText(), ReleaseOrigin.GITEE)
+                    }
                 HttpURLConnection.HTTP_NOT_FOUND -> null
                 else -> throw IllegalStateException("Gitee API returned ${connection.responseCode}")
             }

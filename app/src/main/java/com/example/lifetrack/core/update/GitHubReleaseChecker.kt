@@ -6,10 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 向 GitHub Releases 查询最新版本，作为 Gitee 不可用时的兜底源。
+ * 向 GitHub Releases 查询最新版本，作为 Gitee 不可用时的版本信息兜底源。
  *
  * 这是本项目仅有的两处主动网络请求之一，仅做 HTTPS GET，不携带任何用户数据、
  * 设备标识、Cookie 或遥测，满足 Local First 原则——用户数据始终只在本地。
+ * 兜底结果会被 [ReleaseFetcher] 剥掉制品，国内版不会从这里下载 APK。
  * [isNewer] 是与来源无关的版本比较工具，保留在此供主流程与既有测试调用。
  */
 object GitHubReleaseChecker : ReleaseSource {
@@ -27,7 +28,9 @@ object GitHubReleaseChecker : ReleaseSource {
         try {
             when (connection.responseCode) {
                 HttpURLConnection.HTTP_OK ->
-                    connection.inputStream.bufferedReader().use { ReleasePayloadParser.parse(it.readText()) }
+                    connection.inputStream.bufferedReader().use {
+                        ReleasePayloadParser.parse(it.readText(), ReleaseOrigin.GITHUB)
+                    }
                 HttpURLConnection.HTTP_NOT_FOUND -> null
                 else -> throw IllegalStateException("GitHub API returned ${connection.responseCode}")
             }

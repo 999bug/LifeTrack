@@ -1,18 +1,21 @@
 package com.example.lifetrack.core.update
 
 /**
- * 更新来源。Gitee 为国内主源，GitHub 为兜底源，两者返回同一份 [ReleaseInfo]。
+ * 更新来源。Gitee 为国内主源，GitHub 为版本信息兜底源。
  */
 interface ReleaseSource {
     suspend fun fetchLatest(): ReleaseInfo?
 }
 
 /**
- * 按「Gitee 优先、GitHub 兜底」取最新版本。
+ * 国内分发的版本查询：Gitee 为主源，GitHub 仅在主源不可用时提供版本信息。
  *
- * 主源出现以下任一情况都回退：请求异常、仓库暂无 Release、Release 未附 APK。
- * 两个来源都失败时抛出兜底源的异常，并把主源失败挂为 suppressed 便于排查。
- * 主源有可用 APK 时不会请求兜底源，避免国内网络下多等一次 GitHub 超时。
+ * 主源「请求失败 / 暂无 Release」与「返回了 Release 但附件还没同步过来」是两件事：
+ * 前者才回退 GitHub，后者直接返回主源结果，由 [UpdatePolicy] 判为 Pending。
+ * 绝不拿 GitHub 的 APK 地址顶上——那会让国内用户去下境外 22MB 的包，
+ * 表现为「源端没包却提示可更新，点下去进度条缓慢地走」。
+ *
+ * 回退结果一律剥掉制品，国内版不跨境下载；用户可从设置页手动前往发布页。
  */
 object ReleaseFetcher {
     suspend fun fetchLatest(
@@ -27,10 +30,11 @@ object ReleaseFetcher {
             primaryFailure = e
             null
         }
-        if (primaryRelease?.downloadUrl != null) return primaryRelease
+        // 主源只要给出了版本事实就以其为准，缺附件是同步中间态，不是故障。
+        if (primaryRelease != null) return primaryRelease
 
         return try {
-            fallback.fetchLatest()
+            fallback.fetchLatest()?.copy(origin = ReleaseOrigin.GITHUB, artifact = null)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             primaryFailure?.let { e.addSuppressed(it) }

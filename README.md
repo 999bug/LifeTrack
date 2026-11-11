@@ -12,7 +12,7 @@
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件；两端是同一份 CI 产物，签名一致。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
 - 最新已发布版本 `0.6.0`（versionCode 6，2026-11-10）；校验示例：`Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256`。
-- 应用内检查更新优先查询 Gitee，Gitee 暂无 Release、未附 APK 或请求失败时回退 GitHub。
+- 应用内检查更新以 Gitee 为唯一分发源：只有 APK 与 `.sha256` 两份附件都同步完成、且下载地址预检通过后才提示「可下载」。同步窗口期内只显示「安装包同步中」并按 30s → 1m → 2m → 5m 自动退避重试，不会误报可更新，也不会回退到 GitHub 下载（避免国内用户去下境外包）。Gitee 完全不可用时仅用 GitHub 提供版本信息，需手动前往发布页。
 - **发版无需手填版本号**：在 Actions 手动触发 `Release APK`，CI 从最高 tag 自动推 patch+1、从 gradle 推 `versionCode+1`，构建成功后把版本改动提交回 `main`、打 tag 并同步 Gitee。想跳小版本时才在 `version` 输入框手填（如 `v0.7.0`）。详见 [发布与签名指南](docs/release-guide.md) §2。
 
 > 本 README 描述 `main` 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。**目前 0.6.0 不含 A10 亲密关系模块**（该模块已合入 `main`，将在下一次发版进入 Release）。
@@ -39,7 +39,7 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - 亲密关系模块（A10）：新增「记录亲密关系」入口，三项均可不填——保护措施（是 / 否 / 不适用）、主观感受（好 / 一般 / 差）、时长（1–1440 分钟）；**不记录伴侣姓名或任何可识别身份的信息**。默认停用，启用后今日列表只显示类型与时间、不显示详情或备注，需点开详情弹窗才展开；读屏对列表与详情各收敛为一句汇总。启用期间无论应用锁是否开启都启用 `FLAG_SECURE`，首次启用提示建议开启应用锁；明文导出确认会点明文件包含亲密关系记录。存储层仍只注册类型与字段规格，Room 仍 version 2、备份版本不变。
 - Room 数据持久化、DataStore 深色模式设置。
 - UTC 时间戳 + IANA zoneId + 发生时 localDate；本地日期映射有单元测试。
-- 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 Gitee Releases 最新版本号与下载本应用 APK（Gitee 不可用时回退 GitHub Releases），不发送任何用户数据、设备标识或遥测。应用锁另申请普通权限 `USE_BIOMETRIC`，只用于调用系统指纹 / 锁屏密码验证，不读取或保存生物特征数据。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
+- 为应用内「检查更新」与安装，申请了 `INTERNET` 与 `REQUEST_INSTALL_PACKAGES` 权限；该网络能力**仅**用于查询 Gitee Releases 最新版本、预检并下载本应用 APK 及其 `.sha256`（Gitee 完全不可用时只向 GitHub 查询版本信息，不下载），不发送任何用户数据、设备标识或遥测。应用锁另申请普通权限 `USE_BIOMETRIC`，只用于调用系统指纹 / 锁屏密码验证，不读取或保存生物特征数据。显式关闭 Auto Backup，并同时提供旧版备份规则和 Android 12+ 数据提取规则。
 
 ## 版本基线（固定版本，不使用动态版本）
 
@@ -157,7 +157,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 
 ## 本地存储、自动备份和主动导出边界
 
-- 业务数据库位于应用私有目录，不提供数据上传接口；`INTERNET` 权限仅用于应用内「检查更新」向 `gitee.com` 查询 Gitee Releases 最新版本（失败时回退 `api.github.com`）与下载 APK，不发起任何其它网络请求、不上传数据。
+- 业务数据库位于应用私有目录，不提供数据上传接口；`INTERNET` 权限仅用于应用内「检查更新」向 `gitee.com` 查询 Gitee Releases 最新版本、对 APK 直链发 HEAD 预检、下载 APK 与 `.sha256`（仅 Gitee 源；Gitee 完全不可用时只向 `api.github.com` 查询版本信息），不发起任何其它网络请求、不上传数据。设置页的「查看发布页」是用户主动点击后调起浏览器，不是应用自身发起的请求。
 - `android:allowBackup="false"`，同时提供 `fullBackupContent` 与 Android 12+ `dataExtractionRules`，将数据库、偏好设置、文件和根目录排除在云备份及设备迁移之外。不同厂商设备仍应实机验证系统迁移行为。
 - 自动备份关闭意味着用户不能依靠 Google/厂商备份恢复数据。卸载应用、清除应用数据或丢失手机，都可能导致未主动导出的数据永久丢失。
 - **已实现主动导出 / 恢复**：设置页 → 数据，通过 Storage Access Framework 由用户选择保存位置。文件含 `schemaVersion`、类型表与全部记录（含详情）；恢复时校验应用标识、版本号、事件条数、ID 唯一性、时区、本地日期与字段范围，任一不通过即整体拒绝，替换在单个 Room 事务内完成。
@@ -176,7 +176,7 @@ Room 现在是 **version 2**（`app/schemas/1.json` + `2.json`）。`MIGRATION_1
 3. ✅ 主动导出文件加密、完整性校验与口令轮换（v3，AES-256-GCM + AAD；C4–C6）。
 4. 🟡 Android 自动备份、设备迁移、卸载重装、换机恢复：`allowBackup=false` 与两份排除规则已复核，「卸载重装 + 加密备份恢复」已模拟通过；**真机厂商迁移 / ROM 差异仍待走查**（C8 / B8）。
 5. ✅ 日志、崩溃报告、剪贴板、最近任务屏幕预览及通知内容的隐私审查（C9；应用锁开启时 `FLAG_SECURE` 遮挡预览）。
-6. 应用内「检查更新」的网络行为（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`，失败时回退 `api.github.com/repos/999bug/LifeTrack/releases/latest`，以及下载 APK）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
+6. 应用内「检查更新」的网络行为（HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`；对 Gitee APK 直链发 HEAD；下载 Gitee 的 APK 与 `.sha256`；Gitee 完全不可用时 HTTPS GET `api.github.com/repos/999bug/LifeTrack/releases/latest` 仅取版本信息）已评审：不携带用户数据、设备标识、Cookie 或遥测，符合 Local First 原则——用户数据仍只在本地。这是项目放开 `INTERNET` 权限的唯一场景；新增任何其它网络能力仍需回到本安全边界重新评审。
 
 **系统备份 / 迁移边界**：`allowBackup=false`，`fullBackupContent` 与 Android 12+ `dataExtractionRules` 把 `database` / `sharedpref` / `file` / `external` / `root` 五个域在「云备份」与「设备迁移」两条链路都排除。Keystore 密钥不属于应用数据，不会随备份离开设备；因此系统迁移既不会带走加密库，也不会留下「有库没钥匙」的半套数据。换机唯一可靠的路径是**导出加密备份 → 新设备安装 → 输入口令恢复**；卸载或清除数据仍会丢失未导出的记录。
 

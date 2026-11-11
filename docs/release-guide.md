@@ -226,8 +226,9 @@ Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256
 
 - **为什么不用 Gitee 仓库镜像**：官方「仓库镜像管理」只同步分支、标签和提交记录，不同步 Release 附件。APK 必须由 `release.yml` 的 `mirror-gitee` job 调 OpenAPI 上传。
 - **代码不落地 Gitee**：Gitee 仓库只作为 Release 附件的载体，`target_commitish` 指向其 `main` 分支即可；本地与 CI 都不向 Gitee 推代码。
-- **App 查询链路**：优先 HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`（公开仓库免令牌）；请求失败、暂无 Release 或 Release 未附 APK 时回退 GitHub。主源命中时不会请求 GitHub，避免国内网络多等一次超时。
+- **App 查询链路**：HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`（公开仓库免令牌）。主源只要返回了版本事实就以其为准；**Release 已发布但附件还没同步过来不算故障**，客户端进入「安装包同步中」并按 30s → 1m → 2m → 5m 退避重查，不回退 GitHub 下载。仅当主源请求失败或暂无 Release 时才查 `api.github.com`，且只取版本信息、剥掉下载地址——国内版不跨境下载。
+- **制品就绪判据**：`assets` 里必须同时有 `.apk` 与 `.apk.sha256`。`mirror-gitee` 在同一个 shell 步骤里先创建 Release 再逐个上传附件，sha256 是最后上传的一份，它出现等价于「本次同步已完成」。只比较 `tag_name` 会把同步中间态误报成可更新。
 - **Gitee 的 `latest` 指向「最后创建」的 Release，不是语义版本最高的**：按版本递增正常发版不会出问题；客户端 `isNewer()` 还会再比一次版本号，最坏是提示「已是最新」，不会误装旧包。不要补发旧版本。
 - **附件配额**：社区版单附件 ≤100MB、单仓库附件总量 ≤1GB（GVP 分别 200MB / 5GB）。APK 只走 Release 附件，不要提交进 git（git 单文件上限 50MB、单仓 500MB）。长期发版需定期清理旧 Release 的附件。
-- **下载内容校验**：`ApkDownloader` 会拒绝 `text/html` 响应，写盘后校验 ZIP 魔数与最小体积，防止网关返回登录页却被当成 APK 交给安装器。这层校验不替代系统对 APK 签名的校验。
-- **未验证项**：Gitee 上传附件的 `browser_download_url` 在国内手机网络下能否免登录直连下载，需在首次真实发版后用真机端到端验证；CI 只保证附件上传成功。
+- **下载前置校验**：`HttpArtifactProbe` 对 APK 直链发 HEAD（跟随两次 302 到 CDN），要求 2xx、非 `text/html`、`Content-Length` 存在且 ≥1MB，否则判为「未就绪」并重试。`ApkDownloader` 在**切到下载中状态之前**再校验状态码、Content-Type、长度一致性与 ZIP 魔数，所以进度条只会在确认源端真有完整 APK 后出现；下载过程带 socket 无进展超时与「20 秒窗口内不足 32KB」的停滞看门狗。写盘后按 `.sha256` 校验全文摘要、ZIP 魔数与体积。这些校验不替代系统对 APK 签名的校验。
+- **未验证项**：Gitee 附件的 HEAD 预检与直链下载在桌面网络已实测（最终响应 200 + `application/zip` + `Content-Length: 22299731`）；**国内手机网络下的端到端下载、退避重试与调起安装器仍需真机验证**，CI 只保证附件上传成功。

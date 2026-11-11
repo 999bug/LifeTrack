@@ -1,16 +1,27 @@
 package com.example.lifetrack.feature.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.example.lifetrack.BuildConfig
 
 /**
  * 版本更新记录。
  *
  * 只写用户能感知到的变化，一句一条；内部重构、测试与流水线细节不进这里。
- * 列表按版本从新到旧排列，发版时在最前面补一条——当前安装的版本会标「当前」，
- * 所以新版发布后忘了补记录会立刻在设置页露馅。
+ * 列表按版本从新到旧排列，发版时在最前面补一条；当前安装的版本标「当前」。
+ * 设置页只放一行「更新日志」入口，点开才看这份列表，避免十来个版本把页面撑长。
  */
 internal data class VersionNote(
     val version: String,
@@ -71,27 +82,72 @@ internal val versionHistory: List<VersionNote> = listOf(
     )
 )
 
-/** 一行一个版本；版本号与日期同行，摘要单独一行，200% 字体下也只会往下长。 */
+/** 更新日志弹窗：默认只在「关于」占一行，展开后列表自身可滚动。 */
 @Composable
-internal fun VersionHistoryList() {
-    versionHistory.forEachIndexed { index, note ->
-        if (index > 0) SettingsDivider()
-        val isCurrent = note.version == BuildConfig.VERSION_NAME
-        SettingsRow(
-            title = if (isCurrent) "v${note.version} · 当前" else "v${note.version}",
-            subtitle = note.summary,
-            titleColor = if (isCurrent) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            trailing = {
+internal fun VersionHistoryDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("更新日志") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                versionHistory.forEachIndexed { index, note ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    }
+                    VersionHistoryEntry(note)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        }
+    )
+}
+
+@Composable
+private fun VersionHistoryEntry(note: VersionNote) {
+    val isCurrent = note.version == BuildConfig.VERSION_NAME
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 日期与「当前」标签先按自身宽度测量且强制单行，版本号拿剩余空间；
+            // 大字号下只让版本号换行，不会把「当前」拆成两行或挤掉日期
+            Text(
+                text = "v${note.version}",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isCurrent) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.weight(1f)
+            )
+            if (isCurrent) {
                 Text(
-                    text = note.date,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "当前",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
+            Text(
+                text = note.date,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+        Text(
+            text = note.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

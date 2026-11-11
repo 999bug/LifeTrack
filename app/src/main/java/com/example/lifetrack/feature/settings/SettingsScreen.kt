@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -87,10 +88,10 @@ import kotlinx.coroutines.withContext
 private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 
 /**
- * 设置页：按「记录 / 数据 / 外观 / 安全 / 关于 / 更新日志」六段组织，每段一张卡片。
+ * 设置页：按「记录 / 数据 / 外观 / 安全 / 关于」五段组织，每段一张卡片。
  *
  * 记录项目管理已拆到独立页面（[ModuleManagementScreen]），
- * 更新与隐私收进「关于」，版本变更摘要收在末尾的「更新日志」，
+ * 更新、隐私与版本更新日志都收进「关于」（日志点开才展开），
  * 备份改成两行操作 + 一句风险提示，
  * 避免之前六张卡片各写一套内边距、越加越长的问题。
  */
@@ -119,6 +120,7 @@ fun SettingsScreen(
     var timeoutDialogVisible by remember { mutableStateOf(false) }
     var appLockError by remember { mutableStateOf<String?>(null) }
     var licensesVisible by remember { mutableStateOf(false) }
+    var changelogVisible by remember { mutableStateOf(false) }
     // null = 不显示；非空 = 展示当时的遮挡原因（点击瞬间 DataStore 还没回写，需现场构造）
     var captureNoticeReasons by remember { mutableStateOf<List<ScreenCapturePolicy.Reason>?>(null) }
 
@@ -487,6 +489,13 @@ fun SettingsScreen(
             UpdateSection(viewModel = viewModel)
             SettingsDivider()
             SettingsRow(
+                title = "更新日志",
+                icon = Icons.Filled.History,
+                subtitle = "查看各版本的功能变化",
+                onClick = { changelogVisible = true }
+            )
+            SettingsDivider()
+            SettingsRow(
                 title = "开源许可",
                 icon = Icons.Filled.Description,
                 subtitle = "SQLCipher Community Edition · BSD-style",
@@ -537,10 +546,10 @@ fun SettingsScreen(
                 }
             }
         }
+    }
 
-        SettingsSection(title = "更新日志") {
-            VersionHistoryList()
-        }
+    if (changelogVisible) {
+        VersionHistoryDialog(onDismiss = { changelogVisible = false })
     }
 
     if (exportChoiceVisible) {

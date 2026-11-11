@@ -54,4 +54,38 @@ class ManifestReleaseCheckerTest {
     fun returnsNullOnMalformedJson() {
         assertNull(ManifestReleaseChecker.parse("not json{"))
     }
+
+    @Test
+    fun returnsNullWhenVersionIsBlank() {
+        val json = """{"version":"  ","apkUrl":"$apkUrl","sha256Url":"$shaUrl"}"""
+        assertNull(ManifestReleaseChecker.parse(json))
+    }
+
+    @Test
+    fun returnsNullWhenTopLevelIsArray() {
+        assertNull(ManifestReleaseChecker.parse("""[{"version":"0.6.5"}]"""))
+    }
+
+    @Test
+    fun rejectsArtifactUrlOutsideGitee() {
+        val evil = "https://evil.example.com/LifeTrack-0.6.5-release.apk"
+        val json = """{"version":"0.6.5","apkUrl":"$evil","sha256Url":"$shaUrl"}"""
+        assertNull(ManifestReleaseChecker.parse(json))
+    }
+
+    @Test
+    fun rejectsPlainHttpArtifactUrl() {
+        val plain = "http://gitee.com/saul999/LifeTrack/releases/download/v0.6.5/a.apk"
+        val json = """{"version":"0.6.5","apkUrl":"$plain","sha256Url":"$shaUrl"}"""
+        assertNull(ManifestReleaseChecker.parse(json))
+    }
+
+    @Test
+    fun trimsWhitespaceAroundVersionAndUrls() {
+        val json = """{"version":" 0.6.5 ","apkUrl":" $apkUrl ","sha256Url":" $shaUrl "}"""
+        val info = ManifestReleaseChecker.parse(json)
+        assertEquals("0.6.5", info?.version)
+        assertEquals(apkUrl, info?.artifact?.downloadUrl)
+        assertEquals(shaUrl, info?.artifact?.checksumUrl)
+    }
 }

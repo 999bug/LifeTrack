@@ -90,6 +90,7 @@
 | 发布 0.6.0（加密首发） | `3b5ea49` | APK 22,283,347 B；真机加密迁移确认通过 |
 | 发布 0.6.5 | `274607a` | CI 自动递增到 versionCode 11；`changelog` 校验首次在真实 CI 通过 |
 | 发布 0.6.6 | `12399b6` | APK 5.19 MB（22 MB 的 1/4）；GitHub 侧全绿，Gitee 镜像写 `latest.json` 时 jq 报错失败，已修根因并补写 |
+| 发布 0.6.7 | `a657ad5` | **mirror-gitee 首次全绿**：jq 修复生效，`latest.json` 由 CI 自动从 0.6.6 更新到 0.6.7；APK 5.19 MB，两个 job 均 success |
 
 ---
 
@@ -155,7 +156,7 @@
 | R11 | CI 仪器测试任务未实跑 | `ci.yml` 的 build job 已多次 success（单测 + lint + assembleDebug），instrumented job 按设计 skipped；emulator-runner 链路仍未真正执行 |
 | R12 | 加密后不可降级 | 0.6.0 起的加密库无法被 0.5.0 及更早版本打开；用户卸载重装旧 APK 会命中。README 已写明「回退前先导出备份」 |
 | R13 | CI 自动提交版本改动 | 发版会把 `chore: release …` 推回 `main`，本地会落后一个提交，下次开发前须 `git pull --ff-only`；`main` 若开分支保护要放行 `github-actions[bot]`。详见 `docs/release-guide.md` §2.2 / §2.3 |
-| R14 | 国内主源只剩 latest.json 一条路（**v0.6.6 首次应验**） | `f6837cd` 后不再调用 Gitee REST API；若 CI 写 `latest.json` 那步失败，用户在应用内将无法下载更新（旧版被限流、新版读不到清单）。v0.6.6 发版时该步骤果然失败：Gitee contents API 对不存在的文件返回数组，`jq '.sha'` 报 "Cannot index array with string"，`set -e` 让 `mirror-gitee` exit 5 —— 而 APK 与 sha256 其实都上传成功了，只有清单没写成，国内用户将无法在应用内下载。已修（先判 `type == object`）并新增 `gitee-manifest.yml` 手工补写入口。**每次发版后仍须人工确认这三个条件** |
+| R14 | 国内主源只剩 latest.json 一条路（**v0.6.6 首次应验**） | `f6837cd` 后不再调用 Gitee REST API；若 CI 写 `latest.json` 那步失败，用户在应用内将无法下载更新（旧版被限流、新版读不到清单）。v0.6.6 发版时该步骤果然失败：Gitee contents API 对不存在的文件返回数组，`jq '.sha'` 报 "Cannot index array with string"，`set -e` 让 `mirror-gitee` exit 5 —— 而 APK 与 sha256 其实都上传成功了，只有清单没写成，国内用户将无法在应用内下载。已修（先判 `type == object`）并新增 `gitee-manifest.yml` 手工补写入口。0.6.7 发版时修复生效：`mirror-gitee` 全绿，`latest.json` 自动更新到 0.6.7（PUT 分支首次跑通），直链 302 可达。**仍建议每次发版后确认一次清单版本号与直链** |
 
 > 已解除的历史风险（保留编号以免旧引用断链）：R1 加密缺失、R3 schema 与加密迁移撞车、R5 200% 字体遗留、R8 存量库 1→2 未实测、R9 多会话并发改动。详见各自 confirmation 文档与 `git log`。
 

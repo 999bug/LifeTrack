@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeTrack · 界面重设计原型</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --font: -apple-system, "SF Pro Text", "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+    --canvas: #ECEEE8;
+    --bg: #F6F7F3;
+    --surface: #FDFDFB;
+    --surface-2: #EFF2EB;
+    --surface-3: #E7EBE2;
+    --border: #E3E8DE;
+    --border-strong: #D3DBCC;
+
+    --text: #171A16;
+    --text-2: #59625A;
+    --text-3: #69716A;
+
+    --primary: #33604A;
+    --on-primary: #FFFFFF;
+    --primary-soft: #DDEBE0;
+    --on-primary-soft: #1B3A2A;
+
+    --toilet: #8A6A4B;
+    --water: #3D7391;
+    --coffee: #9A7134;
+    --sport: #4C7A57;
+    --intimacy: #8A5F72;
+
+    --r-card: 16px;
+    --r-btn: 12px;
+    --r-pill: 999px;
+
+    --shadow-card: 0 1px 2px rgba(23,26,22,.04), 0 12px 28px -22px rgba(23,26,22,.35);
+    --shadow-device: 0 40px 90px -40px rgba(10,16,12,.55);
+
+    --ease: cubic-bezier(.2,.7,.3,1);
+    --dur: 160ms;
+  }
+
+  html[data-theme="dark"] {
+    --canvas: #070A08;
+    --bg: #0F1410;
+    --surface: #171E19;
+    --surface-2: #121814;
+    --surface-3: #1E2721;
+    --border: #2A342C;
+    --border-strong: #37443A;
+
+    --text: #E9F0E9;
+    --text-2: #A8B4AA;
+    --text-3: #8B988E;
+
+    --primary: #A9D8B4;
+    --on-primary: #0E1510;
+    --primary-soft: #24382B;
+    --on-primary-soft: #CFE9D5;
+
+    --toilet: #C9A382;
+    --water: #8FC0D8;
+    --coffee: #D9B173;
+    --sport: #9CC7A6;
+    --intimacy: #C99BAE;
+
+    --shadow-card: 0 1px 0 rgba(255,255,255,.02), 0 14px 30px -24px rgba(0,0,0,.9);
+  }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--canvas);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+
+  /* ========== 舞台与工具栏 ========== */
+  .stage { max-width: 1140px; margin: 0 auto; padding: 28px 28px 48px; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding-bottom: 20px; border-bottom: 1px solid var(--border);
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand strong { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+  .brand span { font-size: 12.5px; color: var(--text-3); letter-spacing: .02em; }
+
+  .pager { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r-pill); border: 1px solid var(--border); }
+  .pager button {
+    font: inherit; font-size: 12.5px; font-weight: 550; color: var(--text-2);
+    background: none; border: 0; border-radius: var(--r-pill);
+    padding: 7px 13px; cursor: pointer; transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+    white-space: nowrap;
+  }
+  .pager button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .icon-toggle {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 34px; padding: 0 13px 0 11px;
+    font: inherit; font-size: 12.5px; font-weight: 550; color: var(--text-2);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+    cursor: pointer; transition: all var(--dur) var(--ease);
+  }
+  .icon-toggle:hover { border-color: var(--border-strong); color: var(--text); }
+  .icon-toggle svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  .layout {
+    display: grid; grid-template-columns: 430px minmax(0, 1fr);
+    gap: 56px; align-items: start; margin-top: 34px;
+  }
+
+  /* ========== 设备外壳 ========== */
+  .device-shell {
+    width: 100%; max-width: 430px;
+    padding: 9px; border-radius: 46px;
+    background: linear-gradient(160deg, #262E28, #0B0F0C 45%, #1A211B);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, var(--shadow-device);
+    flex: 0 0 auto; min-width: 0;
+  }
+  html[data-theme="dark"] .device-shell { background: linear-gradient(160deg, #1E2620, #0A0E0B 45%, #171D18); }
+
+  .device {
+    position: relative; display: flex; flex-direction: column;
+    width: 100%; height: clamp(660px, calc(100vh - 190px), 848px);
+    background: var(--bg); border-radius: 38px; overflow: hidden;
+    transition: background var(--dur) var(--ease);
+  }
+
+  .statusbar {
+    flex: 0 0 auto; height: 40px; padding: 0 26px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; font-weight: 650; letter-spacing: .01em; color: var(--text);
+  }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+  .status-right svg { display: block; }
+  .battery { display: inline-block; width: 22px; height: 11px; border: 1.4px solid var(--text); border-radius: 3px; position: relative; opacity: .9; }
+  .battery::after { content: ""; position: absolute; left: 1.4px; top: 1.4px; bottom: 1.4px; width: 12px; border-radius: 1px; background: var(--text); }
+  .battery::before { content: ""; position: absolute; right: -3.4px; top: 3px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: var(--text); opacity: .5; }
+
+  .pages { position: relative; flex: 1 1 auto; overflow: hidden; }
+
+  .page {
+    position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+    padding: 10px 20px 28px; display: none;
+    scrollbar-width: none;
+  }
+  .page::-webkit-scrollbar { display: none; }
+  .page.is-active { display: block; animation: page-in 220ms var(--ease); }
+  @keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ========== 页头 ========== */
+  .page-head { padding: 6px 0 18px; }
+  .eyebrow {
+    margin: 0 0 6px; font-size: 12px; font-weight: 500; letter-spacing: .04em;
+    color: var(--text-3); text-transform: uppercase;
+  }
+  .h1 { margin: 0; font-size: 27px; line-height: 1.2; font-weight: 640; letter-spacing: -.02em; }
+  .head-sub { margin: 7px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+
+  /* ========== 卡片 ========== */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+    box-shadow: var(--shadow-card); padding: 16px;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  }
+  .card-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .card-title h2 { margin: 0; font-size: 14.5px; font-weight: 600; letter-spacing: -.005em; }
+  .card-title span { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  /* ========== 模块网格 ========== */
+  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .module {
+    position: relative; display: flex; flex-direction: column; gap: 3px;
+    padding: 13px 13px 11px; text-align: left; cursor: pointer;
+    font: inherit; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow-card);
+    transition: transform 120ms var(--ease), border-color var(--dur) var(--ease), background 120ms var(--ease);
+    overflow: hidden;
+  }
+  .module::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--c); opacity: .85;
+  }
+  .module:active { transform: scale(.982); background: var(--surface-2); }
+  .module:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  .module[data-type="toilet"]   { --c: var(--toilet); }
+  .module[data-type="water"]    { --c: var(--water); }
+  .module[data-type="coffee"]   { --c: var(--coffee); }
+  .module[data-type="sport"]    { --c: var(--sport); }
+  .module[data-type="intimacy"] { --c: var(--intimacy); }
+  .module.is-off { opacity: .62; }
+
+  .module-icon {
+    width: 30px; height: 30px; border-radius: 9px; margin-bottom: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--c) 13%, transparent);
+    color: var(--c);
+  }
+  .module-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  .module-name { font-size: 14px; font-weight: 600; letter-spacing: -.005em; }
+  .module-meta { font-size: 11.5px; line-height: 1.35; color: var(--text-3); font-variant-numeric: tabular-nums; padding-right: 24px; }
+
+  .module.is-wide {
+    grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 11px;
+    padding: 12px 37px 12px 13px;
+  }
+  .module.is-wide .module-icon { margin-bottom: 0; }
+  .module.is-wide .module-name { flex: 0 0 auto; }
+  .module.is-wide .module-meta { margin-left: auto; text-align: right; padding-right: 26px; }
+  .module.is-wide .module-plus { top: 50%; margin-top: -12px; }
+  .module.is-wide .module-more { display: none; }
+
+  .module-plus {
+    position: absolute; right: 10px; top: 10px;
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c);
+    transition: transform 140ms var(--ease);
+  }
+  .module-plus svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+  .module:active .module-plus { transform: scale(.86); }
+
+  .module-more {
+    position: absolute; right: 10px; bottom: 9px;
+    font-size: 11px; font-weight: 550; color: var(--text-3);
+    padding: 3px 5px; margin: -3px -5px; border-radius: 6px;
+  }
+  .module-more:hover { color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+
+  /* ========== 时间轴 ========== */
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 0 10px; }
+  .section-head h2 { margin: 0; font-size: 15px; font-weight: 620; letter-spacing: -.005em; }
+  .section-head a { font-size: 12px; color: var(--text-2); text-decoration: none; }
+
+  .timeline { list-style: none; margin: 0; padding: 0; }
+
+  .tl-item {
+    position: relative; display: grid; grid-template-columns: 46px 14px 1fr;
+    align-items: start; gap: 0 10px; padding: 9px 0;
+    cursor: pointer; border-radius: 10px;
+    transition: background 120ms var(--ease);
+  }
+  .tl-item:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+  .tl-item::after {
+    content: ""; position: absolute; left: 62px; top: 27px; bottom: -9px; width: 1.5px;
+    background: var(--border); 
+  }
+  .tl-item:last-child::after { display: none; }
+
+  .tl-time { font-size: 12px; font-weight: 550; color: var(--text-2); font-variant-numeric: tabular-nums; padding-top: 3px; }
+  .tl-dot {
+    width: 9px; height: 9px; border-radius: 50%; margin: 6px 0 0 2px;
+    background: var(--c); box-shadow: 0 0 0 3.5px var(--bg);
+    position: relative; z-index: 1;
+  }
+  .tl-body { min-width: 0; padding-bottom: 2px; }
+  .tl-title { margin: 0; font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; }
+  .tl-sub { margin: 2px 0 0; font-size: 12px; line-height: 1.4; color: var(--text-3); }
+  .tl-item[data-type="toilet"] { --c: var(--toilet); }
+  .tl-item[data-type="water"] { --c: var(--water); }
+  .tl-item[data-type="coffee"] { --c: var(--coffee); }
+  .tl-item[data-type="sport"] { --c: var(--sport); }
+  .tl-item[data-type="intimacy"] { --c: var(--intimacy); }
+
+  .empty-line { margin: 0; padding: 14px 0; font-size: 12.5px; color: var(--text-3); }
+
+  /* ========== 分段控件 ========== */
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px;
+    padding: 3px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+  }
+  .seg button {
+    font: inherit; font-size: 13px; font-weight: 550; color: var(--text-2);
+    background: none; border: 0; border-radius: var(--r-pill);
+    padding: 8px 4px; cursor: pointer; min-height: 34px;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .seg button[aria-selected="true"] { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+
+  /* ========== chips ========== */
+  .chips { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; font: inherit; font-size: 12.5px; font-weight: 520;
+    color: var(--text-2); background: transparent;
+    border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+    padding: 6px 12px; min-height: 32px; cursor: pointer;
+    transition: all var(--dur) var(--ease);
+  }
+  .chip[aria-selected="true"] { background: var(--primary-soft); border-color: transparent; color: var(--on-primary-soft); font-weight: 600; }
+
+  /* ========== 统计 ========== */
+  .hero-number { display: flex; align-items: baseline; gap: 8px; }
+  .hero-number .n { font-size: 44px; line-height: 1; font-weight: 620; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+  .hero-number .u { font-size: 14px; font-weight: 500; color: var(--text-2); }
+  .delta { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+  .delta b { font-weight: 600; color: var(--primary); }
+  .delta.is-down b { color: var(--text-2); }
+
+  .chart { display: flex; align-items: flex-end; gap: 8px; height: 132px; padding-top: 6px; position: relative; }
+  .chart::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 22px; height: 1px;
+    background: var(--border);
+  }
+  .bar-wrap { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 0; height: 100%; justify-content: flex-end; }
+  .bar {
+    width: 100%; max-width: 26px; border-radius: 6px 6px 3px 3px;
+    background: color-mix(in srgb, var(--primary) 36%, transparent);
+    transition: height 320ms var(--ease), background var(--dur) var(--ease);
+    min-height: 3px;
+  }
+  .bar.is-today { background: var(--primary); }
+  .bar-x { margin-top: 7px; font-size: 11px; color: var(--text-3); height: 15px; }
+  .bar-x.is-today { color: var(--text); font-weight: 620; }
+  .bar-val { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-bottom: 3px; height: 13px; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .metric {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 13px;
+    padding: 11px 12px; box-shadow: var(--shadow-card);
+  }
+  .metric dt { margin: 0 0 4px; font-size: 11.5px; color: var(--text-3); }
+  .metric dd { margin: 0; font-size: 18px; font-weight: 620; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+  .insight {
+    display: block;
+    padding: 12px 14px; margin-top: 10px;
+    background: var(--primary-soft); border-radius: 13px;
+    border-left: 3px solid var(--primary);
+  }
+  .insight p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--on-primary-soft); }
+  .insight p + p { margin-top: 3px; opacity: .78; }
+
+  .footnote { margin: 16px 2px 0; font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
+
+  /* ========== 历史 ========== */
+  .day-group { margin-top: 20px; }
+  .day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+  .day-head .d { font-size: 13.5px; font-weight: 620; letter-spacing: -.005em; }
+  .day-head .c { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .row {
+    display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    cursor: pointer;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+  .row-time { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .row-main { min-width: 0; }
+  .row-title { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 550; }
+  .row-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c); flex: 0 0 auto; }
+  .row-sub { margin: 2px 0 0 13px; font-size: 11.5px; color: var(--text-3); }
+  .row svg { width: 16px; height: 16px; stroke: var(--text-3); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .row[data-type="toilet"] { --c: var(--toilet); }
+  .row[data-type="water"] { --c: var(--water); }
+  .row[data-type="coffee"] { --c: var(--coffee); }
+  .row[data-type="sport"] { --c: var(--sport); }
+  .row[data-type="intimacy"] { --c: var(--intimacy); }
+
+  /* 月历 */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 14px; }
+  .cal-head strong { font-size: 14.5px; font-weight: 620; letter-spacing: -.01em; }
+  .cal-nav { display: flex; gap: 4px; }
+  .cal-nav button {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-nav button svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-week span { text-align: center; font-size: 10.5px; color: var(--text-3); padding-bottom: 6px; }
+  .cal-cell {
+    aspect-ratio: 1 / 1.14; border-radius: 9px; border: 1px solid transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; cursor: pointer;
+    transition: background 120ms var(--ease);
+  }
+  .cal-cell:hover { background: var(--surface-2); }
+  .cal-cell.is-empty { cursor: default; opacity: 0; }
+  .cal-cell.is-today { background: var(--primary); color: var(--on-primary); font-weight: 650; }
+  .cal-cell.is-today .cal-dot { background: var(--on-primary); opacity: .85; }
+  .cal-dots { display: flex; gap: 2px; height: 4px; }
+  .cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); }
+  .cal-dot[data-type="water"] { background: var(--water); }
+  .cal-dot[data-type="coffee"] { background: var(--coffee); }
+  .cal-dot[data-type="toilet"] { background: var(--toilet); }
+  .cal-legend { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .cal-legend span { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
+  .cal-legend i { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* ========== 设置 ========== */
+  .group-label { margin: 22px 0 8px 2px; font-size: 11.5px; font-weight: 600; letter-spacing: .05em; color: var(--text-3); }
+  .group-label:first-of-type { margin-top: 6px; }
+
+  .list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; box-shadow: var(--shadow-card); }
+
+  .setting {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 13px 14px; min-height: 54px; text-align: left;
+    font: inherit; color: var(--text); background: none; border: 0; cursor: pointer;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  }
+  .setting:last-child { border-bottom: 0; }
+  .setting:hover { background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+  .setting-icon { width: 20px; height: 20px; color: var(--text-3); flex: 0 0 auto; display: flex; }
+  .setting-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+  .setting-main { flex: 1 1 auto; min-width: 0; }
+  .setting-title { display: block; font-size: 14px; font-weight: 500; letter-spacing: -.005em; }
+  .setting-desc { display: block; margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--text-3); }
+  .setting-value { font-size: 12.5px; color: var(--text-3); flex: 0 0 auto; }
+  .setting-chevron { width: 16px; height: 16px; stroke: var(--text-3); fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+
+  .setting-stack { padding: 13px 14px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+  .setting-stack:last-child { border-bottom: 0; }
+  .setting-stack .setting-title { margin-bottom: 9px; }
+
+  /* ========== 底部导航 ========== */
+  .tabbar {
+    flex: 0 0 auto; height: 68px; padding: 0 8px 6px;
+    display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(14px);
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    height: 100%; border: 0; background: none; cursor: pointer; font: inherit;
+    color: var(--text-3); border-radius: 12px;
+    transition: color var(--dur) var(--ease);
+  }
+  .tab svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tab span { font-size: 10.5px; font-weight: 550; letter-spacing: .01em; }
+  .tab[aria-selected="true"] { color: var(--primary); }
+  .tab[aria-selected="true"] svg { stroke-width: 2; }
+
+  /* ========== 记录面板 ========== */
+  .scrim {
+    position: absolute; inset: 0; background: rgba(8,12,9,.42);
+    opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease); z-index: 20;
+    backdrop-filter: blur(2px);
+  }
+  .scrim.is-open { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 21;
+    background: var(--surface); border-radius: 24px 24px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 10px 20px 24px;
+    transform: translateY(102%); transition: transform 260ms var(--ease);
+    max-height: 78%; overflow-y: auto;
+  }
+  .sheet.is-open { transform: none; }
+  .sheet-handle { width: 34px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 16px; }
+  .sheet h2 { margin: 0 0 3px; font-size: 18px; font-weight: 640; letter-spacing: -.015em; }
+  .sheet-sub { margin: 0 0 16px; font-size: 12.5px; color: var(--text-3); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
+  .field .fake-input {
+    height: 44px; border: 1px solid var(--border-strong); border-radius: 10px;
+    display: flex; align-items: center; padding: 0 13px; font-size: 14px;
+    color: var(--text); background: var(--bg);
+  }
+  .field .fake-input em { font-style: normal; color: var(--text-3); font-size: 12.5px; margin-left: auto; }
+  .sheet-actions { display: flex; gap: 9px; margin-top: 18px; }
+  .btn {
+    flex: 1 1 0; height: 46px; border-radius: var(--r-btn); border: 1px solid var(--border-strong);
+    background: transparent; color: var(--text); font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 120ms var(--ease);
+  }
+  .btn:active { transform: scale(.985); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+
+  /* ========== 右侧说明 ========== */
+  .notes { padding-top: 6px; }
+  .notes-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .notes-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+  .notes h2 { margin: 12px 0 6px; font-size: 22px; font-weight: 640; letter-spacing: -.025em; }
+  .notes > p { margin: 0 0 22px; font-size: 13.5px; line-height: 1.65; color: var(--text-2); max-width: 46ch; }
+
+  .note-list { list-style: none; margin: 0 0 26px; padding: 0; display: grid; gap: 13px; }
+  .note-list li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; }
+  .note-idx {
+    width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums;
+  }
+  .note-list b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .note-list span { font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
+
+  .palette { margin-top: 4px; }
+  .palette h3 { margin: 0 0 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .05em; color: var(--text-3); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+  .swatch { display: flex; align-items: center; gap: 6px; padding: 5px 9px 5px 5px; border: 1px solid var(--border); border-radius: 999px; font-size: 11.5px; color: var(--text-2); }
+  .swatch i { width: 15px; height: 15px; border-radius: 50%; }
+  .swatch code { font-size: 10.5px; color: var(--text-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .device-shell { margin: 0 auto; }
+    .notes { max-width: 560px; margin: 0 auto; }
+  }
+  @media (max-width: 480px) {
+    .stage { padding: 16px; }
+    .device-shell { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+    .device { width: 100%; border-radius: 0; height: calc(100vh - 120px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <header class="topbar">
+    <div class="brand">
+      <strong>LifeTrack</strong>
+      <span>界面重设计 · 方案 A「林间日志」</span>
+    </div>
+
+    <nav class="pager" id="pager" aria-label="页面切换">
+      <button aria-selected="true" data-go="today">今天</button>
+      <button aria-selected="false" data-go="history">历史</button>
+      <button aria-selected="false" data-go="stats">统计</button>
+      <button aria-selected="false" data-go="settings">设置</button>
+    </nav>
+
+    <button class="icon-toggle" id="themeBtn" aria-label="切换深浅色">
+      <svg id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>
+      <span id="themeLabel">浅色</span>
+    </button>
+  </header>
+
+  <div class="layout">
+    <div class="device-shell">
+      <div class="device">
+
+        <div class="statusbar">
+          <span>14:26</span>
+          <span class="status-right" aria-hidden="true">
+            <svg width="17" height="11" viewBox="0 0 17 11" fill="none">
+              <rect x="0" y="7.5" width="3" height="3.5" rx="1" fill="currentColor"/>
+              <rect x="4.6" y="5.2" width="3" height="5.8" rx="1" fill="currentColor"/>
+              <rect x="9.2" y="2.8" width="3" height="8.2" rx="1" fill="currentColor"/>
+              <rect x="13.8" y="0" width="3" height="11" rx="1" fill="currentColor"/>
+            </svg>
+            <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M1.4 4.1a9 9 0 0 1 12.2 0"/><path d="M3.9 6.7a5.4 5.4 0 0 1 7.2 0"/><circle cx="7.5" cy="9.4" r=".9" fill="currentColor" stroke="none"/>
+            </svg>
+            <span class="battery"></span>
+          </span>
+        </div>
+
+        <div class="pages">
+
+          <!-- ================= 今天 ================= -->
+          <section class="page is-active" data-page="today">
+            <div class="page-head">
+              <p class="eyebrow">2026年11月11日 · 周三</p>
+              <h1 class="h1">今天</h1>
+              <p class="head-sub" id="todaySub">已记录 5 次 · 最近一次 12:30</p>
+            </div>
+
+            <div class="module-grid" id="moduleGrid">
+              <button class="module" data-type="toilet" data-quick="1">
+                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V9h-4.5"/></svg></span>
+                <span class="module-name">排便</span>
+                <span class="module-meta" data-count>今日 1 次 · 07:12</span>
+                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="module-more" data-more>详细</span>
+              </button>
+
+              <button class="module" data-type="water" data-quick="1">
+                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M12 3.5c3.6 4.1 6 6.9 6 10a6 6 0 0 1-12 0c0-3.1 2.4-5.9 6-10z"/></svg></span>
+                <span class="module-name">饮水</span>
+                <span class="module-meta" data-count>今日 3 次 · 750 ml</span>
+                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="module-more" data-more>详细</span>
+              </button>
+
+              <button class="module" data-type="coffee" data-quick="0">
+                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M5 8h11v5.5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 9.2h1.6a2.3 2.3 0 0 1 0 4.6H16"/><path d="M5 21.2h12"/></svg></span>
+                <span class="module-name">咖啡 / 茶</span>
+                <span class="module-meta" data-count>今日 1 次 · 250 ml</span>
+                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="module-more" data-more>详细</span>
+              </button>
+
+              <button class="module" data-type="sport" data-quick="0">
+                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M3 12.5h3.4l2.4-6.2 4 12.4 2.3-6.2H21"/></svg></span>
+                <span class="module-name">运动</span>
+                <span class="module-meta" data-count>今日 0 次</span>
+                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="module-more" data-more>详细</span>
+              </button>
+
+              <button class="module is-off is-wide" data-type="intimacy" data-quick="0">
+                <span class="module-icon"><svg viewBox="0 0 24 24"><path d="M12 20.2s-7.2-4.5-7.2-9.4A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.2 3.2c0 4.9-7.2 9.4-7.2 9.4z"/></svg></span>
+                <span class="module-name">亲密关系</span>
+                <span class="module-meta" data-count>已停用 · 在设置中启用</span>
+                <span class="module-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+                <span class="module-more" data-more>详细</span>
+              </button>
+            </div>
+
+            <div class="section-head">
+              <h2>今日记录</h2>
+              <a href="#" data-more>查看历史</a>
+            </div>
+
+            <ol class="timeline" id="timeline">
+              <li class="tl-item" data-type="toilet">
+                <span class="tl-time">07:12</span><span class="tl-dot"></span>
+                <span class="tl-body">
+                  <p class="tl-title">排便</p>
+                  <p class="tl-sub">布里斯托 4 型 · 顺畅</p>
+                </span>
+              </li>
+              <li class="tl-item" data-type="water">
+                <span class="tl-time">08:05</span><span class="tl-dot"></span>
+                <span class="tl-body">
+                  <p class="tl-title">饮水</p>
+                  <p class="tl-sub">250 ml</p>
+                </span>
+              </li>
+              <li class="tl-item" data-type="coffee">
+                <span class="tl-time">09:20</span><span class="tl-dot"></span>
+                <span class="tl-body">
+                  <p class="tl-title">咖啡</p>
+                  <p class="tl-sub">250 ml · 含咖啡因</p>
+                </span>
+              </li>
+              <li class="tl-item" data-type="water">
+                <span class="tl-time">09:40</span><span class="tl-dot"></span>
+                <span class="tl-body">
+                  <p class="tl-title">饮水</p>
+                  <p class="tl-sub">300 ml</p>
+                </span>
+              </li>
+              <li class="tl-item" data-type="water">
+                <span class="tl-time">12:30</span><span class="tl-dot"></span>
+                <span class="tl-body">
+                  <p class="tl-title">饮水</p>
+                  <p class="tl-sub">250 ml</p>
+                </span>
+              </li>
+            </ol>
+          </section>
+
+          <!-- ================= 历史 ================= -->
+          <section class="page" data-page="history">
+            <div class="page-head">
+              <p class="eyebrow">全部记录</p>
+              <h1 class="h1">历史</h1>
+              <p class="head-sub">本月 37 次 · 已连续记录 3 天</p>
+            </div>
+
+            <div class="seg" id="viewSeg" role="tablist" aria-label="视图切换" style="margin-bottom:16px">
+              <button role="tab" aria-selected="true" data-view="list">列表</button>
+              <button role="tab" aria-selected="false" data-view="cal">月历</button>
+            </div>
+
+            <div id="listView">
+              <div class="chips" style="margin-bottom:4px">
+                <button class="chip" aria-selected="true">全部</button>
+                <button class="chip" aria-selected="false">饮水</button>
+                <button class="chip" aria-selected="false">咖啡</button>
+                <button class="chip" aria-selected="false">排便</button>
+              </div>
+
+              <div class="day-group">
+                <div class="day-head"><span class="d">11月11日 · 周三</span><span class="c">5 次</span></div>
+                <div class="row" data-type="toilet">
+                  <span class="row-time">07:12</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>排便</span><span class="row-sub">布里斯托 4 型 · 顺畅</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">08:05</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">250 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="coffee">
+                  <span class="row-time">09:20</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>咖啡</span><span class="row-sub">250 ml · 含咖啡因</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">09:40</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">300 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">12:30</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">250 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+
+              <div class="day-group">
+                <div class="day-head"><span class="d">11月10日 · 周二</span><span class="c">4 次</span></div>
+                <div class="row" data-type="toilet">
+                  <span class="row-time">07:40</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>排便</span><span class="row-sub">布里斯托 3 型</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">08:15</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">300 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="coffee">
+                  <span class="row-time">10:05</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>咖啡</span><span class="row-sub">300 ml · 含咖啡因</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">15:20</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">250 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+
+              <div class="day-group">
+                <div class="day-head"><span class="d">11月9日 · 周一</span><span class="c">3 次</span></div>
+                <div class="row" data-type="water">
+                  <span class="row-time">08:02</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">250 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="water">
+                  <span class="row-time">13:15</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>饮水</span><span class="row-sub">300 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="row" data-type="coffee">
+                  <span class="row-time">16:40</span>
+                  <span class="row-main"><span class="row-title"><i class="row-dot"></i>咖啡</span><span class="row-sub">250 ml</span></span>
+                  <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+            </div>
+
+            <div id="calView" hidden>
+              <div class="cal-head">
+                <strong>2026 年 11 月</strong>
+                <div class="cal-nav">
+                  <button aria-label="上个月"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button>
+                  <button aria-label="下个月"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+                </div>
+              </div>
+              <div class="cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+              <div class="cal-grid" id="calGrid"></div>
+              <div class="cal-legend">
+                <span><i style="background:var(--water)"></i>饮水</span>
+                <span><i style="background:var(--coffee)"></i>咖啡</span>
+                <span><i style="background:var(--toilet)"></i>排便</span>
+                <span style="margin-left:auto">灰色为其它记录</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================= 统计 ================= -->
+          <section class="page" data-page="stats">
+            <div class="page-head">
+              <p class="eyebrow">2026年11月9日 – 11月15日</p>
+              <h1 class="h1">统计</h1>
+            </div>
+
+            <div class="seg" id="periodSeg" role="tablist" aria-label="周期">
+              <button role="tab" aria-selected="true" data-period="week">周</button>
+              <button role="tab" aria-selected="false" data-period="month">月</button>
+              <button role="tab" aria-selected="false" data-period="year">年</button>
+            </div>
+
+            <div class="chips" id="typeChips" style="margin-top:12px">
+              <button class="chip" aria-selected="true" data-scope="all">全部</button>
+              <button class="chip" aria-selected="false" data-scope="water">饮水</button>
+              <button class="chip" aria-selected="false" data-scope="coffee">咖啡</button>
+              <button class="chip" aria-selected="false" data-scope="toilet">排便</button>
+              <button class="chip" aria-selected="false" data-scope="sport">运动</button>
+            </div>
+
+            <div style="margin-top:18px">
+              <div class="hero-number">
+                <span class="n" id="statTotal">12</span>
+                <span class="u">次</span>
+              </div>
+              <p class="delta" id="statDelta">比上周多 <b>3</b> 次</p>
+            </div>
+
+            <div class="card" style="margin-top:16px">
+              <div class="card-title">
+                <h2>每日次数</h2>
+                <span id="chartHint">高亮为今天</span>
+              </div>
+              <div class="chart" id="chart"></div>
+            </div>
+
+            <dl class="metric-grid" style="margin:10px 0 0">
+              <div class="metric"><dt>日均</dt><dd id="mAvg">1.7 次</dd></div>
+              <div class="metric"><dt>单日最高</dt><dd id="mMax">5 次</dd></div>
+              <div class="metric"><dt>最长连续</dt><dd id="mStreak">3 天</dd></div>
+              <div class="metric"><dt>常见时段</dt><dd id="mPeak" style="font-size:16px">07:00–09:00</dd></div>
+            </dl>
+
+            <div class="insight">
+              <p id="insightMain">本周共 12 次，比上周多 3 次。</p>
+              <p id="insightSub">记录集中在 07:00–09:00，早晨是你的固定时段。</p>
+            </div>
+
+            <p class="footnote">统计仅基于已保存的记录，不构成医疗诊断。</p>
+          </section>
+
+          <!-- ================= 设置 ================= -->
+          <section class="page" data-page="settings">
+            <div class="page-head">
+              <p class="eyebrow">版本 0.6.1</p>
+              <h1 class="h1">设置</h1>
+            </div>
+
+            <p class="group-label">记录</p>
+            <div class="list">
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
+                <span class="setting-main"><span class="setting-title">记录项目</span><span class="setting-desc">3 个已启用 · 可调整顺序</span></span>
+                <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M13 3 5 13.5h5.5L10 21l8-10.5h-5.5z"/></svg></span>
+                <span class="setting-main"><span class="setting-title">快速打卡</span><span class="setting-desc">点按模块卡立即保存当前时间</span></span>
+                <span class="setting-value">已开启</span>
+              </button>
+            </div>
+
+            <p class="group-label">数据</p>
+            <div class="list">
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M12 15V3M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
+                <span class="setting-main"><span class="setting-title">导出备份</span><span class="setting-desc">加密容器 · 需要口令</span></span>
+                <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
+                <span class="setting-main"><span class="setting-title">恢复备份</span><span class="setting-desc">整体替换当前数据</span></span>
+                <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><circle cx="8.5" cy="12" r="4.5"/><path d="M12.8 12H21M18 12v3M15.5 12v2.2"/></svg></span>
+                <span class="setting-main"><span class="setting-title">更换备份口令</span></span>
+                <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+            </div>
+
+            <p class="group-label">安全</p>
+            <div class="list">
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/></svg></span>
+                <span class="setting-main"><span class="setting-title">应用锁</span><span class="setting-desc">离开 1 分钟后重新验证</span></span>
+                <span class="setting-value">已关闭</span>
+              </button>
+            </div>
+
+            <p class="group-label">外观</p>
+            <div class="list">
+              <div class="setting-stack">
+                <div class="setting-title" style="font-size:14px;font-weight:500">主题</div>
+                <div class="seg" id="themeSeg" role="tablist" aria-label="主题">
+                  <button role="tab" aria-selected="true" data-theme-set="light">浅色</button>
+                  <button role="tab" aria-selected="false" data-theme-set="dark">深色</button>
+                  <button role="tab" aria-selected="false" data-theme-set="system">跟随系统</button>
+                </div>
+              </div>
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M5 6.5h14M5 12h9M5 17.5h11"/></svg></span>
+                <span class="setting-main"><span class="setting-title">文字大小</span></span>
+                <span class="setting-value">跟随系统</span>
+              </button>
+            </div>
+
+            <p class="group-label">关于</p>
+            <div class="list">
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/></svg></span>
+                <span class="setting-main"><span class="setting-title">检查更新</span></span>
+                <span class="setting-value">0.6.1</span>
+              </button>
+              <button class="setting">
+                <span class="setting-icon"><svg viewBox="0 0 24 24"><path d="M5 4.5h9.5L19 9v10.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1z"/><path d="M14 4.5V9h4.5"/></svg></span>
+                <span class="setting-main"><span class="setting-title">开源许可</span></span>
+                <svg class="setting-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+            </div>
+
+            <p class="footnote" style="text-align:center;margin-top:22px">数据只保存在本机 · 不联网不同步</p>
+          </section>
+
+        </div>
+
+        <div class="scrim" id="scrim"></div>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+          <div class="sheet-handle"></div>
+          <h2 id="sheetTitle">记录饮水</h2>
+          <p class="sheet-sub" id="sheetSub">默认 250 ml，可修改后保存</p>
+          <div id="sheetFields">
+            <div class="field">
+              <label>时间</label>
+              <div class="fake-input">今天 14:26 <em>修改</em></div>
+            </div>
+            <div class="field">
+              <label id="fieldLabel">份量</label>
+              <div class="fake-input" id="fieldValue">250 ml <em>选择</em></div>
+            </div>
+          </div>
+          <div class="sheet-actions">
+            <button class="btn" id="sheetCancel">取消</button>
+            <button class="btn primary" id="sheetSave">保存</button>
+          </div>
+        </div>
+
+        <nav class="tabbar" id="tabbar" aria-label="主导航">
+          <button class="tab" aria-selected="true" data-go="today">
+            <svg viewBox="0 0 24 24"><path d="M4 10.6 12 4l8 6.6V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>
+            <span>今天</span>
+          </button>
+          <button class="tab" aria-selected="false" data-go="history">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+            <span>历史</span>
+          </button>
+          <button class="tab" aria-selected="false" data-go="stats">
+            <svg viewBox="0 0 24 24"><path d="M4.5 20V11M12 20V4.5M19.5 20v-6"/></svg>
+            <span>统计</span>
+          </button>
+          <button class="tab" aria-selected="false" data-go="settings">
+            <svg viewBox="0 0 24 24"><path d="M4 8h9M17.5 8H20M4 16h3.5M12 16h8"/><circle cx="15" cy="8" r="2.2"/><circle cx="9.5" cy="16" r="2.2"/></svg>
+            <span>设置</span>
+          </button>
+        </nav>
+
+      </div>
+    </div>
+
+    <aside class="notes" id="notes"></aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var NOTES = {
+    today: {
+      tag: "01 / 今天",
+      title: "从「按钮列表」到「打卡台」",
+      intro: "首页是最高频页面，一天要打开五到十次。现在它排了五个等宽按钮，常用与低频一样重。新结构把计数与操作合并到同一张卡片上。",
+      items: [
+        ["主次分明", "每个模块一张卡，整卡可点即记录。排便与饮水一键 +1，咖啡、运动、亲密关系直接进编辑器（它们没有合理默认值）。"],
+        ["计数即入口", "卡片直接显示「今日 3 次 · 750 ml」，不用滚到别处确认，也不必先点开再决定。"],
+        ["时间轴取代卡片堆", "记录按时间竖排，省掉每张卡的内边距，一屏能多看两条；色点让类型一眼可辨。"],
+        ["模块识别色", "五个模块各有一个低饱和色，只用在图标底、色点和 3dp 竖条上，不抢文字。"]
+      ]
+    },
+    history: {
+      tag: "02 / 历史",
+      title: "按天分组，先看总量再看细节",
+      intro: "「记录」这个名字和「今天」语义重叠，改叫「历史」。列表与月历不是两套界面，而是同一份数据的两种密度。",
+      items: [
+        ["日期头带计数", "「11月11日 · 周三　5 次」——先回答「那天记了多少」，再往下才是条目。"],
+        ["行内三要素", "时间、类型、摘要一行读完。去掉了卡片边框，靠分隔线和留白分组。"],
+        ["月历用色点编码", "每天最多三个色点表示类型构成，不用数字堆叠；今天用实心主色块，与列表选中态同源。"],
+        ["筛选常驻", "类型 chips 固定在列表顶部，切换不用进出页面。"]
+      ]
+    },
+    stats: {
+      tag: "03 / 统计",
+      title: "结论先于图表",
+      intro: "统计页原本就是四个页签里最完整的，这次不动结构，只统一 token 并强化「先给结论」的顺序。",
+      items: [
+        ["数字—图表—指标—结论", "44sp 总量打头，柱图解释分布，四宫格补充维度，最后一句人话总结。视线自上而下不折返。"],
+        ["类型筛选联动全部数字", "切到「饮水」时总量、日均、柱图、结论一起变，不会出现标题写饮水、图表还是全部的错位。"],
+        ["柱图去装饰", "只保留一条基线与今天的高亮，非今天用 30% 主色，避免七根柱子互相争注意力。"],
+        ["空状态明确", "没有数据的类型显示「本周没有记录」，而不是七根贴地的柱子。"]
+      ]
+    },
+    settings: {
+      tag: "04 / 设置",
+      title: "分组、行、分隔线，一套骨架到底",
+      intro: "设置页已经有正确的分组逻辑，问题在视觉：每张卡各写一套内边距。这次统一成「组标题 + 列表 + 行」三层结构。",
+      items: [
+        ["五段分组", "记录 / 数据 / 安全 / 外观 / 关于。安全从「数据」里独立出来，符合用户找锁的心理路径。"],
+        ["行高与缩进固定", "54dp 行高、20dp 图标、文字左对齐同一条轴线，分隔线从文字起始处缩进。扫读时不需要重新定位。"],
+        ["主题三选一", "浅色 / 深色 / 跟随系统做成内嵌分段控件，改完立即生效——这个原型里就能点。"],
+        ["危险与状态用文字", "「已开启」「已关闭」直接写在行尾，不靠颜色单独表意，色弱用户同样可读。"]
+      ]
+    }
+  };
+
+  var SWATCHES = [
+    ["主色", "var(--primary)", "#33604A"],
+    ["排便", "var(--toilet)", "#8A6A4B"],
+    ["饮水", "var(--water)", "#3D7391"],
+    ["咖啡", "var(--coffee)", "#9A7134"],
+    ["运动", "var(--sport)", "#4C7A57"],
+    ["亲密", "var(--intimacy)", "#8A5F72"]
+  ];
+
+  var STATS = {
+    all:     { total: 12, avg: "1.7 次", max: "5 次", streak: "3 天", peak: "07:00–09:00", bars: [3, 4, 5, 0, 0, 0, 0], delta: "比上周多 <b>3</b> 次", main: "本周共 12 次，比上周多 3 次。", sub: "记录集中在 07:00–09:00，早晨是你的固定时段。" },
+    water:   { total: 7,  avg: "1.0 次", max: "3 次", streak: "3 天", peak: "07:00–09:00", bars: [2, 2, 3, 0, 0, 0, 0], delta: "比上周多 <b>1</b> 次", main: "本周饮水 7 次，日均 1.0 次。", sub: "上午 07:00–09:00 最密集，下午偏少。" },
+    coffee:  { total: 3,  avg: "0.4 次", max: "1 次", streak: "3 天", peak: "08:00–10:00", bars: [1, 1, 1, 0, 0, 0, 0], delta: "与上周持平", main: "本周咖啡 3 次，每天不超过 1 杯。", sub: "集中在 08:00–10:00，没有下午摄入。" },
+    toilet:  { total: 2,  avg: "0.3 次", max: "1 次", streak: "2 天", peak: "06:00–08:00", bars: [0, 1, 1, 0, 0, 0, 0], delta: "比上周少 <b>1</b> 次", main: "本周排便 2 次，比上周少 1 次。", sub: "都发生在早晨 06:00–08:00。" },
+    sport:   { total: 0,  avg: "0.0 次", max: "0 次", streak: "0 天", peak: "—",           bars: [0, 0, 0, 0, 0, 0, 0], delta: "本周还没有记录", main: "本周没有运动记录。", sub: "上次记录在 11 月 2 日，已间隔 9 天。" }
+  };
+
+  var DAYS = ["一", "二", "三", "四", "五", "六", "日"];
+  var TODAY_INDEX = 2;
+
+  var state = { scope: "all", page: "today", theme: "light" };
+
+  /* ---------- 页面切换 ---------- */
+  function go(page) {
+    state.page = page;
+    document.querySelectorAll(".page").forEach(function (el) {
+      el.classList.toggle("is-active", el.dataset.page === page);
+    });
+    document.querySelectorAll(".tab").forEach(function (btn) {
+      btn.setAttribute("aria-selected", btn.dataset.go === page ? "true" : "false");
+    });
+    document.querySelectorAll("#pager button").forEach(function (btn) {
+      btn.setAttribute("aria-selected", btn.dataset.go === page ? "true" : "false");
+    });
+    try { history.replaceState(null, "", "#" + page); } catch (err) { /* file:// 某些实现禁止改写，忽略 */ }
+    renderNotes(page);
+  }
+
+  document.addEventListener("click", function (e) {
+    var nav = e.target.closest("[data-go]");
+    if (nav) { e.preventDefault(); go(nav.dataset.go); }
+  });
+
+  /* ---------- 右侧说明 ---------- */
+  function renderNotes(page) {
+    var n = NOTES[page];
+    var html = '<span class="notes-tag">' + n.tag + "</span>";
+    html += "<h2>" + n.title + "</h2><p>" + n.intro + "</p>";
+    html += '<ul class="note-list">';
+    n.items.forEach(function (it, i) {
+      html += '<li><span class="note-idx">' + (i + 1) + '</span><div><b>' + it[0] + "</b><span>" + it[1] + "</span></div></li>";
+    });
+    html += "</ul>";
+    html += '<div class="palette"><h3>模块识别色</h3><div class="swatches">';
+    SWATCHES.forEach(function (s) {
+      html += '<span class="swatch"><i style="background:' + s[1] + '"></i>' + s[0] + " <code>" + s[2] + "</code></span>";
+    });
+    html += "</div></div>";
+    document.getElementById("notes").innerHTML = html;
+  }
+
+  /* ---------- 深浅色 ---------- */
+  function setTheme(theme, fromSeg) {
+    state.theme = theme;
+    var resolved = theme;
+    if (theme === "system") {
+      resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.setAttribute("data-theme", resolved);
+
+    document.getElementById("themeLabel").textContent =
+      theme === "system" ? "跟随系统" : (resolved === "dark" ? "深色" : "浅色");
+    document.getElementById("themeIcon").innerHTML = resolved === "dark"
+      ? '<path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2z"/>'
+      : '<circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>';
+
+    if (!fromSeg) {
+      document.querySelectorAll("#themeSeg button").forEach(function (b) {
+        b.setAttribute("aria-selected", b.dataset.themeSet === theme ? "true" : "false");
+      });
+    }
+  }
+
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    setTheme(next, false);
+  });
+
+  document.querySelectorAll("#themeSeg button").forEach(function (btn) {
+    btn.addEventListener("click", function () { setTheme(btn.dataset.themeSet, false); });
+  });
+
+  /* ---------- 统计 ---------- */
+  function renderChart(bars) {
+    var max = Math.max.apply(null, bars.concat([1]));
+    var html = "";
+    bars.forEach(function (v, i) {
+      var h = v === 0 ? 3 : Math.round((v / max) * 96) + 8;
+      var today = i === TODAY_INDEX;
+      html += '<div class="bar-wrap">';
+      html += '<span class="bar-val">' + (v > 0 ? v : "") + "</span>";
+      html += '<div class="bar' + (today && v > 0 ? " is-today" : "") + '" style="height:' + h + 'px"></div>';
+      html += '<span class="bar-x' + (today ? " is-today" : "") + '">' + DAYS[i] + "</span>";
+      html += "</div>";
+    });
+    document.getElementById("chart").innerHTML = html;
+  }
+
+  function renderStats(scope) {
+    var d = STATS[scope];
+    state.scope = scope;
+    document.getElementById("statTotal").textContent = d.total;
+    document.getElementById("statDelta").innerHTML = d.delta;
+    document.getElementById("statDelta").classList.toggle("is-down", scope === "toilet" || scope === "sport");
+    document.getElementById("mAvg").textContent = d.avg;
+    document.getElementById("mMax").textContent = d.max;
+    document.getElementById("mStreak").textContent = d.streak;
+    document.getElementById("mPeak").textContent = d.peak;
+    document.getElementById("insightMain").textContent = d.main;
+    document.getElementById("insightSub").textContent = d.sub;
+    document.getElementById("chartHint").textContent = d.total === 0 ? "本周无记录" : "高亮为今天";
+    renderChart(d.bars);
+
+    document.querySelectorAll("#typeChips .chip").forEach(function (c) {
+      c.setAttribute("aria-selected", c.dataset.scope === scope ? "true" : "false");
+    });
+  }
+
+  document.querySelectorAll("#typeChips .chip").forEach(function (chip) {
+    chip.addEventListener("click", function () { renderStats(chip.dataset.scope); });
+  });
+
+  document.querySelectorAll("#periodSeg button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll("#periodSeg button").forEach(function (b) {
+        b.setAttribute("aria-selected", "false");
+      });
+      btn.setAttribute("aria-selected", "true");
+      document.getElementById("chartHint").textContent =
+        btn.dataset.period === "week" ? "高亮为今天" : "演示数据仅覆盖本周";
+    });
+  });
+
+  /* ---------- 历史：列表 / 月历 ---------- */
+  document.querySelectorAll("#viewSeg button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll("#viewSeg button").forEach(function (b) {
+        b.setAttribute("aria-selected", "false");
+      });
+      btn.setAttribute("aria-selected", "true");
+      var cal = btn.dataset.view === "cal";
+      document.getElementById("listView").hidden = cal;
+      document.getElementById("calView").hidden = !cal;
+    });
+  });
+
+  document.querySelectorAll(".chips .chip").forEach(function (chip) {
+    if (chip.closest("#typeChips")) return;
+    chip.addEventListener("click", function () {
+      chip.parentElement.querySelectorAll(".chip").forEach(function (c) {
+        c.setAttribute("aria-selected", "false");
+      });
+      chip.setAttribute("aria-selected", "true");
+    });
+  });
+
+  /* ---------- 月历 ---------- */
+  var MONTH = { firstWeekday: 6, days: 30, counts: [3,4,2,5,3,1,4,3,3,4,5] };
+  function renderCalendar() {
+    var html = "";
+    for (var i = 0; i < MONTH.firstWeekday; i++) html += '<div class="cal-cell is-empty"></div>';
+    for (var d = 1; d <= MONTH.days; d++) {
+      var n = MONTH.counts[d - 1] || 0;
+      var isToday = d === 11;
+      var dots = "";
+      if (n > 0) {
+        var total = Math.min(n, 3);
+        for (var k = 0; k < total; k++) {
+          var t = k === 0 ? "water" : (k === 1 ? "coffee" : "toilet");
+          dots += '<i class="cal-dot" data-type="' + t + '"></i>';
+        }
+      }
+      html += '<div class="cal-cell' + (isToday ? " is-today" : "") + '" title="' + (n ? n + " 次" : "无记录") + '">'
+        + '<span>' + d + '</span><span class="cal-dots">' + dots + "</span></div>";
+    }
+    document.getElementById("calGrid").innerHTML = html;
+  }
+
+  /* ---------- 记录面板 ---------- */
+  var SHEET_META = {
+    water:    { title: "记录饮水", sub: "默认 250 ml，保存后计入今日", label: "份量", value: "250 ml" },
+    coffee:   { title: "记录咖啡 / 茶", sub: "选择饮品与份量", label: "饮品", value: "咖啡 · 250 ml" },
+    toilet:   { title: "记录排便", sub: "可补充形态与感受", label: "形态", value: "布里斯托 4 型" },
+    sport:    { title: "记录运动", sub: "时长与强度为必填", label: "时长", value: "30 分钟" },
+    intimacy: { title: "记录亲密关系", sub: "三项字段均可不填", label: "保护", value: "仅本机可见" }
+  };
+
+  var sheet = document.getElementById("sheet");
+  var scrim = document.getElementById("scrim");
+  var pendingType = null;
+
+  function openSheet(type) {
+    var mod = moduleByType(type);
+    var disabled = mod && mod.classList.contains("is-off");
+    pendingType = type;
+
+    if (disabled) {
+      document.getElementById("sheetTitle").textContent = "这个模块已停用";
+      document.getElementById("sheetSub").textContent = "在「设置 → 记录项目」中启用后即可记录，已有历史记录不受影响。";
+      document.getElementById("sheetFields").hidden = true;
+      document.getElementById("sheetSave").textContent = "去设置";
+      document.getElementById("sheetSave").dataset.action = "settings";
+    } else {
+      var m = SHEET_META[type] || SHEET_META.water;
+      document.getElementById("sheetTitle").textContent = m.title;
+      document.getElementById("sheetSub").textContent = m.sub;
+      document.getElementById("fieldLabel").textContent = m.label;
+      document.getElementById("fieldValue").innerHTML = m.value + " <em>选择</em>";
+      document.getElementById("sheetFields").hidden = false;
+      document.getElementById("sheetSave").textContent = "保存";
+      document.getElementById("sheetSave").dataset.action = "save";
+    }
+
+    sheet.classList.add("is-open");
+    scrim.classList.add("is-open");
+  }
+
+  function closeSheet() {
+    sheet.classList.remove("is-open");
+    scrim.classList.remove("is-open");
+    pendingType = null;
+  }
+
+  document.getElementById("sheetCancel").addEventListener("click", closeSheet);
+  scrim.addEventListener("click", closeSheet);
+  document.getElementById("sheetSave").addEventListener("click", function () {
+    var action = this.dataset.action;
+    if (action === "settings") {
+      closeSheet();
+      go("settings");
+      return;
+    }
+    if (pendingType) addRecord(pendingType, true);
+    closeSheet();
+  });
+
+  /* ---------- 首页：记录与计数 ---------- */
+  var todayCounts = { toilet: 1, water: 3, coffee: 1, sport: 0, intimacy: 0 };
+  var todayVolumes = { water: 750, coffee: 250 };
+  var totalCount = 5;
+  var lastTime = "12:30";
+
+  var TYPE_NAME = { toilet: "排便", water: "饮水", coffee: "咖啡", sport: "运动", intimacy: "亲密关系" };
+  var TYPE_DETAIL = {
+    toilet: "布里斯托 4 型 · 顺畅",
+    water: "250 ml",
+    coffee: "250 ml · 含咖啡因",
+    sport: "30 分钟 · 中等强度",
+    intimacy: "已记录"
+  };
+
+  function nowLabel() { return "14:26"; }
+
+  function moduleByType(type) {
+    return document.querySelector('.module[data-type="' + type + '"]');
+  }
+
+  function refreshModuleMeta() {
+    Object.keys(todayCounts).forEach(function (type) {
+      var el = moduleByType(type);
+      if (!el) return;
+      var meta = el.querySelector("[data-count]");
+      if (type === "intimacy") { meta.textContent = "已停用 · 在设置中启用"; return; }
+      var n = todayCounts[type];
+      if (type === "water") {
+        meta.textContent = n === 0 ? "今日 0 次" : "今日 " + n + " 次 · " + todayVolumes.water + " ml";
+      } else if (type === "coffee") {
+        meta.textContent = n === 0 ? "今日 0 次" : "今日 " + n + " 次 · " + todayVolumes.coffee + " ml";
+      } else {
+        meta.textContent = n === 0 ? "今日 0 次" : "今日 " + n + " 次";
+      }
+    });
+
+    var sub = "已记录 " + totalCount + " 次";
+    sub += totalCount > 0 ? " · 最近一次 " + lastTime : "";
+    document.getElementById("todaySub").textContent = sub;
+  }
+
+  function prependTimeline(type, time) {
+    var list = document.getElementById("timeline");
+    var li = document.createElement("li");
+    li.className = "tl-item";
+    li.dataset.type = type;
+    li.innerHTML =
+      '<span class="tl-time">' + time + '</span><span class="tl-dot"></span>' +
+      '<span class="tl-body"><p class="tl-title">' + TYPE_NAME[type] + '</p>' +
+      '<p class="tl-sub">' + TYPE_DETAIL[type] + "</p></span>";
+    list.insertBefore(li, list.firstChild);
+  }
+
+  function addRecord(type, fromSheet) {
+    if (type === "intimacy") return;
+    var time = nowLabel();
+    todayCounts[type] = (todayCounts[type] || 0) + 1;
+    totalCount += 1;
+    lastTime = time;
+    if (type === "water") todayVolumes.water += 250;
+    if (type === "coffee") todayVolumes.coffee += 250;
+    refreshModuleMeta();
+    prependTimeline(type, time);
+
+    var el = moduleByType(type);
+    if (el) {
+      el.animate(
+        [{ transform: "scale(.982)" }, { transform: "scale(1)" }],
+        { duration: 220, easing: "cubic-bezier(.2,.7,.3,1)" }
+      );
+    }
+  }
+
+  document.querySelectorAll(".module").forEach(function (mod) {
+    mod.addEventListener("click", function (e) {
+      var type = mod.dataset.type;
+      if (e.target.closest("[data-more]")) {
+        e.preventDefault();
+        e.stopPropagation();
+        openSheet(type);
+        return;
+      }
+      if (mod.classList.contains("is-off")) { openSheet(type); return; }
+      if (mod.dataset.quick === "1") {
+        addRecord(type, false);
+      } else {
+        openSheet(type);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-more]").forEach(function (el) {
+    if (el.closest(".module")) return;
+    el.addEventListener("click", function (e) {
+      e.preventDefault();
+      go("history");
+    });
+  });
+
+  /* ---------- 初始化 ---------- */
+  renderNotes("today");
+  renderStats("all");
+  renderCalendar();
+  refreshModuleMeta();
+
+  var initial = (location.hash || "").replace("#", "");
+  if (NOTES[initial] && initial !== "today") go(initial);
+
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) {
+    mq.addEventListener("change", function () {
+      if (state.theme === "system") setTheme("system", true);
+    });
+  }
+})();
+</script>
+</body>
+</html>

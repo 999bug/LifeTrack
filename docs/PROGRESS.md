@@ -9,7 +9,7 @@
 
 | 状态 | 任务 | 进度 | 下一步 |
 | --- | --- | --- | --- |
-| 🔄 进行中 | 性能优化（包体 / 启动 / 架构） | P0 包体（22 MB → 5.57 MB）、P1 线程调度、P2 数据库异步打开已完成并实测；P3 的设置页已拆出主卡与「更多」分区，备份流程与 MainViewModel 的拆分待做 | 继续 P3（拆 MainViewModel） |
+| 🔄 进行中 | 性能优化（包体 / 启动 / 架构） | P0 包体（22 MB → 5.57 MB）、P1 线程调度、P2 数据库异步打开、P3 的设置页两段拆分与统计流提取均已完成并实测 | 剩余两项需单独一轮：备份流程抽 `BackupController`、按屏拆 ViewModel（需先引入共享日期源） |
 | 🔄 进行中 | A 模块扩展包 | A1–A8、A10、A11、A12 已完成并验收（五类记录全闭环、统计类型筛选、字段校验收口）；A10 按 L1 隐私收敛落地，**已合入 `main` 但尚未发版**（0.6.0 不含）；仅 A9 月经按用户指示保留后置 | A10 随下一次发版进入 Release；A9 待后续指示 |
 | ✅ 已完成 | 应用内检查更新（另一会话） | `33ef32d`：GitHub Releases 版本检查、APK 下载与安装、设置页 UpdateCard、自动检查一次 | — |
 | ✅ 已完成 | 并发合并收尾 | 双方改动全部进入 HEAD，`testDebugUnitTest` 90 项 + `assembleDebug` 全绿；A6 代码无需再补提交 | — |
@@ -76,6 +76,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | 运行时：统计聚合移出主线程 | 2026-11-11 | `MainViewModel.statistics` 在 `stateIn` 前加 `flowOn(Dispatchers.Default)`：原先 4 个周期的 `StatsAggregator.build` 跑在 `stateIn` 的收集上下文，也就是 `viewModelScope` 默认的 Main，每写一条记录 Room 重发一次就重算一遍，数据攒到几千条会在主线程掉帧。`HistoryScreen` 的 `groupBy{}.toSortedMap()` 原在 composable 函数体内、未 remember，每次重组都重建 Map，改为 `remember(records)`。验证：`testDebugUnitTest` + `assembleDebug` 全绿；模拟器上今天页 5 次 / 4 个模块卡、历史页「共 5 条」、统计页共记录 5 次 / 日均 0.7 / 单日最高 5 / 时段 02:00–04:00，三页口径一致 | 未做 Macrobenchmark 或帧率实测，「主线程不再计算」是代码层结论；flowOn 只影响调度，未改变聚合结果（三页数字一致已佐证） |
 | 启动：数据库打开移出主线程 | 2026-11-11 | `AppContainer.databaseState` 从同步 `val`（构造期就 `openDatabase()`）改为 `StateFlow`，新增 `Loading` 态；打开流程放进 Application 级的 `CoroutineScope(SupervisorJob() + Dispatchers.IO)`，覆盖 `System.loadLibrary`、Keystore 解封口令、`migrateIfNeeded` 整库复制三件阻塞操作。`openDatabase` 去掉 `runBlocking` 改为 `suspend`；意料外异常兜底成 `Unavailable(KEYSTORE_ERROR)`，避免界面永久停在 Loading。`LifeTrackApplication.onCreate` 只创建容器后立即返回，默认类型补齐与明文备份清理改到 Ready 之后、同一协程内串行执行（DAO 抛异常时不清理备份，保留原语义）。`MainActivity` 增加 Loading 分支并新增 `DatabaseLoadingScreen`，`FLAG_SECURE` 的收集随 Ready 一起进入组合（类型表要等数据库就绪才能读）。实测 release 包：进程启动 → `database ready` 724 ms → 首帧 1.26 s，数据库打开与 Compose 组合已并行，不再累加；旋转触发 Activity 重建后没有新的 `database ready` 日志，数据完整 | 未做改动前后 A/B 对照（旧实现已被覆盖），「首帧提前约 0.7 s」是按并行关系推算；升级迁移慢路径（整库复制）未在本机复现，Loading 页在该场景的实际停留时长未验；debug 包首帧仍 3.5 s，与本次改动无关（28 MB 未压缩 dex） |
 | 架构：设置页拆出主卡与「更多」分区 | 2026-11-11 | `SettingsScreen` 的约 1000 行函数抽出 `PrimarySection`（记录项目 / 外观，4 个参数）与 `MoreSection`（更新日志 / 开源许可 / 数据与隐私，5 个参数）。**只搬运渲染代码与回调**，展开态与弹窗可见性仍留在 `SettingsScreen`——它们和安全区、「数据与备份」的 30 多个 state、4 套 launcher（导出 / 恢复 / 换口令 / 选取文件）共用同一个重组作用域，改状态提升方向的风险高于收益。验证：`compileDebugKotlin` / `assembleDebug` 通过；模拟器复验主卡文案（已启用 4/5）、外观弹层三档、数据与隐私展开、更新日志 6 条、开源许可全文 | 安全区与「数据与备份」未拆：后者应整体抽成 `BackupController`（state holder）而不是继续在 composable 间传参，属独立一轮重构；本次未做重组次数或帧率量化 |
+| 架构：统计数据流提取为纯函数 | 2026-11-11 | MainViewModel 里 40 行的统计流水线（四周期窗口解析 + 三路查询合并 + `StatsAggregator` 聚合）提成 `feature/statistics/StatisticsStream.kt` 的 `observeStatistics(repository, today, offsets, typeFilter)`；`emptyStatistics` 一并移出并显式接收 `today`，避免流构建处再取一次系统时间。**纯提取、不改状态归属**：调度（`flowOn`）与 `stateIn` 仍由 ViewModel 决定。完整拆出 `StatisticsViewModel` 需要先引入 `TodayProvider` 这类共享日期源——`todayDate` 同时驱动首页、历史、月历与统计，各自维护会跨天不一致。验证：`testDebugUnitTest` + `assembleDebug` 通过；统计页与提取前逐项一致（共记录 5 次、日均 0.7、单日最高 5、最长连续 1 天） | 未新增单测覆盖 `observeStatistics`（纯搬移，无新逻辑）；MainViewModel 仍是 400 行量级，按屏拆分与备份流程重构留待独立一轮 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

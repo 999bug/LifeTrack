@@ -17,6 +17,9 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["typeCode", "localDate"]),
+        // 历史页「全部类型」、月历与统计的范围查询只带 localDate，复合索引的前导列
+        // typeCode 为 null 时用不上，只能全表扫描；补一条单列索引让 range 走索引。
+        Index(value = ["localDate"]),
         Index(value = ["occurredAtEpochMillis"])
     ]
 )

@@ -25,3 +25,20 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
     }
 }
+
+/**
+ * v2 → v3：给 `track_event` 补 `localDate` 单列索引。
+ *
+ * 历史页「全部类型」、月历与统计的范围条件只带 `localDate`；复合索引
+ * `(typeCode, localDate)` 在 `typeCode` 为 null 时前导列缺失，用不了 range 扫描，
+ * 只能全表扫描并按 `occurredAtEpochMillis` 排序。只加索引，不动表结构与数据；
+ * 索引名必须与 `3.json` 里的 `index_track_event_localDate` 一致。
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_track_event_localDate` " +
+                "ON `track_event` (`localDate`)"
+        )
+    }
+}

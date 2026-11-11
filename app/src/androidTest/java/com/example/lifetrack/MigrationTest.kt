@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.lifetrack.core.database.AppDatabase
 import com.example.lifetrack.core.database.MIGRATION_1_2
+import com.example.lifetrack.core.database.MIGRATION_2_3
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -99,6 +100,47 @@ class MigrationTest {
         db.query("SELECT COUNT(*) FROM event_detail WHERE eventId = 'e2'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("删除事件后详情应随外键级联删除", 0, cursor.getInt(0))
+        }
+    }
+
+    /**
+     * v2 → v3：只补一条 `localDate` 单列索引。
+     *
+     * `runMigrationsAndValidate` 会把迁移后的表结构（含索引名与列）与 `3.json` 的
+     * identityHash 比对，索引名写错、漏建或多建都会在这里失败。
+     */
+    @Test
+    fun migrate2To3_addsLocalDateIndexAndKeepsRecords() {
+        helper.createDatabase(TEST_DB, 2).use { db ->
+            db.execSQL(
+                "INSERT INTO track_type (code, name, iconKey, category, trackingMode, enabled, sortOrder, schemaVersion) " +
+                    "VALUES ('poop', '排便', 'poop', 'body', 'EVENT', 1, 10, 1)"
+            )
+            db.execSQL(
+                "INSERT INTO track_event (id, typeCode, occurredAtEpochMillis, localDate, zoneId, note, " +
+                    "createdAtEpochMillis, updatedAtEpochMillis) " +
+                    "VALUES ('e3', 'poop', 1762657200000, '2026-11-10', 'Asia/Tokyo', '索引迁移前', " +
+                    "1762657200000, 1762657200000)"
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3)
+
+        db.query("SELECT localDate, note FROM track_event WHERE id = 'e3'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("2026-11-10", cursor.getString(0))
+            assertEquals("索引迁移前", cursor.getString(1))
+        }
+        db.query("PRAGMA index_list(track_event)").use { cursor ->
+            val names = buildList {
+                while (cursor.moveToNext()) {
+                    add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+            assertTrue(
+                "应新增 localDate 单列索引，实际：$names",
+                names.contains("index_track_event_localDate")
+            )
         }
     }
 

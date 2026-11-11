@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,10 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * 设置类页面的统一骨架：分区标题 + 一张卡片 + 若干行。
@@ -35,7 +39,7 @@ import androidx.compose.ui.unit.dp
  * 加一个模块就更长一截。这里把「标题 / 卡片 / 行 / 分隔线」收成四个组件，
  * 新加设置项只写一行，不再各自决定排版。
  */
-internal val SettingsShape = RoundedCornerShape(18.dp)
+internal val SettingsShape = RoundedCornerShape(16.dp)
 
 @Composable
 internal fun SettingsSection(
@@ -45,11 +49,14 @@ internal fun SettingsSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
+            // 分组标题不参与层级竞争：11.5sp + 字距，靠位置和留白分组，不靠字号
             text = title,
-            style = MaterialTheme.typography.labelLarge,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.6.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .padding(start = 4.dp)
@@ -57,7 +64,7 @@ internal fun SettingsSection(
         )
         Card(
             shape = SettingsShape,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(content = content)
         }
@@ -72,6 +79,7 @@ internal fun SettingsSection(
 internal fun SettingsRow(
     title: String,
     subtitle: String? = null,
+    icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
@@ -91,6 +99,14 @@ internal fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        icon?.let {
+            Icon(
+                imageVector = it,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)

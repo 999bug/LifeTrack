@@ -20,6 +20,7 @@ import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.ModuleOrdering
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.StatsPeriod
+import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.core.security.AppLockPolicy
@@ -184,8 +185,8 @@ class MainViewModel(
             emptyStatistics()
         )
 
-    val darkTheme: StateFlow<Boolean> = settingsRepository.darkTheme
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.LIGHT)
 
     /** null 表示设置尚未从 DataStore 读出；此时不能先渲染正文，避免锁屏前闪一下内容。 */
     val appLockEnabled: StateFlow<Boolean?> = settingsRepository.appLockEnabled
@@ -380,8 +381,8 @@ class MainViewModel(
         }
     }
 
-    fun setDarkTheme(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setDarkTheme(enabled) }
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settingsRepository.setThemeMode(mode) }
     }
 
     fun setAppLockEnabled(enabled: Boolean) {

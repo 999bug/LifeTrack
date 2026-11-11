@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.dp
  * 统计页与历史页月历共用的暗夜仪表盘色板。
  * 从 StatisticsScreen 抽出来，避免两个页面各写一套导致深/浅色不一致。
  */
-internal val CardShape = RoundedCornerShape(18.dp)
-internal val MetricShape = RoundedCornerShape(14.dp)
+internal val CardShape = RoundedCornerShape(16.dp)
+internal val MetricShape = RoundedCornerShape(13.dp)
 
 internal data class StatsColors(
     val accent: Color,
@@ -34,7 +34,7 @@ internal fun rememberStatsColors(): StatsColors {
             StatsColors(
                 accent = scheme.primary,
                 onAccent = Color(0xFF0E1510),
-                barIdle = scheme.primary.copy(alpha = 0.30f),
+                barIdle = scheme.primary.copy(alpha = 0.38f),
                 grid = Color.White.copy(alpha = 0.07f),
                 label = scheme.onSurfaceVariant.copy(alpha = 0.85f),
                 surface = scheme.surface,
@@ -44,7 +44,7 @@ internal fun rememberStatsColors(): StatsColors {
             StatsColors(
                 accent = scheme.primary,
                 onAccent = scheme.onPrimary,
-                barIdle = scheme.primary.copy(alpha = 0.22f),
+                barIdle = scheme.primary.copy(alpha = 0.32f),
                 grid = scheme.onSurface.copy(alpha = 0.08f),
                 label = scheme.onSurfaceVariant,
                 surface = scheme.surface,

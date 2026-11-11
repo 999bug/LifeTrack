@@ -3,20 +3,34 @@ package com.example.lifetrack.feature.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +49,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -52,6 +70,7 @@ import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
 import com.example.lifetrack.core.model.AppLockTimeout
+import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.RetryBackoff
@@ -78,7 +97,7 @@ fun SettingsScreen(
     viewModel: MainViewModel,
     onOpenModules: () -> Unit
 ) {
-    val darkTheme by viewModel.darkTheme.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
@@ -295,6 +314,7 @@ fun SettingsScreen(
         SettingsSection(title = "记录") {
             SettingsRow(
                 title = "记录项目",
+                icon = Icons.Filled.Tune,
                 subtitle = if (trackTypes.isEmpty()) {
                     "正在载入…"
                 } else {
@@ -308,6 +328,7 @@ fun SettingsScreen(
         SettingsSection(title = "数据") {
             SettingsRow(
                 title = "导出备份",
+                icon = Icons.Filled.FileUpload,
                 subtitle = "默认加密导出，恢复时需要口令",
                 enabled = !busy,
                 onClick = {
@@ -321,6 +342,7 @@ fun SettingsScreen(
             SettingsDivider()
             SettingsRow(
                 title = "从备份恢复",
+                icon = Icons.Filled.FileDownload,
                 subtitle = "支持加密与明文备份，会替换当前全部记录",
                 titleColor = MaterialTheme.colorScheme.error,
                 enabled = !busy,
@@ -331,6 +353,7 @@ fun SettingsScreen(
             SettingsDivider()
             SettingsRow(
                 title = "更换备份口令",
+                icon = Icons.Filled.Key,
                 subtitle = "解旧口令后用新口令重新加密，生成新文件",
                 enabled = !busy,
                 onClick = {
@@ -358,20 +381,27 @@ fun SettingsScreen(
         }
 
         SettingsSection(title = "外观") {
-            SettingsRow(
-                title = "深色模式",
-                subtitle = "仅影响应用显示，不改变记录数据",
-                role = Role.Switch,
-                onClick = { viewModel.setDarkTheme(!darkTheme) },
-                trailing = {
-                    Switch(checked = darkTheme, onCheckedChange = null)
-                }
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text("主题", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                ThemeModeRow(selected = themeMode, onSelect = viewModel::setThemeMode)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "跟随系统时随设备的深色模式切换；仅影响应用显示，不改变记录数据",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         SettingsSection(title = "安全") {
             SettingsRow(
                 title = "应用锁",
+                icon = Icons.Filled.Lock,
                 subtitle = when (appLockEnabled) {
                     true -> "已开启 · 切到后台后需验证"
                     false -> "未开启 · 打开应用时不需要验证"
@@ -421,12 +451,14 @@ fun SettingsScreen(
             SettingsDivider()
             SettingsRow(
                 title = "开源许可",
+                icon = Icons.Filled.Description,
                 subtitle = "SQLCipher Community Edition · BSD-style",
                 onClick = { licensesVisible = true }
             )
             SettingsDivider()
             SettingsRow(
                 title = "数据与隐私",
+                icon = Icons.Filled.PrivacyTip,
                 subtitle = "本地存储、网络权限与备份边界",
                 onClick = { privacyExpanded = !privacyExpanded },
                 trailing = {
@@ -1096,6 +1128,61 @@ private fun RadioOptionRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+/**
+ * 主题三选一。与历史页「列表 / 月历」同构，保证全站的多选一控件长得一样。
+ * 大字号下「跟随系统」四个字放不进一格，缩成「系统」，完整说明由下方的辅助文字兜住。
+ */
+@Composable
+private fun ThemeModeRow(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit
+) {
+    val fontScale = LocalDensity.current.fontScale
+    val barHeight = if (fontScale > 1.3f) 52.dp else 40.dp
+    val isLargeFont = fontScale > 1.3f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(barHeight)
+            .clip(RoundedCornerShape(barHeight / 2))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        ThemeMode.entries.forEach { mode ->
+            val isSelected = mode == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape((barHeight - 6.dp) / 2))
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                    )
+                    .selectable(
+                        selected = isSelected,
+                        role = Role.Tab,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onSelect(mode) }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isLargeFont && mode == ThemeMode.SYSTEM) "系统" else mode.label,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
         }
     }
 }

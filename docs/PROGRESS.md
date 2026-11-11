@@ -65,6 +65,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | 发布机制改造（自动递增） | 2026-11-10 | `release.yml` 去掉必填版本号：新增 `Resolve version`（最高 tag + patch、gradle versionCode +1、tag / Release 冲突与分支校验）、`Bump version in build file`、`Commit version bump to main`（构建成功后才推送，`[skip ci]`，并发时中止）、`Create GitHub Release` 改指向版本提交；`mirror-gitee` 的 `TAG` 改读 job outputs。`docs/release-guide.md` §2 重写 | 未在真实 CI 跑过；需 `main` 允许 bot 推送 |
 | 月历按天查看 + 界面改造第一批 | 2026-11-11 | 底导「记录」改名「历史」；月历格由「日期 + 次数」改为「日期 + 最多 3 个类型图标」，今天实心高亮；点日期弹出 `DayRecordsSheet` 列出当天记录，无记录日走空态；新增 `observeDailyTypeCounts`（按日期+类型聚合，按当天首次出现排序）、`DayCalendarData` 纯函数与 `RecordSummary` 一行摘要；新增 `LifeTrackTokens` 设计常量。210 项单测全绿，`lintDebug` 无 error；模拟器验证浅/深色、200% 字体、360dp 窄屏与弹层三态 | 首页模块网格重构、设置/统计 token 对齐未做，见 `docs/ui-redesign.md` §6 |
 | 首页模块网格重构 | 2026-11-11 | `TodayScreen` 重写为「页头 + 双列模块卡 + 今日时间轴」，删除顶部大计数卡与按钮列表说明段；新增 `ModuleCard`（整卡即记录：排便/饮水一键落库，咖啡/运动直接进编辑器；右下「详细」为独立入口）、`CompactRecordRow`（时间轴行，编辑/删除收进尾部菜单）、`MainViewModel.quickWaterRecord`（默认一杯 250 ml）；停用模块不再渲染；日期固定 `Locale.CHINA`。200% 字体下模块卡降为单列、`widthIn` 避免「详细」被压成单字。210 项单测与 `lintDebug` 全绿，模拟器验证一键记录 / 详细入口 / 单列布局 | 设置页与统计页的 token 对齐未做 |
+| 设置页主题三档 + 统计页 token 收口 | 2026-11-11 | 新增 `ThemeMode`（浅色 / 深色 / 跟随系统）与 `theme_mode` 持久化，写入时同步旧 `dark_theme` 键，回退到 0.6.x 不丢深色偏好；`MainActivity` 用 `isSystemInDarkTheme()` 解析跟随系统；设置页外观区改三段选择，设置行加 20dp 图标、分组标题改 11.5sp/600 带字距、卡片圆角 18→16；统计页卡片圆角 18→16、指标卡 14→13、柱图非高亮柱 alpha 提高。210 项单测与 lint 全绿，模拟器验证三档切换即时生效 | TalkBack 实机朗读仍未验 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

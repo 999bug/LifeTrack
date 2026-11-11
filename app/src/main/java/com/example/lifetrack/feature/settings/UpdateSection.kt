@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,6 +36,7 @@ internal fun UpdateSection(viewModel: MainViewModel) {
 
     SettingsRow(
         title = "应用更新",
+            icon = Icons.Filled.SystemUpdate,
         subtitle = when (val s = state) {
             is UpdateRepository.Status.Idle -> "当前版本 ${BuildConfig.VERSION_NAME}"
             is UpdateRepository.Status.Checking -> "当前版本 ${BuildConfig.VERSION_NAME} · 检查中…"

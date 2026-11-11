@@ -24,6 +24,7 @@ import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.feature.history.DayCalendarData
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.StatsAggregator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,7 +36,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -95,21 +95,41 @@ class MainViewModel(
     private val calendarOffset = MutableStateFlow(0)
 
     /**
-     * 月历格子。翻月后重新查该自然月的按天计数，
-     * 复用已有的 observeDailyCounts，不新增统计区间。
+     * 月历格子。翻月后重新查该自然月的按天计数与按天类型集合，
+     * 两个查询合并成一次渲染，避免「有次数但没图标」或反过来的中间态。
      * 计数口径为全部类型，与历史列表保持一致。
      */
     val calendar: StateFlow<CalendarMonth> = combine(todayDate, calendarOffset) { today, offset ->
         CalendarMonth.of(today, offset)
     }.flatMapLatest { month ->
-        repository
-            .observeDailyCounts(month.start.toString(), month.last.toString(), typeCode = null)
-            .map { counts -> month.withCounts(counts.associate { it.localDate to it.count }) }
+        combine(
+            repository.observeDailyCounts(month.start.toString(), month.last.toString(), typeCode = null),
+            repository.observeDailyTypeCounts(month.start.toString(), month.last.toString())
+        ) { counts, typeRows ->
+            month
+                .withCounts(counts.associate { it.localDate to it.count })
+                .withTypes(DayCalendarData.typesByDate(typeRows))
+        }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         CalendarMonth.of(LocalDate.now(ZoneId.systemDefault()), 0)
     )
+
+    /** 月历点开的日期；null 表示日期详情弹层未打开。 */
+    private val dayDetailDate = MutableStateFlow<LocalDate?>(null)
+    val dayDetail: StateFlow<LocalDate?> = dayDetailDate.asStateFlow()
+
+    /** 弹层里的当天记录。只在弹层打开时查询，关闭后立即停止观察。 */
+    val dayDetailRecords: StateFlow<List<BackupRecord>> = dayDetailDate
+        .flatMapLatest { date ->
+            if (date == null) {
+                flowOf(emptyList())
+            } else {
+                repository.observeRecordsInRange(date.toString(), date.toString(), typeCode = null)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 统计口径：null = 全部类型。统计页顶部的类型筛选直接写这里。 */
     private val statsTypeFilter = MutableStateFlow<String?>(null)
@@ -222,6 +242,15 @@ class MainViewModel(
 
     fun shiftCalendarMonth(steps: Int) {
         calendarOffset.update { (it + steps).coerceAtMost(0) }
+    }
+
+    /** 点月历某一格：打开当天详情。 */
+    fun openDayDetail(date: LocalDate) {
+        dayDetailDate.value = date
+    }
+
+    fun closeDayDetail() {
+        dayDetailDate.value = null
     }
 
     fun setTypeEnabled(code: String, enabled: Boolean) {

@@ -63,6 +63,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | C10 发布前回归（代码就绪） | 2026-11-10 | 新增 `ThirdPartyNotices` 与设置页「关于 → 开源许可」可滚动全文（BSD-style），README 补第三方许可章节；安全边界 5 项逐条改写；`versionCode 6` / `versionName 0.6.0`。191 项单测 + 14 项仪器测试全绿，lint 无 error，`assembleRelease` 成功（22,275,155 B）；200% 字体许可证弹窗无截断。真机覆盖安装由用户 2026-11-10 确认通过；0.6.0 已发布 |
 | A10 亲密关系模块 | 2026-11-10 | 按 `docs/intimacy-module-confirmation.md` V1–V10 推荐值落地：默认停用、三项可空字段、L1 列表级收敛与读屏一句汇总、启用期间无条件 `FLAG_SECURE`、首次启用提示、明文导出加强提示；Room 仍 v2、备份 v1/v2/v3 不变；A9 月经保留 ⛔，未动排便专用链路。204 项单测全绿，`40ee2ba` 提交 |
 | 发布机制改造（自动递增） | 2026-11-10 | `release.yml` 去掉必填版本号：新增 `Resolve version`（最高 tag + patch、gradle versionCode +1、tag / Release 冲突与分支校验）、`Bump version in build file`、`Commit version bump to main`（构建成功后才推送，`[skip ci]`，并发时中止）、`Create GitHub Release` 改指向版本提交；`mirror-gitee` 的 `TAG` 改读 job outputs。`docs/release-guide.md` §2 重写 | 未在真实 CI 跑过；需 `main` 允许 bot 推送 |
+| 月历按天查看 + 界面改造第一批 | 2026-11-11 | 底导「记录」改名「历史」；月历格由「日期 + 次数」改为「日期 + 最多 3 个类型图标」，今天实心高亮；点日期弹出 `DayRecordsSheet` 列出当天记录，无记录日走空态；新增 `observeDailyTypeCounts`（按日期+类型聚合，按当天首次出现排序）、`DayCalendarData` 纯函数与 `RecordSummary` 一行摘要；新增 `LifeTrackTokens` 设计常量。210 项单测全绿，`lintDebug` 无 error；模拟器验证浅/深色、200% 字体、360dp 窄屏与弹层三态 | 首页模块网格重构、设置/统计 token 对齐未做，见 `docs/ui-redesign.md` §6 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

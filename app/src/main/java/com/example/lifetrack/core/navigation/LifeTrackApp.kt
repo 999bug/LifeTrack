@@ -54,7 +54,7 @@ private data class Destination(
 
 private val destinations = listOf(
     Destination("today", "今天", Icons.Filled.Home),
-    Destination("history", "记录", Icons.Filled.CalendarMonth),
+    Destination("history", "历史", Icons.Filled.CalendarMonth),
     Destination("statistics", "统计", Icons.Filled.BarChart),
     Destination("settings", "设置", Icons.Filled.Settings)
 )

@@ -10,6 +10,7 @@ import com.example.lifetrack.core.database.entity.EventDetailEntity
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
+import com.example.lifetrack.core.database.model.DailyTypeCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.EventWithDetails
 import com.example.lifetrack.core.database.model.PoopRecordRelation
@@ -91,6 +92,22 @@ interface TrackEventDao {
         endDate: String,
         typeCode: String?
     ): Flow<List<DailyCountProjection>>
+
+    /**
+     * 月历格子用：按「日期 + 类型」聚合，并带上该类型当天首次出现的时间。
+     * 排序键是 firstAt，因此同一天的多个类型天然按「先记的在前」排列，
+     * 格子只画前几个图标时不会因为重组而跳位。
+     */
+    @Query(
+        "SELECT localDate AS localDate, typeCode AS typeCode, COUNT(*) AS count, " +
+            "MIN(occurredAtEpochMillis) AS firstAt FROM track_event " +
+            "WHERE localDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY localDate, typeCode ORDER BY localDate ASC, firstAt ASC"
+    )
+    fun observeDailyTypeCounts(
+        startDate: String,
+        endDate: String
+    ): Flow<List<DailyTypeCountProjection>>
 
     @Transaction
     @Query("SELECT * FROM track_event WHERE typeCode = 'poop' ORDER BY occurredAtEpochMillis ASC")

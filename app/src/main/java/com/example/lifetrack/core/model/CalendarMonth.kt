@@ -5,7 +5,9 @@ import java.time.LocalDate
 /** 月历的一格。[date] 为 null 表示前后补白，不参与计数也不响应点击。 */
 data class CalendarCell(
     val date: LocalDate?,
-    val count: Int
+    val count: Int,
+    /** 当天出现过的类型码，按当天首次记录时间升序；补白格恒为空。 */
+    val types: List<String> = emptyList()
 )
 
 /**
@@ -29,6 +31,15 @@ data class CalendarMonth(
             cells = cells.map { cell ->
                 val date = cell.date ?: return@map cell
                 cell.copy(count = countByDate[date.toString()] ?: 0)
+            }
+        )
+
+    /** 补上每格出现过的类型码。与 [withCounts] 分开，两个查询各自到达时互不覆盖。 */
+    fun withTypes(typesByDate: Map<String, List<String>>): CalendarMonth =
+        copy(
+            cells = cells.map { cell ->
+                val date = cell.date ?: return@map cell
+                cell.copy(types = typesByDate[date.toString()].orEmpty())
             }
         )
 

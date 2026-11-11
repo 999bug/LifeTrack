@@ -42,6 +42,32 @@ class CalendarMonthTest {
     }
 
     @Test
+    fun `types only apply to real dates and stay empty otherwise`() {
+        val month = CalendarMonth.of(today, 0).withTypes(
+            mapOf(
+                "2026-11-09" to listOf("poop", "water"),
+                "2026-11-10" to listOf("coffee"),
+                "2026-10-26" to listOf("water")
+            )
+        )
+
+        assertEquals(emptyList<String>(), month.cells[0].types)
+        assertEquals(listOf("poop", "water"), month.cells[14].types)
+        assertEquals(listOf("coffee"), month.cells[15].types)
+        assertEquals(emptyList<String>(), month.cells[36].types)
+    }
+
+    @Test
+    fun `counts and types can arrive separately without overwriting each other`() {
+        val month = CalendarMonth.of(today, 0)
+            .withCounts(mapOf("2026-11-09" to 3))
+            .withTypes(mapOf("2026-11-09" to listOf("water")))
+
+        assertEquals(3, month.cells[14].count)
+        assertEquals(listOf("water"), month.cells[14].types)
+    }
+
+    @Test
     fun `leap february renders 29 days`() {
         val month = CalendarMonth.of(LocalDate.of(2024, 2, 10), 0)
 

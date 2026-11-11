@@ -2,6 +2,7 @@ package com.example.lifetrack.domain.repository
 
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.database.model.DailyCountProjection
+import com.example.lifetrack.core.database.model.DailyTypeCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
@@ -26,6 +27,12 @@ interface TrackRepository {
         endDate: String,
         typeCode: String?
     ): Flow<List<DailyCountProjection>>
+
+    /** 月历格子：按日期 + 类型聚合，顺序为当天首次出现时间。 */
+    fun observeDailyTypeCounts(
+        startDate: String,
+        endDate: String
+    ): Flow<List<DailyTypeCountProjection>>
     fun observeEventTimestamps(
         startDate: String,
         endDate: String,

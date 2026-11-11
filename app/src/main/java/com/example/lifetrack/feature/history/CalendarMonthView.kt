@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.lifetrack.core.model.CalendarCell
 import com.example.lifetrack.core.model.CalendarMonth
+import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.statistics.CardShape
-import com.example.lifetrack.feature.statistics.StatsColors
 import com.example.lifetrack.feature.statistics.rememberStatsColors
 import java.time.LocalDate
 
@@ -52,6 +52,8 @@ fun CalendarMonthView(
     month: CalendarMonth,
     today: LocalDate,
     canGoNext: Boolean,
+    selectedDate: LocalDate?,
+    typeNames: Map<String, String>,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
@@ -59,7 +61,7 @@ fun CalendarMonthView(
 ) {
     val colors = rememberStatsColors()
     val fontScale = LocalDensity.current.fontScale
-    // 用最小高度而不是固定高度：大字号下「日期 + 次数」两行可以自己把格子撑高，不会被 clip 裁掉；
+    // 用最小高度而不是固定高度：大字号下「日期 + 图标行」可以自己把格子撑高，不会被 clip 裁掉；
     // 常规字号也保到 48dp，满足最小触摸目标。
     val minCellHeight = if (fontScale > 1.3f) 72.dp else 48.dp
 
@@ -114,7 +116,8 @@ fun CalendarMonthView(
                     CalendarDayCell(
                         cell = cell,
                         today = today,
-                        colors = colors,
+                        selectedDate = selectedDate,
+                        typeNames = typeNames,
                         cellHeight = minCellHeight,
                         fontScale = fontScale,
                         onSelectDate = onSelectDate
@@ -122,9 +125,9 @@ fun CalendarMonthView(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
-            text = "点按日期只看当天 · 颜色深浅表示当日次数",
+            text = "点按日期查看当天记录",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -135,24 +138,37 @@ fun CalendarMonthView(
 private fun RowScope.CalendarDayCell(
     cell: CalendarCell,
     today: LocalDate,
-    colors: StatsColors,
+    selectedDate: LocalDate?,
+    typeNames: Map<String, String>,
     cellHeight: Dp,
     fontScale: Float,
     onSelectDate: (LocalDate) -> Unit
 ) {
     val date = cell.date
-    val shape = RoundedCornerShape(6.dp)
-    val intensity = when {
-        date == null || cell.count <= 0 -> 0f
-        cell.count == 1 -> 0.14f
-        cell.count == 2 -> 0.28f
-        else -> 0.45f
-    }
+    val shape = RoundedCornerShape(8.dp)
     val isToday = date != null && date == today
+    val isSelected = date != null && date == selectedDate
+    val marks = DayCalendarData.visibleMarks(cell.types)
+
     val description = if (date == null) {
         "非本月日期"
     } else {
-        "${date.monthValue}月${date.dayOfMonth}日，${cell.count} 次"
+        val kinds = cell.types.mapNotNull { typeNames[it] }.joinToString("、")
+        val base = "${date.monthValue}月${date.dayOfMonth}日，${cell.count} 次"
+        if (kinds.isEmpty()) base else "$base，含$kinds"
+    }
+
+    // 今天：实心主色 + 反白；被选中（弹层打开）：浅色底 + 主色描边；其余无底色，
+    // 「有没有记录」完全靠图标行表达，避免背景深浅和次数两种编码互相干扰。
+    val container = when {
+        isToday -> MaterialTheme.colorScheme.primary
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        else -> Color.Transparent
+    }
+    val contentColor = if (isToday) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
     }
 
     Box(
@@ -161,10 +177,10 @@ private fun RowScope.CalendarDayCell(
             .padding(2.dp)
             .heightIn(min = cellHeight)
             .clip(shape)
-            .background(if (intensity > 0f) colors.accent.copy(alpha = intensity) else colors.surface)
+            .background(container)
             .border(
-                width = if (isToday) 1.dp else 0.dp,
-                color = if (isToday) colors.accent else Color.Transparent,
+                width = if (isSelected && !isToday) 1.dp else 0.dp,
+                color = if (isSelected && !isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = shape
             )
             .clickable(
@@ -176,20 +192,33 @@ private fun RowScope.CalendarDayCell(
         contentAlignment = Alignment.Center
     ) {
         if (date != null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
                 Text(
                     text = date.dayOfMonth.toString(),
                     fontSize = if (fontScale > 1.3f) 11.sp else 12.sp,
                     maxLines = 1,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = contentColor
                 )
-                // 没有次数的格子也保留一行占位，保证同一周的格子等高
-                Text(
-                    text = if (cell.count > 0) cell.count.toString() else " ",
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    color = if (cell.count > 0) colors.accent else Color.Transparent
-                )
+                // 没有记录也保留同样高度的图标行，保证同一个月的格子等高
+                Box(modifier = Modifier.height(13.dp), contentAlignment = Alignment.Center) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.5.dp)) {
+                        marks.forEach { typeCode ->
+                            Icon(
+                                imageVector = LifeTrackTokens.ModuleIcons.of(typeCode),
+                                contentDescription = null,
+                                tint = if (isToday) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    LifeTrackTokens.ModuleColors.of(typeCode)
+                                },
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

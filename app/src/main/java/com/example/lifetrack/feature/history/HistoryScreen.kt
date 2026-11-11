@@ -69,6 +69,10 @@ fun HistoryScreen(
     val records by viewModel.historyRecords.collectAsStateWithLifecycle()
     val query by viewModel.historyQuery.collectAsStateWithLifecycle()
     val calendar by viewModel.calendar.collectAsStateWithLifecycle()
+    val dayDetail by viewModel.dayDetail.collectAsStateWithLifecycle()
+    val dayDetailRecords by viewModel.dayDetailRecords.collectAsStateWithLifecycle()
+    val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val typeNames = remember(trackTypes) { trackTypes.associate { it.code to it.name } }
     var showRangePicker by remember { mutableStateOf(false) }
     var calendarMode by remember { mutableStateOf(false) }
     val today = remember { LocalDate.now() }
@@ -83,7 +87,7 @@ fun HistoryScreen(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "历史记录",
+                    "历史",
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -106,12 +110,11 @@ fun HistoryScreen(
                     month = calendar,
                     today = today,
                     canGoNext = calendar.start.isBefore(today.withDayOfMonth(1)),
+                    selectedDate = dayDetail,
+                    typeNames = typeNames,
                     onPrevious = { viewModel.shiftCalendarMonth(-1) },
                     onNext = { viewModel.shiftCalendarMonth(1) },
-                    onSelectDate = { date ->
-                        viewModel.setHistoryFilter(date, date)
-                        calendarMode = false
-                    }
+                    onSelectDate = viewModel::openDayDetail
                 )
             }
         }
@@ -160,6 +163,15 @@ fun HistoryScreen(
                 ) { Text("加载更早 30 天") }
             }
         }
+    }
+
+    dayDetail?.let { date ->
+        DayRecordsSheet(
+            date = date,
+            records = dayDetailRecords,
+            typeNames = typeNames,
+            onDismiss = viewModel::closeDayDetail
+        )
     }
 
     if (showRangePicker) {

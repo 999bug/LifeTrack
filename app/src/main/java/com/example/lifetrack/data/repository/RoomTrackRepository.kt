@@ -10,6 +10,7 @@ import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.database.model.DailyCountProjection
+import com.example.lifetrack.core.database.model.DailyTypeCountProjection
 import com.example.lifetrack.core.database.model.EventTimestamp
 import com.example.lifetrack.core.database.model.EventWithDetails
 import com.example.lifetrack.core.database.model.PoopRecordRelation
@@ -52,6 +53,11 @@ class RoomTrackRepository(
         endDate: String,
         typeCode: String?
     ): Flow<List<DailyCountProjection>> = dao.observeDailyCounts(startDate, endDate, typeCode)
+
+    override fun observeDailyTypeCounts(
+        startDate: String,
+        endDate: String
+    ): Flow<List<DailyTypeCountProjection>> = dao.observeDailyTypeCounts(startDate, endDate)
 
     override fun observeEventTimestamps(
         startDate: String,

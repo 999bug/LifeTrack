@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>设置页重构 · 原型 v2 · 生活记</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:#0E1210;
+    color:#E8F2E9;
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .stage{
+    max-width:1120px;
+    margin:0 auto;
+    padding:56px 32px 72px;
+    display:grid;
+    grid-template-columns:300px minmax(0,1fr);
+    gap:56px;
+    align-items:start;
+  }
+
+  /* ---------- 左侧说明 ---------- */
+  .notes{padding-top:8px}
+  .eyebrow{
+    font-size:11px;letter-spacing:1.4px;text-transform:uppercase;
+    color:#7E8A80;font-weight:600;margin:0 0 14px
+  }
+  .notes h1{
+    font-size:25px;line-height:1.35;font-weight:600;margin:0 0 14px;letter-spacing:-.2px
+  }
+  .notes .lede{
+    font-size:13px;line-height:1.8;color:#A9B8AC;margin:0 0 30px
+  }
+  .decision{margin:0 0 22px}
+  .decision h3{
+    font-size:13px;font-weight:600;margin:0 0 6px;color:#E8F2E9;
+    display:flex;align-items:baseline;gap:8px
+  }
+  .decision h3 .num{
+    font-size:10px;color:#A5D6AE;font-variant-numeric:tabular-nums;
+    letter-spacing:.6px;font-weight:600
+  }
+  .decision p{
+    font-size:12.5px;line-height:1.75;color:#8E9C90;margin:0
+  }
+  .metric{
+    margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,.08);
+    display:flex;gap:32px
+  }
+  .metric div span{display:block}
+  .metric .m-val{
+    font-size:22px;font-weight:600;color:#A5D6AE;font-variant-numeric:tabular-nums;
+    letter-spacing:-.4px;line-height:1.2
+  }
+  .metric .m-label{font-size:11px;color:#7E8A80;margin-top:4px;line-height:1.5}
+  .hint{
+    margin-top:26px;font-size:11.5px;line-height:1.7;color:#7C8B7F;
+    border-left:2px solid rgba(165,214,174,.25);padding-left:12px
+  }
+
+  /* ---------- 右侧设备 ---------- */
+  .device-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+  .toolbar{
+    display:flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:999px;padding:5px 6px 5px 14px;
+  }
+  .toolbar .tb-label{font-size:11px;color:#7E8A80;letter-spacing:.4px;margin-right:2px}
+  .seg{display:flex;background:rgba(0,0,0,.25);border-radius:999px;padding:3px}
+  .seg button{
+    font:inherit;font-size:11.5px;color:#A9B8AC;background:none;border:none;
+    padding:5px 13px;border-radius:999px;cursor:pointer;transition:background .15s,color .15s
+  }
+  .seg button.on{background:#2C4A34;color:#C3E8CC}
+  .tb-toggle{
+    display:flex;align-items:center;gap:7px;font-size:11.5px;color:#A9B8AC;
+    padding:5px 12px 5px 8px;border-radius:999px;cursor:pointer;user-select:none;
+    border-left:1px solid rgba(255,255,255,.07);margin-left:2px
+  }
+  .tb-toggle input{appearance:none;width:15px;height:15px;border-radius:4px;
+    border:1.5px solid #4A574C;margin:0;cursor:pointer;position:relative;transition:.15s}
+  .tb-toggle input:checked{background:#A5D6AE;border-color:#A5D6AE}
+  .tb-toggle input:checked::after{
+    content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+    border:solid #0E1510;border-width:0 1.8px 1.8px 0;transform:rotate(42deg)
+  }
+
+  .device{
+    width:412px;height:866px;padding:11px;border-radius:54px;
+    background:#1B1F1C;
+    box-shadow:0 0 0 1px rgba(255,255,255,.07),0 40px 80px -30px rgba(0,0,0,.85);
+    flex:0 0 auto;
+  }
+
+  /* ---------- App 内部：主题变量 ---------- */
+  .phone{
+    --bg:#F7F8F5;
+    --surface:#FFFFFF;
+    --surface-low:#F1F4EF;
+    --on-surface:#1A1C19;
+    --on-surface-var:#414942;
+    --primary:#426B50;
+    --on-primary:#FFFFFF;
+    --primary-container:#C3E8CC;
+    --on-primary-container:#0B2013;
+    --surface-var:#E9EEE7;
+    --outline:#71796F;
+    --outline-var:#C1C9BE;
+    --error:#B3261E;
+    --shadow:0 1px 2px rgba(26,28,25,.05),0 1px 3px rgba(26,28,25,.04);
+    --hairline:rgba(193,201,190,.5);
+    position:relative;width:390px;height:844px;border-radius:44px;overflow:hidden;
+    background:var(--bg);color:var(--on-surface);
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",Roboto,sans-serif;
+    transition:background .25s,color .25s;
+  }
+  .phone[data-theme="dark"]{
+    --bg:#111713;
+    --surface:#19211B;
+    --surface-low:#141B16;
+    --on-surface:#E8F2E9;
+    --on-surface-var:#B9C6BA;
+    --primary:#A5D6AE;
+    --on-primary:#0E1510;
+    --primary-container:#2C4A34;
+    --on-primary-container:#C3E8CC;
+    --surface-var:#2A352D;
+    --outline:#7E8A80;
+    --outline-var:#3B463D;
+    --error:#F2B8B5;
+    --shadow:none;
+    --hairline:rgba(59,70,61,.75);
+  }
+
+  /* 状态栏 */
+  .statusbar{
+    position:absolute;top:0;left:0;right:0;height:44px;z-index:12;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 26px;font-size:13.5px;font-weight:600;color:var(--on-surface);
+    letter-spacing:.2px;pointer-events:none;
+  }
+  .statusbar .sb-right{display:flex;align-items:center;gap:6px;color:var(--on-surface)}
+  .statusbar svg{display:block}
+
+  /* 滚动内容 */
+  .screen{
+    position:absolute;top:0;left:0;right:0;bottom:80px;
+    overflow-y:auto;overscroll-behavior:contain;
+    padding:52px 16px 20px;
+    scrollbar-width:thin;scrollbar-color:rgba(120,130,120,.3) transparent;
+  }
+  .screen::-webkit-scrollbar{width:4px}
+  .screen::-webkit-scrollbar-thumb{background:rgba(120,130,120,.3);border-radius:2px}
+
+  .page-title{
+    font-size:28px;line-height:38px;font-weight:500;letter-spacing:-.3px;
+    margin:0 0 14px 4px;color:var(--on-surface);
+  }
+  .section-label{
+    font-size:11.5px;font-weight:600;letter-spacing:.6px;
+    color:var(--on-surface-var);margin:20px 0 8px 4px;opacity:.85;
+  }
+
+  .card{
+    background:var(--surface);border-radius:16px;overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .phone[data-theme="dark"] .card{border:1px solid rgba(255,255,255,.045)}
+
+  /* 行 */
+  .row{
+    display:flex;align-items:center;gap:12px;width:100%;
+    min-height:56px;padding:10px 16px;margin:0;
+    background:none;border:none;font:inherit;color:inherit;
+    text-align:left;cursor:pointer;transition:background .12s;
+  }
+  .row:active{background:var(--surface-var)}
+  .row:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+  .row--sub{padding-left:48px}
+  .row-icon{
+    flex:0 0 20px;width:20px;height:20px;color:var(--on-surface-var);
+    display:flex;align-items:center;justify-content:center
+  }
+  .row-icon svg{width:20px;height:20px;display:block}
+  .row-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .row-title{font-size:16px;line-height:22px;color:var(--on-surface)}
+  .row-title.is-error{color:var(--error)}
+  .row-sub{font-size:12.5px;line-height:17px;color:var(--on-surface-var)}
+  .row-sub.is-error{color:var(--error)}
+  .badge{
+    flex:0 0 auto;display:none;align-items:center;gap:5px;
+    font-size:11px;line-height:16px;font-weight:600;color:var(--primary);
+    background:var(--primary-container);border-radius:999px;padding:4px 9px;
+    white-space:nowrap
+  }
+  .badge.show{display:inline-flex}
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--primary)}
+  .chev{flex:0 0 20px;width:20px;height:20px;color:var(--on-surface-var);opacity:.8}
+
+  .divider{height:1px;background:var(--hairline);margin-left:16px}
+
+  /* 开关 */
+  .switch{
+    appearance:none;-webkit-appearance:none;flex:0 0 auto;
+    width:52px;height:32px;border-radius:16px;margin:0;cursor:pointer;
+    border:2px solid var(--outline);background:var(--surface-var);
+    position:relative;transition:background .2s,border-color .2s;
+  }
+  .switch::after{
+    content:"";position:absolute;top:50%;left:5px;width:16px;height:16px;
+    border-radius:50%;background:var(--outline);transform:translateY(-50%);
+    transition:left .2s,width .2s,height .2s,background .2s;
+  }
+  .switch:checked{background:var(--primary);border-color:var(--primary)}
+  .switch:checked::after{left:20px;width:24px;height:24px;background:var(--on-primary)}
+
+  /* 折叠 */
+  .collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s cubic-bezier(.2,.8,.2,1)}
+  .collapse.open{grid-template-rows:1fr}
+  .collapse-inner{overflow:hidden;min-height:0}
+  .chev-down{transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+  .chev-down.open{transform:rotate(180deg)}
+  .note{
+    font-size:11.5px;line-height:1.65;color:var(--on-surface-var);
+    padding:11px 16px 13px;opacity:.9
+  }
+  .note.is-warn{color:var(--error);opacity:.85}
+
+  /* 底部 */
+  .page-footer{padding:26px 0 6px;text-align:center}
+  .footer-brand{
+    font-size:12px;color:var(--on-surface-var);letter-spacing:.2px;opacity:.75
+  }
+  .footer-brand .ver{font-variant-numeric:tabular-nums}
+  .footer-action{
+    margin-top:8px;font:inherit;font-size:13px;color:var(--primary);
+    background:none;border:none;padding:9px 16px;border-radius:20px;cursor:pointer;
+    min-height:48px;transition:background .15s
+  }
+  .footer-action:hover{background:var(--primary-container)}
+  .footer-action:active{background:var(--primary-container)}
+  .footer-disclaimer{
+    font-size:11px;line-height:16px;color:var(--on-surface-var);
+    opacity:.72;margin:10px 0 0;text-align:center
+  }
+
+  .update-banner{
+    display:none;align-items:center;gap:12px;text-align:left;
+    background:var(--primary-container);border-radius:16px;padding:14px 16px;
+  }
+  .update-banner.show{display:flex}
+  .update-banner .ub-text{flex:1 1 auto;min-width:0}
+  .ub-title{font-size:14px;font-weight:600;color:var(--on-primary-container);line-height:20px}
+  .ub-sub{font-size:12px;line-height:17px;color:var(--on-primary-container);opacity:.8;margin-top:2px}
+  .ub-btn{
+    font:inherit;font-size:13px;font-weight:600;color:var(--on-primary);
+    background:var(--primary);border:none;border-radius:999px;
+    padding:9px 18px;cursor:pointer;min-height:48px;flex:0 0 auto
+  }
+
+  /* 底部导航 */
+  .navbar{
+    position:absolute;left:0;right:0;bottom:0;height:80px;z-index:10;
+    display:flex;align-items:center;
+    background:var(--surface);border-top:1px solid var(--hairline);
+    padding:0 4px;
+  }
+  .nav-item{
+    flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:none;border:none;font:inherit;padding:0;cursor:pointer;
+    color:var(--on-surface-var);min-width:0
+  }
+  .nav-item .nav-pill{
+    width:60px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    transition:background .15s
+  }
+  .nav-item svg{width:22px;height:22px;display:block}
+  .nav-item .nav-label{font-size:11.5px;line-height:15px;letter-spacing:.1px}
+  .nav-item.active{color:var(--on-surface)}
+  .nav-item.active .nav-pill{background:var(--primary-container);color:var(--on-primary-container)}
+  .nav-item.active .nav-label{font-weight:600}
+
+  /* 二级页 */
+  .subpage{
+    position:absolute;inset:0;z-index:30;background:var(--bg);
+    display:flex;flex-direction:column;
+    transform:translateX(100%);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1);
+    will-change:transform;
+  }
+  .subpage.open{transform:translateX(0)}
+  .subp-head{
+    flex:0 0 auto;height:56px;display:flex;align-items:center;gap:4px;
+    padding:0 8px;background:var(--bg);
+  }
+  .back-btn{
+    width:48px;height:48px;display:flex;align-items:center;justify-content:center;
+    background:none;border:none;border-radius:50%;cursor:pointer;color:var(--on-surface);padding:0
+  }
+  .back-btn:active{background:var(--surface-var)}
+  .back-btn svg{width:22px;height:22px}
+  .subp-title{font-size:19px;font-weight:600;letter-spacing:-.1px;color:var(--on-surface)}
+  .subp-body{flex:1 1 auto;overflow-y:auto;padding:4px 16px 28px;scrollbar-width:thin}
+  .subp-body::-webkit-scrollbar{width:4px}
+  .subp-body::-webkit-scrollbar-thumb{background:rgba(120,130,120,.3);border-radius:2px}
+
+  .log-row{padding:14px 16px;display:flex;flex-direction:column;gap:3px}
+  .log-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .log-ver{font-size:14px;font-weight:600;color:var(--on-surface);font-variant-numeric:tabular-nums}
+  .log-ver.current{color:var(--primary)}
+  .log-date{font-size:11.5px;color:var(--on-surface-var);font-variant-numeric:tabular-nums;opacity:.8}
+  .log-sum{font-size:12.5px;line-height:18px;color:var(--on-surface-var)}
+
+  .prose{padding:8px 16px 16px}
+  .prose h4{
+    font-size:13px;font-weight:600;margin:16px 0 6px;color:var(--on-surface)
+  }
+  .prose h4:first-child{margin-top:4px}
+  .prose p{font-size:12.5px;line-height:1.75;color:var(--on-surface-var);margin:0 0 8px}
+
+  /* 底部弹层 */
+  .scrim{
+    position:absolute;inset:0;z-index:40;background:rgba(10,14,11,.45);
+    opacity:0;pointer-events:none;transition:opacity .25s
+  }
+  .scrim.open{opacity:1;pointer-events:auto}
+  .sheet{
+    position:absolute;left:0;right:0;bottom:0;z-index:41;
+    background:var(--surface);border-radius:24px 24px 0 0;
+    padding:10px 0 22px;
+    transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1)
+  }
+  .sheet.open{transform:translateY(0)}
+  .sheet-grip{width:32px;height:4px;border-radius:2px;background:var(--outline-var);margin:0 auto 14px}
+  .sheet h3{font-size:16px;font-weight:600;margin:0 0 4px;padding:0 24px;color:var(--on-surface)}
+  .sheet .sheet-sub{font-size:12px;color:var(--on-surface-var);padding:0 24px;margin:0 0 10px}
+  .sheet-opt{
+    display:flex;align-items:center;gap:14px;width:100%;
+    background:none;border:none;font:inherit;text-align:left;cursor:pointer;
+    padding:13px 24px;color:var(--on-surface);min-height:56px
+  }
+  .sheet-opt:active{background:var(--surface-var)}
+  .radio-dot{
+    flex:0 0 20px;width:20px;height:20px;border-radius:50%;
+    border:2px solid var(--outline);position:relative;transition:.15s
+  }
+  .sheet-opt[aria-checked="true"] .radio-dot{border-color:var(--primary)}
+  .sheet-opt[aria-checked="true"] .radio-dot::after{
+    content:"";position:absolute;inset:4px;border-radius:50%;background:var(--primary)
+  }
+  .sheet-opt .so-text{display:flex;flex-direction:column;gap:2px}
+  .so-title{font-size:15px;line-height:21px}
+  .so-sub{font-size:12px;line-height:16px;color:var(--on-surface-var)}
+
+  /* Toast */
+  .toast{
+    position:absolute;left:50%;bottom:104px;z-index:60;
+    transform:translate(-50%,8px);
+    background:rgba(26,28,25,.92);color:#F7F8F5;
+    font-size:12.5px;line-height:1.5;padding:10px 16px;border-radius:12px;
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+    max-width:300px;text-align:center
+  }
+  .phone[data-theme="dark"] .toast{background:rgba(232,242,233,.94);color:#111713}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:1000px){
+    .stage{grid-template-columns:1fr;gap:40px;padding:40px 24px 64px}
+    .notes{max-width:520px;order:2}
+    .device-wrap{order:1;width:100%}
+    .device{transform:scale(.88);transform-origin:top center;margin-bottom:-100px}
+  }
+  @media (max-width:440px){
+    .device{transform:scale(.78);margin-bottom:-190px}
+    .toolbar{flex-wrap:wrap;justify-content:center;border-radius:16px;padding:8px}
+    .tb-toggle{border-left:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <aside class="notes">
+    <p class="eyebrow">设置页重构 · 原型 v2</p>
+    <h1>把低频设置收进一层，高频项先被看见</h1>
+    <p class="lede">
+      上一版把六张卡片收成了分组，但功能还在往里加，现在又长成了 5 个分区、13 行、两段长说明，
+      末尾还挂着更新日志与许可。这次不换视觉，只做减法：按使用频率分层，低频项折叠或下钻。
+    </p>
+
+    <div class="decision">
+      <h3><span class="num">01</span>数据与备份折叠成一行</h3>
+      <p>导出、恢复、换口令一年用不了几次，却常驻占掉 230dp。折成一行后首屏少一块，展开仍在原地，不跳页。</p>
+    </div>
+
+    <div class="decision">
+      <h3><span class="num">02</span>五段按频率重排，日志下钻</h3>
+      <p>「记录 / 外观」合并为无标题主卡，「安全」独立，「更多」收隐私、许可、更新日志；数据与备份单列一张默认收起的卡。日志改成二级页，不再拖着 10 条版本往下滚。</p>
+    </div>
+
+    <div class="decision">
+      <h3><span class="num">03</span>版本与更新沉到页面最底</h3>
+      <p>版本号从「关于」中间移到页脚，检查更新跟着一起走。折叠态下页脚落在首屏下沿、轻扫即到；有新版时页脚换成提示卡，首屏「更新日志」行同步出现「有新版本」标记，不会因为下沉而错过。</p>
+    </div>
+
+    <div class="metric">
+      <div><span class="m-val">≈790</span><span class="m-label">改后整页高度 dp</span></div>
+      <div><span class="m-val">≈1700</span><span class="m-label">改前整页高度 dp</span></div>
+      <div><span class="m-val">-54%</span><span class="m-label">页面长度</span></div>
+    </div>
+
+    <p class="hint">
+      可以点的部分：数据行展开/收起、外观切换主题（含深色）、应用锁开关（关掉后自动锁定会消失）、
+      更新日志与数据与隐私两个二级页、页脚检查更新。右上角可模拟「有新版本」，
+      此时首屏「更新日志」行会出现标记，页脚换成更新卡（往下轻扫可见）。
+    </p>
+  </aside>
+
+  <main class="device-wrap">
+    <div class="toolbar">
+      <span class="tb-label">App 主题</span>
+      <div class="seg" id="themeSeg">
+        <button data-set="light" class="on">浅色</button>
+        <button data-set="dark">深色</button>
+      </div>
+      <label class="tb-toggle">
+        <input type="checkbox" id="simUpdate">
+        模拟新版本
+      </label>
+    </div>
+
+    <div class="device">
+      <div class="phone" id="phone" data-theme="light">
+
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="sb-right">
+            <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4" y="5" width="3" height="6" rx="1"/><rect x="8" y="2.5" width="3" height="8.5" rx="1"/><rect x="12" y="0" width="3" height="11" rx="1"/></svg>
+            <svg width="14" height="11" viewBox="0 0 14 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a9 9 0 0 1 12 0"/><path d="M3.4 6.7a5.6 5.6 0 0 1 7.2 0"/><circle cx="7" cy="9.4" r=".9" fill="currentColor" stroke="none"/></svg>
+            <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x=".7" y=".7" width="17" height="9.6" rx="2.6" stroke="currentColor" stroke-opacity=".45" stroke-width="1.1"/><rect x="2.3" y="2.3" width="12.4" height="6.4" rx="1.4" fill="currentColor"/><path d="M19.4 4v3a2 2 0 0 0 0-3z" fill="currentColor" fill-opacity=".5"/></svg>
+          </span>
+        </div>
+
+        <!-- ========== 设置主页 ========== -->
+        <div class="screen" id="screen">
+          <h1 class="page-title">设置</h1>
+
+          <section class="card">
+            <button class="row" onclick="toast('原型：打开记录项目管理页')">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                  <path d="M4 7h16M4 12h16M4 17h16"/>
+                  <circle cx="9" cy="7" r="2.1" fill="var(--surface)"/>
+                  <circle cx="15" cy="12" r="2.1" fill="var(--surface)"/>
+                  <circle cx="8" cy="17" r="2.1" fill="var(--surface)"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">记录项目</span>
+                <span class="row-sub">已启用 4 / 共 5 项 · 启用与排序</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+            <div class="divider"></div>
+            <button class="row" onclick="openSheet()">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <circle cx="12" cy="12" r="8.2"/>
+                  <path d="M12 3.8a8.2 8.2 0 0 0 0 16.4z" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">外观</span>
+                <span class="row-sub" id="themeRowSub">跟随系统</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+          </section>
+
+          <h2 class="section-label">安全</h2>
+          <section class="card">
+            <label class="row" for="lockSwitch">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4.8" y="10.4" width="14.4" height="9.6" rx="2.4"/>
+                  <path d="M8.4 10.4V7.6a3.6 3.6 0 0 1 7.2 0v2.8"/>
+                  <circle cx="12" cy="15.2" r="1.15" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">应用锁</span>
+                <span class="row-sub" id="lockSub">已开启 · 切到后台需验证</span>
+              </span>
+              <input class="switch" type="checkbox" id="lockSwitch" checked>
+            </label>
+
+            <div id="timeoutBlock">
+              <div class="divider"></div>
+              <button class="row row--sub" onclick="toast('原型：选择自动锁定时长')">
+                <span class="row-text">
+                  <span class="row-title">自动锁定</span>
+                  <span class="row-sub">5 分钟</span>
+                </span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+              </button>
+            </div>
+
+            <div class="divider"></div>
+            <button class="row" onclick="toast('原型：查看截屏状态与恢复方法')">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+                  <path d="M12 3.6 19 6v5.6c0 4.2-2.8 7.6-7 8.9-4.2-1.3-7-4.7-7-8.9V6z"/>
+                  <path d="m9 12 2.2 2.2L15.4 10" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">截屏与录屏</span>
+                <span class="row-sub">正常 · 可截屏，最近任务预览显示内容</span>
+              </span>
+              <span class="row-sub" style="flex:0 0 auto">正常</span>
+            </button>
+          </section>
+
+          <section class="card" style="margin-top:20px">
+            <button class="row" id="dataToggle" onclick="toggleData()" aria-expanded="false">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <ellipse cx="12" cy="6" rx="7" ry="2.8"/>
+                  <path d="M5 6v12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8V6" stroke-linecap="round"/>
+                  <path d="M5 12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">数据与备份</span>
+                <span class="row-sub">导出、恢复与更换口令</span>
+              </span>
+              <svg class="chev chev-down" id="dataChev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+
+            <div class="collapse" id="dataPanel">
+              <div class="collapse-inner">
+                <div class="divider"></div>
+                <button class="row" onclick="toast('原型：选择加密方式并导出')">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 15.2V4"/><path d="m8 11.2 4-4 4 4"/><path d="M5 19.4h14"/>
+                    </svg>
+                  </span>
+                  <span class="row-text">
+                    <span class="row-title">导出备份</span>
+                    <span class="row-sub">默认加密导出，恢复时需要口令</span>
+                  </span>
+                </button>
+                <div class="divider"></div>
+                <button class="row" onclick="toast('原型：选择备份文件并确认覆盖')">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 4v11.2"/><path d="m8 11.2 4 4 4-4"/><path d="M5 19.4h14"/>
+                    </svg>
+                  </span>
+                  <span class="row-text">
+                    <span class="row-title is-error">从备份恢复</span>
+                    <span class="row-sub">会用备份替换当前全部记录</span>
+                  </span>
+                </button>
+                <div class="divider"></div>
+                <button class="row" onclick="toast('原型：选择备份并更换口令')">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="8" cy="12" r="3.4"/>
+                      <path d="M11.4 12H20"/><path d="M17 12v3"/><path d="M13.8 12v2.2"/>
+                    </svg>
+                  </span>
+                  <span class="row-text">
+                    <span class="row-title">更换备份口令</span>
+                    <span class="row-sub">解旧口令后用新口令重新加密</span>
+                  </span>
+                </button>
+                <div class="divider"></div>
+                <p class="note is-warn">
+                  加密备份需要口令才能恢复，口令遗失无法找回；明文备份不加密，拿到文件就能看到全部记录。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <h2 class="section-label">更多</h2>
+          <section class="card">
+            <button class="row" onclick="openPage('privacy')">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="8.2"/>
+                  <path d="M12 11.2v5.2"/>
+                  <circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">数据与隐私</span>
+                <span class="row-sub">本地存储、网络权限与备份边界</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+            <div class="divider"></div>
+            <button class="row" onclick="toast('原型：打开开源许可全文')">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6.2 3.6h7.2l4.4 4.4v12.4H6.2z"/>
+                  <path d="M13.4 3.6V8h4.4"/><path d="M9 13h6M9 16.4h4.2"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">开源许可</span>
+                <span class="row-sub">SQLCipher Community Edition · BSD-style</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+            <div class="divider"></div>
+            <button class="row" onclick="openPage('changelog')">
+              <span class="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="8.2"/>
+                  <path d="M12 7.6v4.8l3.2 1.9"/>
+                </svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">更新日志</span>
+                <span class="row-sub" id="logSub">最近 6 个版本的变更</span>
+              </span>
+              <span class="badge" id="updateBadge">有新版本</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+          </section>
+
+          <footer class="page-footer" id="footer">
+            <div id="footerNormal">
+              <div class="footer-brand">生活记 <span class="ver">0.6.4</span></div>
+              <button class="footer-action" id="checkBtn" onclick="checkUpdate()">检查更新</button>
+            </div>
+            <div class="update-banner" id="updateBanner">
+              <div class="ub-text">
+                <div class="ub-title">v0.6.5 可用</div>
+                <div class="ub-sub">布里斯托图示与月历细节改进</div>
+              </div>
+              <button class="ub-btn" onclick="toast('原型：下载并调起系统安装器')">更新</button>
+            </div>
+            <p class="footer-disclaimer">本地生活记录工具 · 不提供医疗诊断</p>
+          </footer>
+        </div>
+
+        <!-- ========== 二级页：更新日志 ========== -->
+        <div class="subpage" id="page-changelog">
+          <div class="subp-head">
+            <button class="back-btn" onclick="closePage('changelog')" aria-label="返回">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12 15 19.5"/></svg>
+            </button>
+            <span class="subp-title">更新日志</span>
+          </div>
+          <div class="subp-body">
+            <section class="card">
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver current">v0.6.4 · 当前</span><span class="log-date">2026-11-11</span></div>
+                <div class="log-sum">截屏遮挡时在设置页显示当前状态与原因，点开即可查看恢复方法</div>
+              </div>
+              <div class="divider"></div>
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver">v0.6.3</span><span class="log-date">2026-11-11</span></div>
+                <div class="log-sum">排便记录改用布里斯托图示选择；修复国内更新在同步期的误报</div>
+              </div>
+              <div class="divider"></div>
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver">v0.6.2</span><span class="log-date">2026-11-11</span></div>
+                <div class="log-sum">月历可按天查看；首页改为模块网格与今日时间轴；主题支持浅色、深色与跟随系统</div>
+              </div>
+              <div class="divider"></div>
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver">v0.6.1</span><span class="log-date">2026-11-10</span></div>
+                <div class="log-sum">新增亲密关系记录模块（默认停用）；发版版本号改为自动递增</div>
+              </div>
+              <div class="divider"></div>
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver">v0.6.0</span><span class="log-date">2026-11-10</span></div>
+                <div class="log-sum">数据库与备份全面加密；新增应用锁、截屏防护与开源许可</div>
+              </div>
+              <div class="divider"></div>
+              <div class="log-row">
+                <div class="log-head"><span class="log-ver">v0.5.0</span><span class="log-date">2026-11-10</span></div>
+                <div class="log-sum">应用内更新支持 Gitee 国内镜像，GitHub 兜底</div>
+              </div>
+            </section>
+            <p class="note" style="padding:14px 4px 0">完整历史随版本累积，此页只列最近 6 个版本。</p>
+          </div>
+        </div>
+
+        <!-- ========== 二级页：数据与隐私 ========== -->
+        <div class="subpage" id="page-privacy">
+          <div class="subp-head">
+            <button class="back-btn" onclick="closePage('privacy')" aria-label="返回">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12 15 19.5"/></svg>
+            </button>
+            <span class="subp-title">数据与隐私</span>
+          </div>
+          <div class="subp-body">
+            <section class="card">
+              <div class="prose">
+                <h4>记录存在哪里</h4>
+                <p>所有记录只保存在本应用的私有存储中，数据库与备份文件均已加密，不上传任何服务器。</p>
+
+                <h4>网络权限的用途</h4>
+                <p>为「检查更新」与安装，应用申请了网络权限（INTERNET）与安装权限（REQUEST_INSTALL_PACKAGES）。该权限仅用于查询 Gitee Releases 上的最新版本（不可用时回退 GitHub），以及下载本应用安装包；不收集、不上传任何用户数据、设备标识或遥测。</p>
+
+                <h4>应用锁与生物识别</h4>
+                <p>应用锁通过系统生物识别权限（USE_BIOMETRIC）调用指纹或锁屏密码验证，应用不读取、不上传、不保存任何生物特征数据。</p>
+
+                <h4>备份与设备迁移</h4>
+                <p>系统自动云备份与设备迁移已通过 Manifest 与规则文件排除应用数据；卸载或清除数据仍可能丢失记录，建议定期导出加密备份。</p>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ========== 外观弹层 ========== -->
+        <div class="scrim" id="scrim" onclick="closeSheet()"></div>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="外观">
+          <div class="sheet-grip"></div>
+          <h3>外观</h3>
+          <p class="sheet-sub">仅影响应用显示，不改变记录数据。</p>
+          <button class="sheet-opt" role="radio" aria-checked="false" data-mode="system" onclick="pickTheme('system')">
+            <span class="radio-dot"></span>
+            <span class="so-text">
+              <span class="so-title">跟随系统</span>
+              <span class="so-sub">随设备的深色模式自动切换</span>
+            </span>
+          </button>
+          <button class="sheet-opt" role="radio" aria-checked="true" data-mode="light" onclick="pickTheme('light')">
+            <span class="radio-dot"></span>
+            <span class="so-text">
+              <span class="so-title">浅色</span>
+              <span class="so-sub">始终使用浅色</span>
+            </span>
+          </button>
+          <button class="sheet-opt" role="radio" aria-checked="false" data-mode="dark" onclick="pickTheme('dark')">
+            <span class="radio-dot"></span>
+            <span class="so-text">
+              <span class="so-title">深色</span>
+              <span class="so-sub">始终使用深色，夜间更省电</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <!-- ========== 底部导航 ========== -->
+        <nav class="navbar">
+          <button class="nav-item" onclick="toast('原型只做了设置页')">
+            <span class="nav-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11 12 4l8 7v7.6a1.4 1.4 0 0 1-1.4 1.4h-4.2v-6h-4.8v6H5.4A1.4 1.4 0 0 1 4 18.6z"/></svg>
+            </span>
+            <span class="nav-label">今天</span>
+          </button>
+          <button class="nav-item" onclick="toast('原型只做了设置页')">
+            <span class="nav-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2.4"/><path d="M8 3.6v4M16 3.6v4M4 10.4h16" stroke-linecap="round"/></svg>
+            </span>
+            <span class="nav-label">历史</span>
+          </button>
+          <button class="nav-item" onclick="toast('原型只做了设置页')">
+            <span class="nav-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M5.5 19V11M12 19V5.5M18.5 19v-5"/></svg>
+            </span>
+            <span class="nav-label">统计</span>
+          </button>
+          <button class="nav-item active" aria-current="page">
+            <span class="nav-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.8v2.4M12 17.8v2.4M3.8 12h2.4M17.8 12h2.4M6.2 6.2l1.7 1.7M16.1 16.1l1.7 1.7M17.8 6.2l-1.7 1.7M7.9 16.1l-1.7 1.7"/></svg>
+            </span>
+            <span class="nav-label">设置</span>
+          </button>
+        </nav>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const phone = document.getElementById('phone');
+  const themeRowSub = document.getElementById('themeRowSub');
+  const sheet = document.getElementById('sheet');
+  const scrim = document.getElementById('scrim');
+  const toastEl = document.getElementById('toast');
+  const dataPanel = document.getElementById('dataPanel');
+  const dataChev = document.getElementById('dataChev');
+  const dataToggle = document.getElementById('dataToggle');
+  const lockSwitch = document.getElementById('lockSwitch');
+  const lockSub = document.getElementById('lockSub');
+  const timeoutBlock = document.getElementById('timeoutBlock');
+  const checkBtn = document.getElementById('checkBtn');
+  const footerNormal = document.getElementById('footerNormal');
+  const updateBanner = document.getElementById('updateBanner');
+  const simUpdate = document.getElementById('simUpdate');
+  const updateBadge = document.getElementById('updateBadge');
+  const logSub = document.getElementById('logSub');
+
+  let currentMode = 'light';
+  let toastTimer = null;
+  let checkTimer = null;
+
+  const themeLabels = { system: '跟随系统', light: '浅色', dark: '深色' };
+
+  function applyMode(mode) {
+    currentMode = mode;
+    let resolved = mode;
+    if (mode === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    phone.setAttribute('data-theme', resolved);
+    themeRowSub.textContent = themeLabels[mode];
+    document.querySelectorAll('.sheet-opt').forEach(function (el) {
+      el.setAttribute('aria-checked', el.dataset.mode === mode ? 'true' : 'false');
+    });
+    document.querySelectorAll('#themeSeg button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.set === resolved);
+    });
+  }
+
+  // 工具栏：直接指定浅色 / 深色（不影响行内文案，仅预览）
+  document.querySelectorAll('#themeSeg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const mode = b.dataset.set;
+      applyMode(mode);
+      toast('预览：' + themeLabels[mode]);
+    });
+  });
+
+  function openSheet() {
+    sheet.classList.add('open');
+    scrim.classList.add('open');
+  }
+  function closeSheet() {
+    sheet.classList.remove('open');
+    scrim.classList.remove('open');
+  }
+  function pickTheme(mode) {
+    applyMode(mode);
+    closeSheet();
+  }
+
+  function toggleData() {
+    const open = dataPanel.classList.toggle('open');
+    dataChev.classList.toggle('open', open);
+    dataToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function openPage(name) {
+    document.getElementById('page-' + name).classList.add('open');
+  }
+  function closePage(name) {
+    document.getElementById('page-' + name).classList.remove('open');
+  }
+
+  lockSwitch.addEventListener('change', function () {
+    const on = lockSwitch.checked;
+    timeoutBlock.style.display = on ? 'block' : 'none';
+    lockSub.textContent = on ? '已开启 · 切到后台需验证' : '未开启 · 打开应用时不需要验证';
+  });
+
+  function checkUpdate() {
+    if (checkBtn.disabled) return;
+    checkBtn.disabled = true;
+    checkBtn.textContent = '检查中…';
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(function () {
+      checkBtn.textContent = '已是最新 · 刚刚检查';
+      checkBtn.disabled = false;
+      setTimeout(function () {
+        if (!simUpdate.checked) checkBtn.textContent = '检查更新';
+      }, 4000);
+    }, 1100);
+  }
+
+  // 页脚沉到底部后，首屏需要一个可发现性兜底：有新版时「更新日志」行同步标记。
+  simUpdate.addEventListener('change', function () {
+    const on = simUpdate.checked;
+    footerNormal.style.display = on ? 'none' : 'block';
+    updateBanner.classList.toggle('show', on);
+    updateBadge.classList.toggle('show', on);
+    logSub.textContent = on ? 'v0.6.5 已发布 · 到页脚更新' : '最近 6 个版本的变更';
+  });
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1900);
+  }
+
+  // 初始态：浅色 + 折叠收起
+  applyMode('light');
+</script>
+</body>
+</html>

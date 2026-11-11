@@ -67,7 +67,7 @@ class AppContainer(private val application: Application) {
 
     val trackRepository by lazy { RoomTrackRepository(database) }
     val settingsRepository = SettingsRepository(application)
-    val updateRepository = UpdateRepository(application)
+    val updateRepository = UpdateRepository(application, settingsRepository)
 
     /**
      * 打开数据库并发布状态。整段跑在 IO 线程：Keystore 解封在部分机型要几十到几百毫秒，

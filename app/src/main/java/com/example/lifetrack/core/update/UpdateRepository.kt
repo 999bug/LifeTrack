@@ -2,6 +2,7 @@ package com.example.lifetrack.core.update
 
 import android.content.Context
 import com.example.lifetrack.BuildConfig
+import com.example.lifetrack.core.datastore.SettingsRepository
 import kotlin.jvm.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
  */
 class UpdateRepository(
     private val appContext: Context,
+    private val settings: SettingsRepository,
     private val fetcher: ReleaseFetcher = ReleaseFetcher,
     private val probe: ArtifactProbe = HttpArtifactProbe,
     private val retryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -62,15 +64,28 @@ class UpdateRepository(
     @Volatile
     private var retryJob: Job? = null
 
-    /** [auto] 为 true 时（启动自动检查）同一进程内只查一次。 */
+    /**
+     * [auto] 为 true 时（启动自动检查）同一进程内只查一次，且距上次成功查询不足
+     * [AUTO_CHECK_INTERVAL_MILLIS] 时直接跳过——否则每次冷启动都会打一次 Gitee API。
+     * 手动检查（[auto] 为 false）不受任何节流限制。
+     */
     suspend fun check(auto: Boolean = false) {
         if (auto && startupChecked) return
+        // 无论这次是否被节流，本进程的自动检查都只处理一次。
         startupChecked = true
+        if (auto && shouldSkipAutoCheck()) {
+            // 能走到这里说明上次成功查过、且远端版本不高于当前版本，
+            // 直接呈现「已是最新」，UI 不会因为没有请求而停留在「未检查」。
+            _state.value = Status.UpToDate
+            return
+        }
         if (_state.value is Status.Checking) return
         cancelRetry()
         _state.value = Status.Checking
         runCatching {
             val latest = fetcher.fetchLatest()
+            // 只有拿到远端响应才记时间戳；失败不写，下次启动照常重试。
+            settings.recordUpdateCheck(latest?.version)
             when (val decision = UpdatePolicy.decide(latest, BuildConfig.VERSION_NAME)) {
                 UpdateDecision.UpToDate -> {
                     pendingAttempt = 0
@@ -158,6 +173,22 @@ class UpdateRepository(
         }
     }
 
+    /**
+     * 自动检查的节流判定。
+     *
+     * 唯一例外是「上次已经查到比当前安装版本更高的版本」：这时不跳过，
+     * 否则用户重启后看不到更新提示——节流不该让提示消失。
+     */
+    private suspend fun shouldSkipAutoCheck(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val lastCheckedAt = settings.lastUpdateCheckAt()
+        if (lastCheckedAt <= 0L) return false
+        val latest = settings.lastKnownLatestVersion()
+        if (latest != null && GitHubReleaseChecker.isNewer(latest, BuildConfig.VERSION_NAME)) {
+            return false
+        }
+        return nowMillis - lastCheckedAt < AUTO_CHECK_INTERVAL_MILLIS
+    }
+
     private fun enterPending(decision: UpdateDecision.Pending) {
         val waitMillis = PendingBackoff.delayMillis(pendingAttempt)
         pendingAttempt++
@@ -180,5 +211,10 @@ class UpdateRepository(
     private fun cancelRetry() {
         retryJob?.cancel()
         retryJob = null
+    }
+
+    private companion object {
+        /** 自动检查的最小间隔：24 小时。 */
+        const val AUTO_CHECK_INTERVAL_MILLIS = 24L * 60 * 60 * 1000
     }
 }

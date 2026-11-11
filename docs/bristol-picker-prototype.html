@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeTrack · 布里斯托图示选择器原型</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --font: -apple-system, "SF Pro Text", "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+    --canvas: #ECEEE8;
+    --bg: #F6F7F3;
+    --surface: #FDFDFB;
+    --surface-2: #EFF2EB;
+    --surface-3: #E7EBE2;
+    --border: #E3E8DE;
+    --border-strong: #D3DBCC;
+
+    --text: #171A16;
+    --text-2: #59625A;
+    --text-3: #69716A;
+
+    --primary: #33604A;
+    --on-primary: #FFFFFF;
+    --primary-soft: #DDEBE0;
+    --on-primary-soft: #1B3A2A;
+
+    --toilet: #8A6A4B;
+    --water: #3D7391;
+    --coffee: #9A7134;
+    --sport: #4C7A57;
+    --intimacy: #8A5F72;
+
+    --r-card: 16px;
+    --r-btn: 12px;
+    --r-pill: 999px;
+
+    --shadow-card: 0 1px 2px rgba(23,26,22,.04), 0 12px 28px -22px rgba(23,26,22,.35);
+    --shadow-dialog: 0 18px 48px -18px rgba(10,16,12,.42);
+    --shadow-device: 0 40px 90px -40px rgba(10,16,12,.55);
+
+    --ease: cubic-bezier(.2,.7,.3,1);
+    --dur: 160ms;
+
+    --sz-h2: 18px;
+    --sz-title: 15px;
+    --sz-sub: 14px;
+    --sz-body: 13px;
+    --sz-label: 12px;
+    --sz-tiny: 11.5px;
+  }
+
+  html[data-theme="dark"] {
+    --canvas: #070A08;
+    --bg: #0F1410;
+    --surface: #171E19;
+    --surface-2: #121814;
+    --surface-3: #1E2721;
+    --border: #2A342C;
+    --border-strong: #37443A;
+
+    --text: #E9F0E9;
+    --text-2: #A8B4AA;
+    --text-3: #8B988E;
+
+    --primary: #A9D8B4;
+    --on-primary: #0E1510;
+    --primary-soft: #24382B;
+    --on-primary-soft: #CFE9D5;
+
+    --toilet: #C9A382;
+    --water: #8FC0D8;
+    --coffee: #D9B173;
+    --sport: #9CC7A6;
+    --intimacy: #C99BAE;
+
+    --shadow-card: 0 1px 0 rgba(255,255,255,.02), 0 14px 30px -24px rgba(0,0,0,.9);
+    --shadow-dialog: 0 18px 48px -18px rgba(0,0,0,.8);
+  }
+
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--canvas);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  button { font-family: inherit; }
+
+  .stage { max-width: 1140px; margin: 0 auto; padding: 28px 28px 48px; }
+  .topbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding-bottom: 20px; border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand strong { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+  .brand span { font-size: var(--sz-label); color: var(--text-3); letter-spacing: .02em; }
+
+  .pager, .seg {
+    display: flex; gap: 2px; padding: 3px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-pill);
+  }
+  .pager button, .seg button {
+    font: inherit; font-size: var(--sz-label); font-weight: 550; color: var(--text-2);
+    background: none; border: 0; border-radius: var(--r-pill);
+    padding: 7px 13px; cursor: pointer; white-space: nowrap;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .pager button[aria-selected="true"], .seg button[aria-selected="true"] {
+    background: var(--surface); color: var(--text); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+  .seg-label { font-size: var(--sz-tiny); color: var(--text-3); margin-left: 4px; }
+
+  .layout {
+    display: grid; grid-template-columns: 430px minmax(0, 1fr);
+    gap: 56px; align-items: start; margin-top: 34px;
+  }
+
+  .device-shell {
+    width: 100%; max-width: 430px; padding: 9px; border-radius: 46px;
+    background: #1A211B;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, var(--shadow-device);
+    flex: 0 0 auto; min-width: 0;
+  }
+  html[data-theme="dark"] .device-shell { background: #141A16; }
+
+  .device {
+    position: relative; display: flex; flex-direction: column;
+    width: 100%; height: clamp(680px, calc(100vh - 190px), 860px);
+    background: var(--bg); border-radius: 38px; overflow: hidden;
+    transition: background var(--dur) var(--ease);
+  }
+  .statusbar {
+    flex: 0 0 auto; height: 40px; padding: 0 26px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: var(--sz-label); font-weight: 650; color: var(--text);
+  }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+  .battery { display: inline-block; width: 22px; height: 11px; border: 1.4px solid var(--text); border-radius: 3px; position: relative; opacity: .9; }
+  .battery::after { content: ""; position: absolute; left: 1.4px; top: 1.4px; bottom: 1.4px; width: 12px; border-radius: 1px; background: var(--text); }
+
+  .pages { position: relative; flex: 1 1 auto; overflow: hidden; }
+  .page { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 10px 20px 28px; scrollbar-width: none; }
+  .page::-webkit-scrollbar { display: none; }
+
+  .page-head { padding: 6px 0 18px; }
+  .eyebrow { margin: 0 0 6px; font-size: var(--sz-label); font-weight: 500; letter-spacing: .04em; color: var(--text-3); }
+  .h1 { margin: 0; font-size: 27px; line-height: 1.2; font-weight: 640; letter-spacing: -.02em; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+    box-shadow: var(--shadow-card); padding: 16px;
+  }
+  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .module {
+    position: relative; display: flex; flex-direction: column; gap: 3px;
+    padding: 13px 13px 11px; text-align: left; cursor: pointer;
+    font: inherit; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow-card); overflow: hidden;
+    transition: transform 120ms var(--ease), border-color var(--dur) var(--ease);
+  }
+  .module::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); opacity: .85; }
+  .module:active { transform: scale(.982); }
+  .module:focus-visible, .bristol-card:focus-visible, .skip-card:focus-visible,
+  .chip:focus-visible, .text-link:focus-visible, .pager button:focus-visible, .seg button:focus-visible {
+    outline: 2px solid var(--primary); outline-offset: 2px;
+  }
+  .module[data-type="toilet"] { --c: var(--toilet); }
+  .module[data-type="water"] { --c: var(--water); }
+  .module[data-type="coffee"] { --c: var(--coffee); }
+  .module[data-type="sport"] { --c: var(--sport); }
+  .module-icon {
+    width: 30px; height: 30px; border-radius: 9px; margin-bottom: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--c) 13%, transparent); color: var(--c);
+  }
+  .module-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; }
+  .module-name { font-size: var(--sz-sub); font-weight: 600; }
+  .module-meta { font-size: var(--sz-tiny); line-height: 1.35; color: var(--text-3); }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 0 10px; }
+  .section-head h2 { margin: 0; font-size: var(--sz-title); font-weight: 620; }
+  .section-head span { font-size: var(--sz-label); color: var(--text-3); }
+
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .tl-item {
+    position: relative; display: grid; grid-template-columns: 46px 14px 1fr;
+    align-items: start; gap: 0 10px; padding: 9px 0; cursor: pointer; border-radius: 10px;
+  }
+  .tl-item::after { content: ""; position: absolute; left: 62px; top: 27px; bottom: -9px; width: 1.5px; background: var(--border); }
+  .tl-item:last-child::after { display: none; }
+  .tl-time { font-size: var(--sz-label); font-weight: 550; color: var(--text-2); padding-top: 3px; font-variant-numeric: tabular-nums; }
+  .tl-dot { width: 9px; height: 9px; border-radius: 50%; margin: 6px 0 0 2px; background: var(--c); box-shadow: 0 0 0 3.5px var(--bg); position: relative; z-index: 1; }
+  .tl-item[data-type="toilet"] { --c: var(--toilet); }
+  .tl-item[data-type="water"] { --c: var(--water); }
+  .tl-title { margin: 0; font-size: 13.5px; font-weight: 600; }
+  .tl-sub { margin: 2px 0 0; font-size: var(--sz-label); line-height: 1.4; color: var(--text-3); }
+  .tl-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--primary); font-size: var(--sz-label); font-weight: 600; }
+  .tl-badge svg { width: 20px; height: 14px; color: var(--toilet); }
+
+  .tabbar {
+    flex: 0 0 auto; height: 68px; padding: 0 8px 6px;
+    display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
+    background: var(--bg); border-top: 1px solid var(--border);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 100%; border: 0; background: none; color: var(--text-3); font: inherit; }
+  .tab svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; }
+  .tab span { font-size: 10.5px; font-weight: 550; }
+  .tab[aria-selected="true"] { color: var(--primary); }
+
+  .scrim {
+    position: absolute; inset: 0; background: rgba(8,12,9,.46);
+    opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease); z-index: 20;
+  }
+  .scrim.is-open { opacity: 1; pointer-events: auto; }
+
+  .editor {
+    position: absolute; left: 14px; right: 14px; top: 50%; z-index: 22;
+    transform: translateY(-50%);
+    max-height: 84%; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
+    box-shadow: var(--shadow-dialog);
+    opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease);
+  }
+  .editor.is-open { opacity: 1; pointer-events: auto; }
+  .editor-head { flex: 0 0 auto; padding: 18px 20px 8px; display: flex; align-items: baseline; gap: 10px; }
+  .editor-head h2 { margin: 0; font-size: var(--sz-h2); font-weight: 640; letter-spacing: -.015em; }
+  .editor-head span { font-size: var(--sz-label); color: var(--text-3); }
+  .editor-scroll { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px 14px; scrollbar-width: thin; }
+  .editor-actions {
+    flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 6px;
+    padding: 10px 14px 14px; border-top: 1px solid var(--border);
+  }
+  .editor-actions button {
+    font: inherit; font-size: var(--sz-sub); font-weight: 600; color: var(--primary);
+    background: none; border: 0; border-radius: var(--r-btn); padding: 10px 14px; cursor: pointer;
+  }
+  .editor-actions button.primary { background: var(--primary); color: var(--on-primary); padding: 10px 22px; }
+  .editor-actions button:active { transform: scale(.985); }
+
+  .picker-row { display: flex; gap: 10px; }
+  .fake-input {
+    flex: 1 1 0; min-width: 0; height: 44px; border: 1px solid var(--border-strong);
+    border-radius: 10px; display: flex; align-items: center; padding: 0 12px;
+    font-size: var(--sz-sub); color: var(--text); background: var(--bg);
+  }
+  .zone { margin: 8px 0 0; font-size: var(--sz-label); color: var(--text-3); }
+  .divider { height: 1px; background: var(--border); margin: 16px 0 14px; }
+  .field-label { margin: 0 0 8px; font-size: var(--sz-sub); font-weight: 600; }
+  .field-label em { font-style: normal; font-weight: 400; color: var(--text-3); }
+  .field-block { margin-top: 14px; }
+
+  .chips { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; font: inherit; font-size: var(--sz-label); font-weight: 520;
+    color: var(--text-2); background: transparent;
+    border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+    padding: 6px 12px; min-height: 32px; cursor: pointer;
+    transition: all var(--dur) var(--ease);
+  }
+  .chip[aria-pressed="true"] { background: var(--primary-soft); border-color: transparent; color: var(--on-primary-soft); font-weight: 600; }
+
+  .axis {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: var(--sz-tiny); color: var(--text-3); margin-bottom: 9px;
+  }
+  .axis i { flex: 1 1 auto; height: 1px; background: var(--border-strong); }
+
+  .bristol-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .bristol-card, .skip-card {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 2px; min-height: 92px; padding: 8px 4px 7px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text); cursor: pointer; text-align: center;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), transform 120ms var(--ease);
+  }
+  .bristol-card:active, .skip-card:active { transform: scale(.982); }
+  .bristol-card .art { width: 58px; height: 38px; color: var(--toilet); }
+  .bristol-card .art svg { width: 100%; height: 100%; display: block; }
+  .bristol-card .num { font-size: var(--sz-label); font-weight: 620; font-variant-numeric: tabular-nums; }
+  .bristol-card .cap { font-size: var(--sz-tiny); line-height: 1.25; color: var(--text-3); }
+  .bristol-card[aria-pressed="true"] {
+    background: var(--primary-soft); border: 2px solid var(--primary); padding: 7px 3px 6px;
+  }
+  .bristol-card[aria-pressed="true"] .art { color: var(--on-primary-soft); }
+  .bristol-card[aria-pressed="true"] .num, .bristol-card[aria-pressed="true"] .cap { color: var(--on-primary-soft); }
+  .check {
+    position: absolute; right: 5px; top: 5px; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--primary); color: var(--on-primary);
+    display: none; align-items: center; justify-content: center;
+  }
+  .check svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .bristol-card[aria-pressed="true"] .check { display: flex; }
+
+  .skip-card {
+    border-style: dashed; border-color: var(--border-strong); background: transparent;
+    justify-content: center; gap: 4px;
+  }
+  .skip-card span { font-size: var(--sz-label); font-weight: 550; color: var(--text-2); }
+  .skip-card small { font-size: var(--sz-tiny); color: var(--text-3); }
+  .skip-card[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); }
+
+  .selection {
+    margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+    background: var(--surface-3); border-left: 3px solid var(--border-strong);
+  }
+  .selection.is-set { background: var(--primary-soft); border-left-color: var(--primary); }
+  .selection strong { display: block; font-size: var(--sz-body); font-weight: 620; }
+  .selection p { margin: 3px 0 0; font-size: var(--sz-label); line-height: 1.5; color: var(--text-2); }
+  .selection.is-set p { color: var(--on-primary-soft); }
+
+  .field-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .field-row .field-label { margin: 0; }
+  .text-link {
+    margin: 0; padding: 2px 0; font: inherit; font-size: var(--sz-label); font-weight: 550;
+    color: var(--primary); background: none; border: 0; cursor: pointer; text-align: left;
+    flex: 0 0 auto;
+  }
+  .text-link:hover { text-decoration: underline; }
+
+  .fake-note {
+    min-height: 56px; border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 10px 12px; font-size: var(--sz-body); color: var(--text-3); background: var(--bg);
+  }
+
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
+    background: var(--surface); border-radius: 24px 24px 0 0; border-top: 1px solid var(--border);
+    padding: 10px 20px 24px; transform: translateY(102%);
+    transition: transform 260ms var(--ease); max-height: 82%; overflow-y: auto;
+  }
+  .sheet.is-open { transform: none; }
+  .sheet-handle { width: 34px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 16px; }
+  .sheet h2 { margin: 0 0 3px; font-size: var(--sz-h2); font-weight: 640; }
+  .sheet-sub { margin: 0 0 14px; font-size: var(--sz-label); color: var(--text-3); line-height: 1.5; }
+  .guide-group { margin: 14px 0 6px; font-size: var(--sz-tiny); font-weight: 600; letter-spacing: .04em; color: var(--text-3); }
+  .guide-row { display: grid; grid-template-columns: 56px 34px 1fr; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .guide-row:last-of-type { border-bottom: 0; }
+  .guide-art { width: 56px; height: 34px; color: var(--toilet); }
+  .guide-art svg { width: 100%; height: 100%; display: block; }
+  .guide-num { font-size: var(--sz-label); font-weight: 620; font-variant-numeric: tabular-nums; color: var(--primary); }
+  .guide-row b { display: block; font-size: var(--sz-body); font-weight: 600; }
+  .guide-row span { font-size: var(--sz-tiny); color: var(--text-3); line-height: 1.4; }
+  .sheet-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .btn {
+    height: 42px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--border-strong);
+    background: transparent; color: var(--text); font: inherit; font-size: var(--sz-sub); font-weight: 600; cursor: pointer;
+  }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+
+  .detail-row { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: var(--sz-body); }
+  .detail-row:last-of-type { border-bottom: 0; }
+  .detail-row dt { color: var(--text-3); }
+  .detail-row dd { margin: 0; font-weight: 550; }
+  .detail-row dd.muted { color: var(--text-3); font-weight: 400; }
+  .detail-art { display: inline-flex; width: 58px; height: 34px; color: var(--toilet); vertical-align: middle; margin-right: 6px; }
+  .detail-art svg { width: 100%; height: 100%; }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 84px; z-index: 30; transform: translate(-50%, 8px);
+    padding: 9px 16px; border-radius: var(--r-pill); background: var(--text); color: var(--bg);
+    font-size: var(--sz-label); font-weight: 550; opacity: 0; pointer-events: none;
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+  }
+  .toast.is-open { opacity: 1; transform: translate(-50%, 0); }
+
+  .notes { padding-top: 6px; }
+  .notes-tag { display: inline-flex; align-items: center; gap: 6px; font-size: var(--sz-tiny); font-weight: 600; letter-spacing: .06em; color: var(--text-3); }
+  .notes-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+  .notes h2 { margin: 12px 0 6px; font-size: 22px; font-weight: 640; letter-spacing: -.025em; }
+  .notes > p { margin: 0 0 20px; font-size: 13.5px; line-height: 1.65; color: var(--text-2); max-width: 48ch; }
+  .notes h3 { margin: 24px 0 8px; font-size: var(--sz-tiny); font-weight: 600; letter-spacing: .05em; color: var(--text-3); }
+  .note-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .note-list li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; }
+  .note-idx { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-size: var(--sz-tiny); font-weight: 600; color: var(--text-3); }
+  .note-list b { display: block; font-size: var(--sz-body); font-weight: 600; margin-bottom: 2px; }
+  .note-list span { font-size: var(--sz-label); line-height: 1.55; color: var(--text-2); }
+  .spec { width: 100%; border-collapse: collapse; font-size: var(--sz-label); }
+  .spec th, .spec td { text-align: left; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .spec th { color: var(--text-3); font-weight: 500; white-space: nowrap; }
+  .spec td { color: var(--text-2); }
+  .spec code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--sz-tiny); color: var(--text); }
+  .footnote { margin: 18px 0 0; font-size: var(--sz-tiny); line-height: 1.6; color: var(--text-3); }
+
+  .device.is-large {
+    --sz-h2: 25px; --sz-title: 21px; --sz-sub: 19px;
+    --sz-body: 18px; --sz-label: 16px; --sz-tiny: 15px;
+  }
+  .device.is-large .bristol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device.is-large .bristol-card, .device.is-large .skip-card { min-height: 112px; }
+  .device.is-large .bristol-card .art { width: 66px; height: 40px; }
+  .device.is-large .picker-row { flex-direction: column; }
+  .device.is-large .fake-input { width: 100%; }
+  .device.is-large .h1 { font-size: 34px; }
+  .device.is-large .module-name { font-size: var(--sz-sub); }
+  .device.is-large .tl-title { font-size: var(--sz-sub); }
+
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .device-shell { margin: 0 auto; }
+    .notes { max-width: 560px; margin: 0 auto; }
+  }
+  @media (max-width: 480px) {
+    .stage { padding: 16px; }
+    .device-shell { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+    .device { width: 100%; border-radius: 0; height: calc(100vh - 120px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <header class="topbar">
+    <div class="brand">
+      <strong>LifeTrack</strong>
+      <span>布里斯托图示选择器 · 原型 v0（仅设计评审，未改 Compose 代码）</span>
+    </div>
+    <div class="pager" id="viewPager" aria-label="方案对照">
+      <button data-view="old" aria-selected="false">现状</button>
+      <button data-view="new" aria-selected="true">图示方案</button>
+    </div>
+    <div class="seg" id="themeSeg" aria-label="主题">
+      <button data-theme="light" aria-selected="true">浅色</button>
+      <button data-theme="dark" aria-selected="false">深色</button>
+    </div>
+    <div class="seg" id="fontSeg" aria-label="字号">
+      <button data-font="normal" aria-selected="true">标准</button>
+      <button data-font="large" aria-selected="false">200%</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="device-shell">
+      <div class="device" id="device">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="status-right">
+            <svg width="15" height="12" viewBox="0 0 15 12" aria-hidden="true"><path d="M1 9h2v2H1zM5 6.5h2V11H5zM9 4h2v7H9zM13 1h2v10h-2z" fill="currentColor"/></svg>
+            <span class="battery"></span>
+          </span>
+        </div>
+
+        <div class="pages">
+          <section class="page" aria-label="今天">
+            <div class="page-head">
+              <p class="eyebrow">11月11日 · 周三</p>
+              <h1 class="h1">今天</h1>
+            </div>
+            <div class="module-grid">
+              <button class="module" data-type="toilet" id="openEditor" aria-label="记录排便，打开详细记录编辑器">
+                <span class="module-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 3-2 4-2 7H8c0-3-2-4-2-7z"/><path d="M8 19h8"/></svg></span>
+                <span class="module-name">排便</span>
+                <span class="module-meta">今日 <span id="todayCount">2</span> 次 · 点按记录</span>
+              </button>
+              <button class="module" data-type="water">
+                <span class="module-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9z"/></svg></span>
+                <span class="module-name">饮水</span>
+                <span class="module-meta">今日 4 次</span>
+              </button>
+              <button class="module" data-type="coffee">
+                <span class="module-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h11v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M16 10h2a2 2 0 0 1 0 4h-2"/></svg></span>
+                <span class="module-name">咖啡 / 茶</span>
+                <span class="module-meta">今日 1 次</span>
+              </button>
+              <button class="module" data-type="sport">
+                <span class="module-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="5" r="2"/><path d="M8 20l3-6-3-3 2-4 4 2 3 3"/></svg></span>
+                <span class="module-name">运动</span>
+                <span class="module-meta">今日 0 次</span>
+              </button>
+            </div>
+
+            <div class="section-head"><h2>今日记录</h2><span id="recordCount">2 条</span></div>
+            <ul class="timeline" id="timeline">
+              <li class="tl-item" data-type="water" data-detail="water">
+                <span class="tl-time">07:10</span><span class="tl-dot"></span>
+                <div><p class="tl-title">饮水 250 ml</p><p class="tl-sub">点按查看详情</p></div>
+              </li>
+              <li class="tl-item" data-type="toilet" data-detail="poop-old">
+                <span class="tl-time">08:32</span><span class="tl-dot"></span>
+                <div><p class="tl-title">排便 · 布里斯托 4 型</p><p class="tl-sub">适中 · 不费力</p></div>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <nav class="tabbar" aria-label="主导航">
+          <button class="tab" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M4 10.6 12 4l8 6.6V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg><span>今天</span></button>
+          <button class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>历史</span></button>
+          <button class="tab"><svg viewBox="0 0 24 24"><path d="M5 19V11M10 19V5M15 19v-6M20 19V8"/></svg><span>统计</span></button>
+          <button class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg><span>设置</span></button>
+        </nav>
+
+        <div class="scrim is-open" id="editorScrim"></div>
+        <div class="editor is-open" id="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+          <div class="editor-head">
+            <h2 id="editorTitle">详细记录</h2><span>排便 · 编辑详情字段</span>
+          </div>
+          <div class="editor-scroll">
+            <div class="picker-row">
+              <div class="fake-input">2026年11月11日</div>
+              <div class="fake-input">09:12</div>
+            </div>
+            <p class="zone">按记录所在地时区保存：Asia/Shanghai</p>
+
+            <div class="divider"></div>
+            <div class="field-row">
+              <p class="field-label">布里斯托类型 <em>（可选）</em></p>
+              <button class="text-link" id="openGuide">七型对照</button>
+            </div>
+
+            <div id="oldView" hidden>
+              <div class="chips" id="oldChips" aria-label="现状：只有数字的一行筛选芯片"></div>
+              <p class="zone">现状代码：1–7 七个数字芯片，横向滚动，再点一次取消选择。</p>
+            </div>
+
+            <div id="newView">
+              <div class="axis"><span>偏干端</span><i></i><span>含水量 →</span><i></i><span>偏稀端</span></div>
+              <div class="bristol-grid" id="bristolGrid" role="group" aria-label="布里斯托七型形态，按含水量从偏干到偏稀排列"></div>
+              <div class="selection" id="selection" aria-live="polite">
+                <strong>未记录</strong>
+                <p>选一个最接近的形态，看不准可以跳过；再点一次已选的卡片也能取消。</p>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+            <div class="field-block">
+              <p class="field-label">排便量 <em>（可选）</em></p>
+              <div class="chips" data-single="amount">
+                <button class="chip" aria-pressed="true">未记录</button>
+                <button class="chip" aria-pressed="false">少量</button>
+                <button class="chip" aria-pressed="false">适中</button>
+                <button class="chip" aria-pressed="false">大量</button>
+              </div>
+            </div>
+            <div class="field-block">
+              <p class="field-label">费力程度 <em>（可选）</em></p>
+              <div class="chips" data-single="effort">
+                <button class="chip" aria-pressed="true">未记录</button>
+                <button class="chip" aria-pressed="false">不费力</button>
+                <button class="chip" aria-pressed="false">轻微</button>
+                <button class="chip" aria-pressed="false">明显</button>
+              </div>
+            </div>
+            <div class="field-block">
+              <p class="field-label">便意急迫感</p>
+              <div class="chips" data-single="urgency">
+                <button class="chip" aria-pressed="true">未记录</button>
+                <button class="chip" aria-pressed="false">否</button>
+                <button class="chip" aria-pressed="false">是</button>
+              </div>
+            </div>
+            <div class="field-block">
+              <p class="field-label">腹部不适</p>
+              <div class="chips" data-single="abdominal">
+                <button class="chip" aria-pressed="true">未记录</button>
+                <button class="chip" aria-pressed="false">否</button>
+                <button class="chip" aria-pressed="false">是</button>
+              </div>
+            </div>
+            <div class="field-block">
+              <p class="field-label">排不净感</p>
+              <div class="chips" data-single="incomplete">
+                <button class="chip" aria-pressed="true">未记录</button>
+                <button class="chip" aria-pressed="false">否</button>
+                <button class="chip" aria-pressed="false">是</button>
+              </div>
+            </div>
+
+            <div class="field-block">
+              <p class="field-label">备注 <em>（可选）</em></p>
+              <div class="fake-note">写下想补充的内容</div>
+            </div>
+          </div>
+          <div class="editor-actions">
+            <button id="cancelEditor">取消</button>
+            <button class="primary" id="saveEditor">保存</button>
+          </div>
+        </div>
+
+        <div class="scrim" id="guideScrim"></div>
+        <div class="sheet" id="guideSheet" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+          <div class="sheet-handle"></div>
+          <h2 id="guideTitle">七型对照</h2>
+          <p class="sheet-sub">按外形和稠度选最接近的一型。1→7 是含水量从少到多的连续刻度，不是七种并列的分类。</p>
+          <div id="guideList"></div>
+          <p class="sheet-sub" style="margin-top:14px">仅用于自我观察记录。持续异常或伴随其它不适，请咨询医生。</p>
+          <div class="sheet-actions"><button class="btn primary" id="closeGuide">知道了</button></div>
+        </div>
+
+        <div class="scrim" id="detailScrim"></div>
+        <div class="sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+          <div class="sheet-handle"></div>
+          <h2 id="detailTitle">排便 · 08:32</h2>
+          <p class="sheet-sub">记录详情</p>
+          <dl id="detailFields"></dl>
+          <div class="sheet-actions"><button class="btn" id="closeDetail">关闭</button></div>
+        </div>
+
+        <div class="toast" id="toast" role="status">已保存</div>
+      </div>
+    </div>
+
+    <aside class="notes">
+      <span class="notes-tag">设计说明</span>
+      <h2>照着图选，不用背分型</h2>
+      <p>如厕后单手记录，用户不会记得「3 型和 4 型差在哪」。把七个形态一次摊开，用图形 + 两字短标签替代纯数字，选中后再补一句确认文案。</p>
+
+      <ol class="note-list">
+        <li><span class="note-idx">1</span><div><b>七型一眼看全</b><span>4 + 3 网格，不横向滚动。现状的横向 chip 行在手机上只能看到前四型，第 7 型要滑到底，等于让用户凭记忆选。</span></div></li>
+        <li><span class="note-idx">2</span><div><b>颜色只做识别，不做装饰</b><span>形态图统一用排便模块识别色 <code>--toilet</code>；选中态改用主色描边 + 勾选圆点 + 描述条，三重信号，不只靠颜色。分组用「偏干端 / 中间段 / 偏稀端」的轴向词，不贴诊断标签。</span></div></li>
+        <li><span class="note-idx">3</span><div><b>允许不确定</b><span>虚线「不确定 / 本项留空」卡与再点取消都回到未记录，对应 <code>bristolType: Int?</code>；它默认选中，与其它字段的「未记录」chip 口径一致。字段仍可空，统计里「未填写」继续单独计分母，不画成第 8 根柱。</span></div></li>
+        <li><span class="note-idx">4</span><div><b>沿用既有壳层</b><span>日期、时间、时区提示、五个详情字段、备注、取消 / 保存全部保持真实顺序与文案，只替换布里斯托那一块插槽内容。</span></div></li>
+      </ol>
+
+      <h3>组件规格</h3>
+      <table class="spec">
+        <tr><th>容器</th><td>通用编辑器 <code>AlertDialog</code>，内容区仍可纵向滚动（<code>heightIn(max=560.dp)</code>）</td></tr>
+        <tr><th>网格</th><td>4 列 × 2 行，间距 7px；200% 字号改 2 列（对齐 <code>fontScale &gt; 1.3</code> 的既有分行逻辑）</td></tr>
+        <tr><th>卡片</th><td>最小 92×? px，圆角 12px，触摸目标远超 44dp；图形 58×38，编号 12px，短标签 11.5px</td></tr>
+        <tr><th>状态</th><td>默认 / 按下缩放 0.982 / 选中 2px 主色描边 + <code>primarySoft</code> 底 + 勾选 / 焦点环 2px</td></tr>
+        <tr><th>动效</th><td>只保留 160ms 状态过渡与按下缩放，遵循「克制的动效」</td></tr>
+        <tr><th>无障碍</th><td>每卡为带 <code>aria-pressed</code> 的按钮，读屏播报「4 型，光滑柔软，中间段」；图形对读屏隐藏</td></tr>
+        <tr><th>对比度</th><td>沿用 <code>docs/ui-redesign.md</code> 已校验色值：正文 15.8:1、次级 5.9:1、辅助 4.7:1（浅色）</td></tr>
+      </table>
+
+      <h3>对应到当前代码</h3>
+      <table class="spec">
+        <tr><th>被替换</th><td><code>feature/poop/PoopEditorDialog.kt:63-75</code> 七个数字 chip</td></tr>
+        <tr><th>插槽外壳</th><td><code>feature/record/RecordEditorDialog.kt:92-165</code></td></tr>
+        <tr><th>其余字段</th><td><code>feature/record/RecordChoiceFields.kt:18-50</code></td></tr>
+        <tr><th>字段与范围</th><td><code>core/database/entity/PoopDetailEntity.kt:18-28</code>、<code>core/backup/BackupCodec.kt:409</code>（1–7 不变）</td></tr>
+        <tr><th>色值 / token</th><td><code>core/ui/Theme.kt:13-59</code>、<code>core/ui/LifeTrackTokens.kt:33-57</code></td></tr>
+        <tr><th>列表摘要</th><td><code>feature/poop/PoopRecordItem.kt:50-69</code></td></tr>
+        <tr><th>详情字段</th><td><code>core/model/RecordDetailPresentation.kt:104-111</code></td></tr>
+        <tr><th>统计口径</th><td><code>docs/statistics-enhancement-confirmation.md:65</code></td></tr>
+      </table>
+
+      <h3>待你确认的四件事</h3>
+      <ol class="note-list">
+        <li><span class="note-idx">A</span><div><b>要不要显式的「跳过」卡</b><span>现状靠「再点一次取消」，隐式且不易发现；原型补了一张虚线卡。</span></div></li>
+        <li><span class="note-idx">B</span><div><b>列表 / 详情要不要加形态短描述</b><span>原型里保存后的记录带小图形与「光滑柔软」，会动到列表与详情文案及单测；也可以只加图形、文案保持「布里斯托 4 型」。</span></div></li>
+        <li><span class="note-idx">C</span><div><b>「七型对照」常驻还是只首次出现</b><span>原型做成常驻文字入口；若担心编辑器变长，可只在首次进入时提示一次。</span></div></li>
+        <li><span class="note-idx">D</span><div><b>图形落地方式</b><span>矢量 drawable 七份资源，或 Compose Canvas 一个可复用绘制函数；后者更少资源、更容易跟随主题换色。</span></div></li>
+      </ol>
+
+      <p class="footnote">原型为单文件、无外链、无渐变、无装饰性图标字体；浅色 / 深色、标准 / 200% 字号、现状 / 方案均可切换。本文件只是设计评审稿，未改动任何 Compose 代码、Room schema 或备份格式。</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TYPES = [
+    { n: 1, cap: "分离硬球", group: "偏干端", desc: "一颗颗分离的硬球，像坚果，很难排出" },
+    { n: 2, cap: "凹凸结块", group: "偏干端", desc: "连成香肠状，但表面凹凸不平、有明显结块" },
+    { n: 3, cap: "带裂痕", group: "中间段", desc: "香肠状，表面有裂痕，偏干一些" },
+    { n: 4, cap: "光滑柔软", group: "中间段", desc: "香肠或蛇形，表面光滑柔软，容易排出" },
+    { n: 5, cap: "柔软小块", group: "偏稀端", desc: "断边清楚的柔软小块，很容易排出" },
+    { n: 6, cap: "糊状", group: "偏稀端", desc: "糊状、蓬松，边缘毛糙不规则" },
+    { n: 7, cap: "水样", group: "偏稀端", desc: "完全是水样，没有固体块" }
+  ];
+
+  function art(n) {
+    var open = '<svg viewBox="0 0 64 40" aria-hidden="true" focusable="false">';
+    var close = '</svg>';
+    var body = {
+      1: '<g fill="currentColor"><circle cx="17" cy="14" r="6.5"/><circle cx="32" cy="11" r="6.5"/><circle cx="47" cy="15" r="6.5"/><circle cx="19" cy="28" r="6.5"/><circle cx="35" cy="29" r="6.5"/><circle cx="49" cy="29" r="6"/></g>',
+      2: '<g fill="currentColor"><circle cx="15" cy="21" r="9"/><circle cx="28" cy="17" r="10"/><circle cx="41" cy="22" r="9"/><circle cx="52" cy="18" r="8"/></g>',
+      3: '<rect x="6" y="11" width="52" height="18" rx="9" fill="currentColor"/><g fill="none" style="stroke:var(--surface-2)" stroke-width="2.2" stroke-linecap="round"><path d="M20 12l2 6-2 5"/><path d="M34 12l-2 6 2 5"/><path d="M47 12l-2 6 2 5"/></g>',
+      4: '<path d="M9 25 Q32 7 55 24" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"/>',
+      5: '<g fill="currentColor"><rect x="7" y="12" width="18" height="13" rx="6.5"/><rect x="28" y="16" width="20" height="13" rx="6.5"/><rect x="50" y="11" width="11" height="12" rx="5.5"/><rect x="21" y="29" width="17" height="10" rx="5"/></g>',
+      6: '<path d="M8 27 q5 -12 12 -10 q3 -11 12 -7 q7 -9 13 -1 q11 -1 10 9 q7 7 -2 12 q-7 8 -16 5 q-9 7 -18 2 q-11 1 -11 -10 Z" fill="currentColor"/>',
+      7: '<g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 12 q7 -5 14 0 t14 0 t14 0 t8 0"/><path d="M10 23 q7 -5 14 0 t14 0 t14 0"/><path d="M7 33 q25 7 50 0"/></g>'
+    }[n];
+    return open + body + close;
+  }
+
+  var state = { view: "new", bristol: null, saved: null };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function renderGrid() {
+    var html = TYPES.map(function (t) {
+      return '<button class="bristol-card" type="button" data-n="' + t.n + '" aria-pressed="false" aria-label="' + t.n + ' 型，' + t.cap + '，' + t.group + '。' + t.desc + '">' +
+        '<span class="check"><svg viewBox="0 0 12 12"><path d="M2 6.2 4.8 9 10 3.2"/></svg></span>' +
+        '<span class="art">' + art(t.n) + '</span>' +
+        '<span class="num">' + t.n + ' 型</span>' +
+        '<span class="cap">' + t.cap + '</span>' +
+      '</button>';
+    }).join("");
+    html += '<button class="skip-card" type="button" id="skipCard" aria-pressed="false" aria-label="不确定，先跳过，不记录布里斯托类型">' +
+      '<span>不确定</span><small>本项留空</small></button>';
+    $("bristolGrid").innerHTML = html;
+
+    Array.prototype.forEach.call($("bristolGrid").querySelectorAll(".bristol-card"), function (btn) {
+      btn.addEventListener("click", function () {
+        var n = Number(btn.getAttribute("data-n"));
+        select(n === state.bristol ? null : n);
+      });
+    });
+    $("skipCard").addEventListener("click", function () { select(null); });
+    syncSelection();
+  }
+
+  function renderOldChips() {
+    var html = "";
+    for (var i = 1; i <= 7; i++) {
+      html += '<button class="chip" type="button" data-n="' + i + '" aria-pressed="false">' + i + ' 型</button>';
+    }
+    $("oldChips").innerHTML = html;
+    Array.prototype.forEach.call($("oldChips").querySelectorAll(".chip"), function (btn) {
+      btn.addEventListener("click", function () {
+        var n = Number(btn.getAttribute("data-n"));
+        select(n === state.bristol ? null : n);
+      });
+    });
+    syncSelection();
+  }
+
+  function syncSelection() {
+    Array.prototype.forEach.call(document.querySelectorAll(".bristol-card, #oldChips .chip"), function (el) {
+      el.setAttribute("aria-pressed", String(Number(el.getAttribute("data-n")) === state.bristol));
+    });
+    var skip = $("skipCard");
+    if (skip) { skip.setAttribute("aria-pressed", String(state.bristol === null)); }
+
+    var box = $("selection");
+    if (state.bristol === null) {
+      box.className = "selection";
+      box.innerHTML = "<strong>未记录</strong><p>选一个最接近的形态，看不准可以跳过；再点一次已选的卡片也能取消。其余字段保持现状，在编辑器内向下滚动查看。</p>";
+    } else {
+      var t = TYPES[state.bristol - 1];
+      box.className = "selection is-set";
+      box.innerHTML = "<strong>" + t.n + " 型 · " + t.cap + "</strong><p>" + t.group + " · " + t.desc + "</p>";
+    }
+  }
+
+  function select(n) {
+    state.bristol = n;
+    syncSelection();
+  }
+
+  function renderGuide() {
+    var groups = [
+      { title: "偏干端 · 1–2 型", items: [1, 2] },
+      { title: "中间段 · 3–4 型", items: [3, 4] },
+      { title: "偏稀端 · 5–7 型", items: [5, 6, 7] }
+    ];
+    $("guideList").innerHTML = groups.map(function (g) {
+      var rows = g.items.map(function (n) {
+        var t = TYPES[n - 1];
+        return '<div class="guide-row"><span class="guide-art">' + art(n) + '</span>' +
+          '<span class="guide-num">' + n + ' 型</span>' +
+          '<div><b>' + t.cap + '</b><span>' + t.desc + '</span></div></div>';
+      }).join("");
+      return '<p class="guide-group">' + g.title + '</p>' + rows;
+    }).join("");
+  }
+
+  function setView(view) {
+    state.view = view;
+    $("oldView").hidden = view !== "old";
+    $("newView").hidden = view === "old";
+    $("openGuide").hidden = view === "old";
+    Array.prototype.forEach.call($("viewPager").querySelectorAll("button"), function (b) {
+      b.setAttribute("aria-selected", String(b.getAttribute("data-view") === view));
+    });
+    syncSelection();
+  }
+
+  function openEditor() {
+    $("editor").classList.add("is-open");
+    $("editorScrim").classList.add("is-open");
+  }
+  function closeEditor() {
+    $("editor").classList.remove("is-open");
+    $("editorScrim").classList.remove("is-open");
+  }
+  function openSheet(id, scrimId) {
+    $(id).classList.add("is-open");
+    $(scrimId).classList.add("is-open");
+  }
+  function closeSheet(id, scrimId) {
+    $(id).classList.remove("is-open");
+    $(scrimId).classList.remove("is-open");
+  }
+
+  function toast(text) {
+    var el = $("toast");
+    el.textContent = text;
+    el.classList.add("is-open");
+    window.setTimeout(function () { el.classList.remove("is-open"); }, 2200);
+  }
+
+  function save() {
+    var t = state.bristol === null ? null : TYPES[state.bristol - 1];
+    state.saved = t;
+    var label = t ? "布里斯托 " + t.n + " 型" : "排便 · 未填写形态";
+    var badge = t ? '<span class="tl-badge"><span class="detail-art" style="width:20px;height:14px">' + art(t.n) + '</span>' + t.cap + '</span>' : "未记录形态";
+    var li = document.createElement("li");
+    li.className = "tl-item";
+    li.setAttribute("data-type", "toilet");
+    li.setAttribute("data-detail", "poop-new");
+    li.innerHTML = '<span class="tl-time">09:12</span><span class="tl-dot"></span>' +
+      '<div><p class="tl-title">' + label + '</p><p class="tl-sub">适中 · 不费力 · ' + badge + '</p></div>';
+    $("timeline").insertBefore(li, $("timeline").firstChild);
+    $("todayCount").textContent = String(Number($("todayCount").textContent) + 1);
+    $("recordCount").textContent = String($("timeline").children.length) + " 条";
+    li.addEventListener("click", function () { showDetail(li); });
+    closeEditor();
+    toast("已保存 · " + (t ? t.n + " 型 " + t.cap : "未记录形态"));
+  }
+
+  function showDetail(li) {
+    var kind = li.getAttribute("data-detail");
+    if (kind === "water") {
+      $("detailTitle").textContent = "饮水 · 07:10";
+      $("detailFields").innerHTML =
+        '<div class="detail-row"><dt>数量</dt><dd>250 ml</dd></div>' +
+        '<div class="detail-row"><dt>单位</dt><dd>ml</dd></div>' +
+        '<div class="detail-row"><dt>备注</dt><dd class="muted">未填写</dd></div>';
+      openSheet("detailSheet", "detailScrim");
+      return;
+    }
+    var isNew = kind === "poop-new";
+    var t = isNew ? state.saved : TYPES[3];
+    var rows = [
+      ["发生时间", "2026年11月11日 周三 " + (isNew ? "09:12" : "08:32"), false],
+      ["本地日期 / 时区", "2026-11-11 · Asia/Shanghai", false]
+    ];
+    var bristolValue = t
+      ? '<span class="detail-art">' + art(t.n) + '</span>' + t.n + " 型 · " + t.cap
+      : "未记录";
+    rows.push(["布里斯托类型", bristolValue, !t]);
+    rows.push(["排便量", "适中", false]);
+    rows.push(["费力程度", "不费力", false]);
+    rows.push(["便意急迫感", "未记录", true]);
+    rows.push(["腹部不适", "未记录", true]);
+    rows.push(["排不净感", "未记录", true]);
+    $("detailFields").innerHTML = rows.map(function (r) {
+      return '<div class="detail-row"><dt>' + r[0] + '</dt><dd class="' + (r[2] ? "muted" : "") + '">' + r[1] + "</dd></div>";
+    }).join("");
+    $("detailTitle").textContent = "排便 · " + (isNew ? "09:12" : "08:32");
+    openSheet("detailSheet", "detailScrim");
+  }
+
+  function bindChips() {
+    Array.prototype.forEach.call(document.querySelectorAll(".chips[data-single]"), function (group) {
+      Array.prototype.forEach.call(group.querySelectorAll(".chip"), function (chip) {
+        chip.addEventListener("click", function () {
+          Array.prototype.forEach.call(group.querySelectorAll(".chip"), function (c) {
+            c.setAttribute("aria-pressed", "false");
+          });
+          chip.setAttribute("aria-pressed", "true");
+        });
+      });
+    });
+  }
+
+  function bindToolbar() {
+    Array.prototype.forEach.call($("viewPager").querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () { setView(b.getAttribute("data-view")); });
+    });
+    Array.prototype.forEach.call($("themeSeg").querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        document.documentElement.setAttribute("data-theme", b.getAttribute("data-theme"));
+        Array.prototype.forEach.call($("themeSeg").querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-selected", String(x === b));
+        });
+      });
+    });
+    Array.prototype.forEach.call($("fontSeg").querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        $("device").classList.toggle("is-large", b.getAttribute("data-font") === "large");
+        Array.prototype.forEach.call($("fontSeg").querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-selected", String(x === b));
+        });
+      });
+    });
+  }
+
+  renderGrid();
+  renderOldChips();
+  renderGuide();
+  bindChips();
+  bindToolbar();
+  setView("new");
+
+  $("openEditor").addEventListener("click", openEditor);
+  $("cancelEditor").addEventListener("click", closeEditor);
+  $("editorScrim").addEventListener("click", closeEditor);
+  $("saveEditor").addEventListener("click", save);
+  $("openGuide").addEventListener("click", function () { openSheet("guideSheet", "guideScrim"); });
+  $("closeGuide").addEventListener("click", function () { closeSheet("guideSheet", "guideScrim"); });
+  $("guideScrim").addEventListener("click", function () { closeSheet("guideSheet", "guideScrim"); });
+  $("closeDetail").addEventListener("click", function () { closeSheet("detailSheet", "detailScrim"); });
+  $("detailScrim").addEventListener("click", function () { closeSheet("detailSheet", "detailScrim"); });
+  Array.prototype.forEach.call($("timeline").querySelectorAll(".tl-item"), function (li) {
+    li.addEventListener("click", function () { showDetail(li); });
+  });
+})();
+</script>
+</body>
+</html>

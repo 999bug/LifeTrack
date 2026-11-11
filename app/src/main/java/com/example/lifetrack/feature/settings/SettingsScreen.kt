@@ -112,6 +112,7 @@ fun SettingsScreen(
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
+    val compactState by viewModel.compactState.collectAsStateWithLifecycle()
     // 与 MainActivity 共用同一判定口径：窗口已遮挡时，界面必须说得出原因和恢复方法。
     val captureReasons = ScreenCapturePolicy.reasons(appLockEnabled == true, trackTypes)
     val captureBlocked = captureReasons.isNotEmpty()
@@ -455,6 +456,14 @@ fun SettingsScreen(
                         arrayOf("application/json", "text/plain", "application/octet-stream")
                     )
                 }
+            )
+            SettingsDivider()
+            SettingsRow(
+                title = "整理数据库",
+                icon = Icons.Filled.Storage,
+                subtitle = compactSubtitle(compactState),
+                enabled = !busy && compactState !is MainViewModel.CompactState.Running,
+                onClick = { viewModel.compactDatabase() }
             )
             if (busy || status != null) {
                 SettingsDivider()
@@ -1097,6 +1106,29 @@ private fun BackupCrypto.Reason.exportMessage(): String = when (this) {
     BackupCrypto.Reason.INVALID_IV,
     BackupCrypto.Reason.CIPHERTEXT_TOO_SHORT,
     BackupCrypto.Reason.DECRYPT_FAILED -> "加密失败，请重试。"
+}
+
+/** 「整理数据库」行的副标题：把状态翻成一句用户能读懂的话。 */
+private fun compactSubtitle(state: MainViewModel.CompactState): String = when (state) {
+    MainViewModel.CompactState.Idle -> "回收本地数据占用的多余空间"
+    MainViewModel.CompactState.Running -> "正在整理，请勿离开…"
+    is MainViewModel.CompactState.Done -> {
+        val saved = (state.beforeBytes - state.afterBytes).coerceAtLeast(0L)
+        if (saved <= 0L) {
+            "已整理 · ${formatBytes(state.afterBytes)}（无可回收空间）"
+        } else {
+            "已整理 · ${formatBytes(state.beforeBytes)} → ${formatBytes(state.afterBytes)}，" +
+                "回收 ${formatBytes(saved)}"
+        }
+    }
+
+    is MainViewModel.CompactState.Failed -> "整理失败：${state.message}"
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_048_576L -> "%.1f MB".format(bytes / 1_048_576.0)
+    bytes >= 1024L -> "%d KB".format(bytes / 1024)
+    else -> "$bytes B"
 }
 
 private fun backupFileName(suffix: String? = null): String {

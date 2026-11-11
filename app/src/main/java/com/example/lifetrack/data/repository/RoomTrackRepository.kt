@@ -24,8 +24,11 @@ import com.example.lifetrack.core.model.toRecordDetail
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 
 class RoomTrackRepository(
@@ -253,4 +256,32 @@ class RoomTrackRepository(
         abdominalDiscomfort = abdominalDiscomfort,
         incompleteEvacuation = incompleteEvacuation
     )
+
+    override suspend fun databaseSizeBytes(): Long = withContext(Dispatchers.IO) {
+        databaseTotalBytes()
+    }
+
+    override suspend fun compactDatabase(): Long = withContext(Dispatchers.IO) {
+        val db = database.openHelper.writableDatabase
+        // Room 默认 WAL：删除只释放页，占用的空间留在 `-wal` 里，主库可能一直是 4 KB。
+        // 做一次 TRUNCATE checkpoint，把日志落盘并截断文件。返回结果第一列是 busy 标志，
+        // 非 0 表示还有读事务占着，此时截断无效，明确报错让用户稍后再试。
+        db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+            val busy = if (cursor.moveToFirst()) cursor.getInt(0) else -1
+            if (busy != 0) error("数据库正被占用，请稍后再试")
+        }
+        databaseTotalBytes()
+    }
+
+    /**
+     * 主库 + `-wal` + `-shm` 的合计大小。
+     *
+     * Room 默认 WAL 模式，新写入先落 `-wal`，主文件可能一直停在 4 KB；
+     * 只统计主库会让「整理前后」看起来毫无变化。
+     */
+    private fun databaseTotalBytes(): Long {
+        val basePath = database.openHelper.writableDatabase.path ?: return 0L
+        return listOf(basePath, "$basePath-wal", "$basePath-shm")
+            .sumOf { File(it).length() }
+    }
 }

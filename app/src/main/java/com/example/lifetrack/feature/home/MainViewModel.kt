@@ -29,6 +29,7 @@ import com.example.lifetrack.feature.history.DayCalendarData
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.emptyStatistics
 import com.example.lifetrack.feature.statistics.observeStatistics
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -294,6 +295,37 @@ class MainViewModel(
 
     suspend fun countAllRecords(): Int = withContext(Dispatchers.IO) {
         repository.countAllRecords()
+    }
+
+    /** 「整理数据库」的状态。只在设置页数据区使用，是一次性维护动作。 */
+    sealed interface CompactState {
+        data object Idle : CompactState
+        data object Running : CompactState
+
+        /** 整理前后的文件大小，用来告诉用户实际回收了多少。 */
+        data class Done(val beforeBytes: Long, val afterBytes: Long) : CompactState
+        data class Failed(val message: String) : CompactState
+    }
+
+    private val _compactState = MutableStateFlow<CompactState>(CompactState.Idle)
+    val compactState: StateFlow<CompactState> = _compactState.asStateFlow()
+
+    /** 当前数据库文件大小；读不到时返回 0，UI 显示「—」。 */
+    suspend fun databaseSizeBytes(): Long =
+        runCatching { repository.databaseSizeBytes() }.getOrDefault(0L)
+
+    fun compactDatabase() {
+        if (_compactState.value is CompactState.Running) return
+        viewModelScope.launch {
+            _compactState.value = CompactState.Running
+            val before = runCatching { repository.databaseSizeBytes() }.getOrDefault(0L)
+            runCatching { repository.compactDatabase() }
+                .onSuccess { after -> _compactState.value = CompactState.Done(before, after) }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    _compactState.value = CompactState.Failed(e.message ?: "整理失败")
+                }
+        }
     }
 
     fun quickRecord() {

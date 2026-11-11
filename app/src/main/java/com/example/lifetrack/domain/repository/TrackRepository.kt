@@ -62,4 +62,15 @@ interface TrackRepository {
     suspend fun restoreBackup(payload: BackupPayload)
 
     suspend fun countAllRecords(): Int
+
+    /** 数据库文件的当前大小（字节），用于展示整理前后的对比。 */
+    suspend fun databaseSizeBytes(): Long
+
+    /**
+     * 回收数据库占用的多余空间，返回整理后的文件大小（主库 + `-wal` + `-shm`）。
+     *
+     * Room 默认 WAL 模式，删除只释放页、不缩文件，空间主要堆在 `-wal` 里；
+     * 这里做一次 `wal_checkpoint(TRUNCATE)` 把日志落盘并截断。调用方需在 IO 线程执行。
+     */
+    suspend fun compactDatabase(): Long
 }

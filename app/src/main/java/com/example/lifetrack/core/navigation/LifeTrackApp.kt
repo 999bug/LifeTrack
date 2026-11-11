@@ -119,6 +119,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 TodayScreen(
                     viewModel = viewModel,
                     onQuickRecord = viewModel::quickRecord,
+                    onWaterQuick = viewModel::quickWaterRecord,
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },

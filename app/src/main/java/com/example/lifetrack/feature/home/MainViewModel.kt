@@ -18,7 +18,9 @@ import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.core.model.HistoryFilter
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.ModuleOrdering
+import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.StatsPeriod
+import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.statsWindow
 import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
@@ -43,6 +45,9 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+
+/** 首页饮水卡一键记录的默认杯量（ml）。 */
+private const val QUICK_WATER_AMOUNT_ML = 250
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(
@@ -320,6 +325,31 @@ class MainViewModel(
                 PoopRecordDraft(
                     occurredAtEpochMillis = Instant.now().toEpochMilli(),
                     zoneId = zone.id
+                )
+            )
+            refreshToday()
+        }
+    }
+
+    /**
+     * 首页饮水卡的一键记录：默认一杯 250 ml。
+     * 与排便一样属于「有合理默认值」的动作，因此不在首页弹编辑器；
+     * 需要改份量时走卡片上的「详细」。
+     */
+    fun quickWaterRecord() {
+        viewModelScope.launch {
+            repository.addRecord(
+                RecordDraft(
+                    typeCode = WaterFields.TYPE_CODE,
+                    occurredAtEpochMillis = Instant.now().toEpochMilli(),
+                    zoneId = ZoneId.systemDefault().id,
+                    detail = RecordDetail.Generic(
+                        typeCode = WaterFields.TYPE_CODE,
+                        fields = mapOf(
+                            WaterFields.AMOUNT to QUICK_WATER_AMOUNT_ML.toString(),
+                            WaterFields.UNIT to "ml"
+                        )
+                    )
                 )
             )
             refreshToday()

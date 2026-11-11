@@ -64,6 +64,7 @@ A 包按「小步可验证」分批交付：第一批 A1+A2，第二批 A3+A4+A5
 | A10 亲密关系模块 | 2026-11-10 | 按 `docs/intimacy-module-confirmation.md` V1–V10 推荐值落地：默认停用、三项可空字段、L1 列表级收敛与读屏一句汇总、启用期间无条件 `FLAG_SECURE`、首次启用提示、明文导出加强提示；Room 仍 v2、备份 v1/v2/v3 不变；A9 月经保留 ⛔，未动排便专用链路。204 项单测全绿，`40ee2ba` 提交 |
 | 发布机制改造（自动递增） | 2026-11-10 | `release.yml` 去掉必填版本号：新增 `Resolve version`（最高 tag + patch、gradle versionCode +1、tag / Release 冲突与分支校验）、`Bump version in build file`、`Commit version bump to main`（构建成功后才推送，`[skip ci]`，并发时中止）、`Create GitHub Release` 改指向版本提交；`mirror-gitee` 的 `TAG` 改读 job outputs。`docs/release-guide.md` §2 重写 | 未在真实 CI 跑过；需 `main` 允许 bot 推送 |
 | 月历按天查看 + 界面改造第一批 | 2026-11-11 | 底导「记录」改名「历史」；月历格由「日期 + 次数」改为「日期 + 最多 3 个类型图标」，今天实心高亮；点日期弹出 `DayRecordsSheet` 列出当天记录，无记录日走空态；新增 `observeDailyTypeCounts`（按日期+类型聚合，按当天首次出现排序）、`DayCalendarData` 纯函数与 `RecordSummary` 一行摘要；新增 `LifeTrackTokens` 设计常量。210 项单测全绿，`lintDebug` 无 error；模拟器验证浅/深色、200% 字体、360dp 窄屏与弹层三态 | 首页模块网格重构、设置/统计 token 对齐未做，见 `docs/ui-redesign.md` §6 |
+| 首页模块网格重构 | 2026-11-11 | `TodayScreen` 重写为「页头 + 双列模块卡 + 今日时间轴」，删除顶部大计数卡与按钮列表说明段；新增 `ModuleCard`（整卡即记录：排便/饮水一键落库，咖啡/运动直接进编辑器；右下「详细」为独立入口）、`CompactRecordRow`（时间轴行，编辑/删除收进尾部菜单）、`MainViewModel.quickWaterRecord`（默认一杯 250 ml）；停用模块不再渲染；日期固定 `Locale.CHINA`。200% 字体下模块卡降为单列、`widthIn` 避免「详细」被压成单字。210 项单测与 `lintDebug` 全绿，模拟器验证一键记录 / 详细入口 / 单列布局 | 设置页与统计页的 token 对齐未做 |
 
 ## 2. A · 模块扩展包（README 清单 2 项）
 

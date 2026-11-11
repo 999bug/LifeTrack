@@ -6,38 +6,53 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.feature.record.RecordRow
+import com.example.lifetrack.core.ui.LifeTrackTokens
+import com.example.lifetrack.feature.record.RecordSummary
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE")
+private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA)
 
+/**
+ * 首页：页头 + 模块网格 + 今日时间轴。
+ *
+ * 与旧版的两处关键差别：
+ * 1. 顶部那张「今日记录 N 次」的大卡被去掉——它的信息已经写在每个模块卡的状态行里，
+ *    以及页头副标题的「已记录 N 次 · 最近一次 HH:mm」，留着就是三处重复。
+ * 2. 一排等宽的「记录饮水」按钮改成双列模块卡：状态与入口合并，整卡可点。
+ *
+ * 停用的模块不进入首页（2026-11-11 确认），也不做灰显占位；
+ * 启用入口只在「设置 → 记录项目」。
+ */
 @Composable
 fun TodayScreen(
     viewModel: MainViewModel,
     onQuickRecord: () -> Unit,
+    onWaterQuick: () -> Unit,
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
@@ -53,153 +68,182 @@ fun TodayScreen(
     val enabledTypes = trackTypes.filter { it.enabled }
     // 首页、历史、月历与统计默认都按「全部类型」同一口径计数，这里不再只数排便。
     val countsByType = records.groupingBy { it.event.typeCode }.eachCount()
+    val typeNames = remember(enabledTypes) { enabledTypes.associate { it.code to it.name } }
+    val columns = moduleColumns(LocalDensity.current.fontScale)
+
     val today = LocalDate.now().format(todayFormatter)
+    val lastTime = records.firstOrNull()?.let { RecordSummary.time(it) }
+    val subtitle = buildString {
+        append("已记录 ${records.size} 次")
+        if (lastTime != null) append(" · 最近一次 $lastTime")
+    }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(
+            start = LifeTrackTokens.Spacing.page,
+            end = LifeTrackTokens.Spacing.page,
+            top = 12.dp,
+            bottom = 28.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("今天", style = MaterialTheme.typography.headlineMedium)
-                Text(today, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                Text(
+                    text = today,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.4.sp
+                )
+                Text(
+                    text = "今天",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
-        item {
-            // 读屏只念一句汇总，不逐个念「排便 0 次 / 饮水 0 次」四遍
-            val countSummary = buildString {
-                append("今日共 ${records.size} 次")
-                enabledTypes.forEach { append("，${it.name} ${countsByType[it.code] ?: 0} 次") }
-            }
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                modifier = Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = countSummary
-                }
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("今日记录", style = MaterialTheme.typography.titleMedium)
-                    Row {
-                        Text(
-                            records.size.toString(),
-                            style = MaterialTheme.typography.displayMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            "次",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(start = 6.dp, top = 18.dp)
-                        )
-                    }
-                    if (enabledTypes.isEmpty()) {
-                        Text(
-                            "没有启用的记录项目",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    } else {
-                        enabledTypes.chunked(2).forEach { rowTypes ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                rowTypes.forEach { type ->
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            type.name,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
-                                        )
-                                        Text(
-                                            "${countsByType[type.code] ?: 0} 次",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
-                                }
-                                if (rowTypes.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        item {
-            if (enabledTypes.isEmpty()) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("当前没有启用的记录项目", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "可在设置 → 记录项目中启用后继续记录。已有的历史记录不受影响。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedButton(onClick = onOpenSettings) { Text("去设置") }
-                    }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // 按「记录项目」页设置的顺序渲染入口，排序才是真的生效
-                    enabledTypes.forEach { type ->
-                        when (type.code) {
-                            DEFAULT_POOP_TYPE.code -> Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Button(onClick = onQuickRecord, modifier = Modifier.weight(1f)) { Text("快速打卡") }
-                                OutlinedButton(onClick = onDetailedRecord, modifier = Modifier.weight(1f)) { Text("详细记录") }
-                            }
 
-                            WaterFields.TYPE_CODE -> OutlinedButton(
-                                onClick = onWaterRecord,
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("记录饮水") }
-
-                            CoffeeFields.TYPE_CODE -> OutlinedButton(
-                                onClick = onCoffeeRecord,
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("记录咖啡 / 茶") }
-
-                            SportFields.TYPE_CODE -> OutlinedButton(
-                                onClick = onSportRecord,
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("记录运动") }
-
-                            IntimacyFields.TYPE_CODE -> OutlinedButton(
-                                onClick = onIntimacyRecord,
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("记录亲密关系") }
-                        }
-                    }
-                    Text(
-                        "快速打卡会立即保存当前时间；饮水 / 咖啡的份量、运动的时长为必填，亲密关系三项均可不填。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-        item { Text("今日记录", style = MaterialTheme.typography.titleLarge) }
-        if (records.isEmpty()) {
+        if (trackTypes.isEmpty()) {
+            // 首次进入时 Room 还没吐出类型表，此时既不是「没有启用项」也不该闪一下空态，先不渲染。
+        } else if (enabledTypes.isEmpty()) {
             item {
-                Text("今天还没有记录。完成第一次打卡后，会显示在这里。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text("当前没有启用的记录项目", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "在「设置 → 记录项目」里启用后就能在这里记录。已有的历史记录不受影响。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 12.dp)
+                    )
+                    OutlinedButton(onClick = onOpenSettings) { Text("去设置") }
+                }
             }
         } else {
-            items(records, key = { it.event.id }) { record ->
-                RecordRow(
+            item {
+                Column {
+                    enabledTypes.chunked(columns).forEach { rowTypes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
+                        ) {
+                            rowTypes.forEach { type ->
+                                ModuleCard(
+                                    type = type,
+                                    count = countsByType[type.code] ?: 0,
+                                    summary = moduleSummary(records, type),
+                                    quickAction = type.isQuickAction,
+                                    onRecord = { moduleAction(type, onQuickRecord, onWaterQuick, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)() },
+                                    onDetail = { moduleDetail(type, onDetailedRecord, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)() },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            // 最后一排只有一张卡时补一个空位，避免它被拉伸成整行宽
+                            if (rowTypes.size < columns) {
+                                repeat(columns - rowTypes.size) {
+                                    Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(LifeTrackTokens.Spacing.gap))
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "今日记录",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+            )
+        }
+
+        if (records.isEmpty()) {
+            item {
+                Text(
+                    text = "今天还没有记录。点上面的模块卡就能记一条。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            itemsIndexed(records, key = { _, record -> record.event.id }) { index, record ->
+                CompactRecordRow(
                     record = record,
+                    typeNames = typeNames,
                     onShowDetail = { onShowDetail(record) },
                     onEdit = { onEdit(record) },
-                    onDelete = { onDelete(record.event.id) }
+                    onDelete = { onDelete(record.event.id) },
+                    showDivider = index < records.lastIndex
                 )
             }
         }
     }
+}
+
+/** 有合理默认值、可以直接落一条记录的模块。 */
+private val TrackTypeEntity.isQuickAction: Boolean
+    get() = code == DEFAULT_POOP_TYPE.code || code == WaterFields.TYPE_CODE
+
+private fun moduleAction(
+    type: TrackTypeEntity,
+    onQuickRecord: () -> Unit,
+    onWaterQuick: () -> Unit,
+    onWaterRecord: () -> Unit,
+    onCoffeeRecord: () -> Unit,
+    onSportRecord: () -> Unit,
+    onIntimacyRecord: () -> Unit
+): () -> Unit = when (type.code) {
+    DEFAULT_POOP_TYPE.code -> onQuickRecord
+    WaterFields.TYPE_CODE -> onWaterQuick
+    CoffeeFields.TYPE_CODE -> onCoffeeRecord
+    SportFields.TYPE_CODE -> onSportRecord
+    IntimacyFields.TYPE_CODE -> onIntimacyRecord
+    else -> onWaterRecord
+}
+
+private fun moduleDetail(
+    type: TrackTypeEntity,
+    onDetailedRecord: () -> Unit,
+    onWaterRecord: () -> Unit,
+    onCoffeeRecord: () -> Unit,
+    onSportRecord: () -> Unit,
+    onIntimacyRecord: () -> Unit
+): () -> Unit = when (type.code) {
+    DEFAULT_POOP_TYPE.code -> onDetailedRecord
+    WaterFields.TYPE_CODE -> onWaterRecord
+    CoffeeFields.TYPE_CODE -> onCoffeeRecord
+    SportFields.TYPE_CODE -> onSportRecord
+    IntimacyFields.TYPE_CODE -> onIntimacyRecord
+    // 未知类型没有编辑器可用；「详细」只在快捷记录型卡片上出现，不会走到这里
+    else -> onWaterRecord
+}
+
+/**
+ * 模块卡状态行里的份量摘要。
+ *
+ * 只汇总 ml 口径：用户把单位切成「杯」时不做换算，宁可少显示一个数字，
+ * 也不给出一个凭猜测折算出来的总量。
+ */
+private fun moduleSummary(records: List<BackupRecord>, type: TrackTypeEntity): String? {
+    val amountKey = when (type.code) {
+        WaterFields.TYPE_CODE -> WaterFields.AMOUNT
+        CoffeeFields.TYPE_CODE -> CoffeeFields.AMOUNT
+        else -> return null
+    }
+    var total = 0
+    records.forEach { record ->
+        if (record.event.typeCode != type.code) return@forEach
+        val fields = (record.detail as? RecordDetail.Generic)?.fields ?: return@forEach
+        val unit = fields[WaterFields.UNIT] ?: "ml"
+        if (unit != "ml") return@forEach
+        total += fields[amountKey]?.toIntOrNull() ?: 0
+    }
+    return if (total > 0) "$total ml" else null
 }

@@ -1,0 +1,30 @@
+# 启动热路径的 AOT 编译提示。
+#
+# 手写版只覆盖「Application → 首屏 → 首屏数据」这条链，粒度到包/类而不是具体方法，
+# 避免方法签名写错导致 profile 失效。正式做法是在 arm 真机上用 Macrobenchmark 的
+# BaselineProfileRule 生成，生成的 baseline-prof.txt 会整体替换本文件；
+# 步骤见 docs/baseline-profile.md。
+#
+# 这些规则在 R8 之前消费，库类名用混淆前的原始名字。
+
+# 应用入口与首屏组合
+Lcom/example/lifetrack/LifeTrackApplication;
+Lcom/example/lifetrack/AppContainer;
+Lcom/example/lifetrack/MainActivity;
+HSPLcom/example/lifetrack/core/ui/**->**(**)
+HSPLcom/example/lifetrack/core/navigation/**->**(**)
+HSPLcom/example/lifetrack/feature/home/**->**(**)
+HSPLcom/example/lifetrack/feature/lock/**->**(**)
+
+# 首屏数据：Room + SQLCipher + DataStore
+HSPLcom/example/lifetrack/core/database/**->**(**)
+HSPLcom/example/lifetrack/core/security/**->**(**)
+HSPLcom/example/lifetrack/core/datastore/**->**(**)
+HSPLcom/example/lifetrack/data/repository/**->**(**)
+HSPLcom/example/lifetrack/domain/**->**(**)
+
+# 支撑首屏的框架代码
+HSPLandroidx/compose/runtime/**->**(**)
+HSPLandroidx/room/**->**(**)
+HSPLandroidx/datastore/**->**(**)
+HSPLnet/zetetic/database/**->**(**)

@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.security.DatabaseKeyStore
@@ -47,6 +49,34 @@ fun DatabaseUnavailableScreen(failure: DatabaseKeyStore.Failure) {
                 Text(
                     text = "错误代码：$failure",
                     style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 数据库在后台打开期间的启动占位。
+ *
+ * 打开过程包含 Keystore 解封口令，老用户升级首启还要整库加密迁移，耗时不可控；
+ * 这段时间不渲染任何需要数据库的界面，也不读取任何记录内容。
+ */
+@Composable
+fun DatabaseLoadingScreen() {
+    LifeTrackTheme(darkTheme = isSystemInDarkTheme()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "正在准备本地数据",
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }

@@ -13,8 +13,10 @@ import com.example.lifetrack.data.repository.RoomTrackRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import net.zetetic.database.Logger
 import net.zetetic.database.NoopTarget
 
@@ -24,19 +26,18 @@ class LifeTrackApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 数据库的实际打开在 AppContainer 的后台协程里进行：读 Keystore、解封口令、
+        // 必要时整库加密迁移，都不能压在主线程上。这里只创建容器，立即返回。
         container = AppContainer(this)
-        if (container.databaseState !is AppContainer.DatabaseState.Ready) return
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            // 加密库首次成功读取之后才清掉明文备份；DAO 抛异常时备份会继续保留。
-            container.database.trackTypeDao().insertIgnore(DEFAULT_POOP_TYPE)
-            container.confirmEncryptionIfNeeded()
-        }
     }
 }
 
 class AppContainer(private val application: Application) {
 
     sealed interface DatabaseState {
+        /** 正在后台打开数据库；UI 只显示启动占位，不渲染任何依赖数据库的界面。 */
+        object Loading : DatabaseState
+
         /** [degraded] 为 true 表示迁移失败后已回退到明文，加密目标本包未达成。 */
         data class Ready(val database: AppDatabase, val degraded: Boolean) : DatabaseState
 
@@ -49,30 +50,64 @@ class AppContainer(private val application: Application) {
     private var confirmationPending = false
     private var degraded = false
 
-    val databaseState: DatabaseState = openDatabase()
+    private val _databaseState = MutableStateFlow<DatabaseState>(DatabaseState.Loading)
+
+    /** 与进程同生命周期：打开数据库的过程不能被界面生命周期打断。 */
+    val databaseState: StateFlow<DatabaseState> = _databaseState.asStateFlow()
+
+    private val openScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        openScope.launch { openAndPublish() }
+    }
 
     val database: AppDatabase
-        get() = (databaseState as? DatabaseState.Ready)?.database
+        get() = (_databaseState.value as? DatabaseState.Ready)?.database
             ?: error("database is unavailable")
 
     val trackRepository by lazy { RoomTrackRepository(database) }
     val settingsRepository = SettingsRepository(application)
     val updateRepository = UpdateRepository(application)
 
-    fun confirmEncryptionIfNeeded() {
+    /**
+     * 打开数据库并发布状态。整段跑在 IO 线程：Keystore 解封在部分机型要几十到几百毫秒，
+     * 老用户升级首启还要整库复制加密，放在 Application.onCreate 的主线程会直接拖慢首帧。
+     */
+    private suspend fun openAndPublish() {
+        val state = try {
+            openDatabase()
+        } catch (t: Throwable) {
+            // 兜底：意料外的初始化异常不能把界面永久停在 Loading。
+            Log.e(TAG, "database open failed unexpectedly", t)
+            DatabaseState.Unavailable(DatabaseKeyStore.Failure.KEYSTORE_ERROR)
+        }
+        _databaseState.value = state
+        if (state !is DatabaseState.Ready) return
+
+        // 加密库首次成功读取之后才清掉明文备份；DAO 抛异常时备份会继续保留。
+        try {
+            state.database.trackTypeDao().insertIgnore(DEFAULT_POOP_TYPE)
+        } catch (t: Throwable) {
+            Log.e(TAG, "seed default type failed", t)
+            return
+        }
+        confirmEncryptionIfNeeded()
+    }
+
+    private fun confirmEncryptionIfNeeded() {
         if (confirmationPending && !degraded) {
             encryption.confirmMigration(AppDatabase.NAME)
             confirmationPending = false
         }
     }
 
-    private fun openDatabase(): DatabaseState {
+    private suspend fun openDatabase(): DatabaseState {
         System.loadLibrary("sqlcipher")
         // SQLCipher 默认把日志送 Logcat，生产构建关掉（C9 隐私审查项提前落地）。
         if (!BuildConfig.DEBUG) Logger.setTarget(NoopTarget())
 
         val passphrase = try {
-            runBlocking { keyRepository.getOrCreatePassphrase(DatabaseKeyStore()) }
+            keyRepository.getOrCreatePassphrase(DatabaseKeyStore())
         } catch (e: DatabaseKeyStore.KeyUnavailableException) {
             Log.e(TAG, "database key unavailable: ${e.failure}")
             return DatabaseState.Unavailable(e.failure)

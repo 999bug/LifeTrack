@@ -71,6 +71,7 @@ import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
+import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.AppLockTimeout
 import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.security.BackupCrypto
@@ -339,28 +340,12 @@ fun SettingsScreen(
     ) {
         Text("设置", style = MaterialTheme.typography.headlineMedium)
 
-        // 高频项：不加分区标题，第一张卡就是默认层级。
-        SettingsCard {
-            SettingsRow(
-                title = "记录项目",
-                icon = Icons.Filled.Tune,
-                subtitle = if (trackTypes.isEmpty()) {
-                    "正在载入…"
-                } else {
-                    "已启用 ${trackTypes.count { it.enabled }} / 共 ${trackTypes.size} 项 · 启用与排序"
-                },
-                onClick = onOpenModules,
-                trailing = { ChevronTrailing() }
-            )
-            SettingsDivider()
-            SettingsRow(
-                title = "外观",
-                icon = Icons.Filled.DarkMode,
-                subtitle = themeMode.label,
-                onClick = { themeDialogVisible = true },
-                trailing = { ChevronTrailing() }
-            )
-        }
+        PrimarySection(
+            trackTypes = trackTypes,
+            themeMode = themeMode,
+            onOpenModules = onOpenModules,
+            onOpenTheme = { themeDialogVisible = true }
+        )
 
         SettingsSection(title = "安全") {
             SettingsRow(
@@ -489,78 +474,13 @@ fun SettingsScreen(
             )
         }
 
-        SettingsSection(title = "更多") {
-            SettingsRow(
-                title = "更新日志",
-                icon = Icons.Filled.History,
-                subtitle = if (availableVersion != null) {
-                    "v$availableVersion 已发布 · 向下查看更新"
-                } else {
-                    "最近 6 个版本的变更"
-                },
-                onClick = { changelogVisible = true },
-                trailing = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (availableVersion != null) UpdateBadge()
-                        ChevronTrailing()
-                    }
-                }
-            )
-            SettingsDivider()
-            SettingsRow(
-                title = "开源许可",
-                icon = Icons.Filled.Description,
-                subtitle = "SQLCipher Community Edition · BSD-style",
-                onClick = { licensesVisible = true }
-            )
-            SettingsDivider()
-            SettingsRow(
-                title = "数据与隐私",
-                icon = Icons.Filled.PrivacyTip,
-                subtitle = "本地存储、网络权限与备份边界",
-                onClick = { privacyExpanded = !privacyExpanded },
-                trailing = {
-                    Icon(
-                        imageVector = if (privacyExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = if (privacyExpanded) "收起说明" else "展开说明",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            )
-            AnimatedVisibility(visible = privacyExpanded) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        "记录仅保存在本应用的私有存储中，不上传任何服务器。",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限" +
-                            "（REQUEST_INSTALL_PACKAGES）；该权限仅用于查询 Gitee Releases 上的最新版本" +
-                            "（Gitee 不可用时回退 GitHub Releases）与下载本应用安装包，" +
-                            "不收集、不上传任何用户数据、设备标识或遥测。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "应用锁使用系统生物识别权限（USE_BIOMETRIC）调用指纹或锁屏密码验证，" +
-                            "不读取、不上传、不保存任何生物特征数据。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "系统自动云备份与设备迁移已通过 Manifest 与规则文件排除应用数据；卸载或清除数据仍可能丢失记录，建议定期导出备份。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+        MoreSection(
+            availableVersion = availableVersion,
+            privacyExpanded = privacyExpanded,
+            onOpenChangelog = { changelogVisible = true },
+            onOpenLicenses = { licensesVisible = true },
+            onTogglePrivacy = { privacyExpanded = !privacyExpanded }
+        )
 
         // 应用更新是功能入口，紧跟「更多」分区（其最后一行是「数据与隐私」），
         // 不能夹在页脚小字里；版本号与免责文案才是整页最底部。
@@ -1290,5 +1210,126 @@ private fun ThemeModeRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * 「更多」分区的展示部分：更新日志、开源许可、数据与隐私。
+ *
+ * 只负责渲染与回调；展开态与弹窗可见性仍由 [SettingsScreen] 持有——它们和备份流程
+ * 共用同一个重组作用域，先不下沉，避免把状态提升方向改掉。
+ */
+@Composable
+private fun MoreSection(
+    availableVersion: String?,
+    privacyExpanded: Boolean,
+    onOpenChangelog: () -> Unit,
+    onOpenLicenses: () -> Unit,
+    onTogglePrivacy: () -> Unit
+) {
+    SettingsSection(title = "更多") {
+        SettingsRow(
+            title = "更新日志",
+            icon = Icons.Filled.History,
+            subtitle = if (availableVersion != null) {
+                "v$availableVersion 已发布 · 向下查看更新"
+            } else {
+                "最近 6 个版本的变更"
+            },
+            onClick = { onOpenChangelog() },
+            trailing = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (availableVersion != null) UpdateBadge()
+                    ChevronTrailing()
+                }
+            }
+        )
+        SettingsDivider()
+        SettingsRow(
+            title = "开源许可",
+            icon = Icons.Filled.Description,
+            subtitle = "SQLCipher Community Edition · BSD-style",
+            onClick = { onOpenLicenses() }
+        )
+        SettingsDivider()
+        SettingsRow(
+            title = "数据与隐私",
+            icon = Icons.Filled.PrivacyTip,
+            subtitle = "本地存储、网络权限与备份边界",
+            onClick = { onTogglePrivacy() },
+            trailing = {
+                Icon(
+                    imageVector = if (privacyExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (privacyExpanded) "收起说明" else "展开说明",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+        AnimatedVisibility(visible = privacyExpanded) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "记录仅保存在本应用的私有存储中，不上传任何服务器。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "为应用内「检查更新」与安装，本应用申请了网络权限（INTERNET）与安装权限" +
+                        "（REQUEST_INSTALL_PACKAGES）；该权限仅用于查询 Gitee Releases 上的最新版本" +
+                        "（Gitee 不可用时回退 GitHub Releases）与下载本应用安装包，" +
+                        "不收集、不上传任何用户数据、设备标识或遥测。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "应用锁使用系统生物识别权限（USE_BIOMETRIC）调用指纹或锁屏密码验证，" +
+                        "不读取、不上传、不保存任何生物特征数据。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "系统自动云备份与设备迁移已通过 Manifest 与规则文件排除应用数据；卸载或清除数据仍可能丢失记录，建议定期导出备份。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 高频项主卡：记录项目与外观。不加分区标题，第一张卡就是默认层级。
+ */
+@Composable
+private fun PrimarySection(
+    trackTypes: List<TrackTypeEntity>,
+    themeMode: ThemeMode,
+    onOpenModules: () -> Unit,
+    onOpenTheme: () -> Unit
+) {
+    SettingsCard {
+        SettingsRow(
+            title = "记录项目",
+            icon = Icons.Filled.Tune,
+            subtitle = if (trackTypes.isEmpty()) {
+                "正在载入…"
+            } else {
+                "已启用 ${trackTypes.count { it.enabled }} / 共 ${trackTypes.size} 项 · 启用与排序"
+            },
+            onClick = onOpenModules,
+            trailing = { ChevronTrailing() }
+        )
+        SettingsDivider()
+        SettingsRow(
+            title = "外观",
+            icon = Icons.Filled.DarkMode,
+            subtitle = themeMode.label,
+            onClick = { onOpenTheme() },
+            trailing = { ChevronTrailing() }
+        )
     }
 }

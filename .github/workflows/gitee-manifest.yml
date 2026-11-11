@@ -1,0 +1,118 @@
+name: Backfill Gitee latest.json
+
+# 只在「Release 已发布、但 latest.json 没写成」时手工补写用。
+# 正常发版由 release.yml 的 mirror-gitee job 负责写，日常不需要跑这个。
+# 补写前会先 HEAD 校验 Gitee 上的 APK 与 sha256 真实可达，避免写出指向死链的清单。
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要补写的版本 tag（如 v0.6.6）；留空则取仓库里最高的 tag'
+        required: false
+        default: ''
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
+      GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}
+      GITEE_BRANCH: ${{ vars.GITEE_BRANCH || 'main' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version and notes
+        id: v
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG}"
+          if [ -z "$TAG" ]; then
+            TAG=$(git tag -l 'v*' | sort -V | tail -1)
+          fi
+          if [ -z "$TAG" ]; then
+            echo "::error::仓库里没有任何 v* tag"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          FILE="app/src/main/java/com/example/lifetrack/feature/settings/VersionHistory.kt"
+          NOTES=$(grep -A2 "version = \"${VERSION}\"" "$FILE" \
+            | grep -o 'summary = ".*"' | head -1 | sed 's/summary = "//; s/"$//')
+          if [ -z "$NOTES" ]; then
+            echo "::error::VersionHistory.kt 里找不到 ${VERSION} 的 summary"
+            exit 1
+          fi
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "notes=$NOTES"
+          } >> "$GITHUB_OUTPUT"
+          echo "补写 $TAG（$VERSION）：$NOTES"
+
+      - name: Verify Gitee assets are reachable
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          BASE="https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/download/${TAG}"
+          for f in "LifeTrack-${VERSION}-release.apk" "LifeTrack-${VERSION}-release.apk.sha256"; do
+            CODE=$(curl -sS -o /dev/null -w '%{http_code}' -I "${BASE}/${f}" || true)
+            echo "${f} -> HTTP ${CODE}"
+            case "$CODE" in
+              200|302) ;;
+              *)
+                echo "::error::Gitee 上没有 ${f}（HTTP ${CODE}），先补传附件再写清单"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Write latest.json
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          NOTES: ${{ steps.v.outputs.notes }}
+        run: |
+          set -euo pipefail
+          BASE="https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/download/${TAG}"
+          MANIFEST=$(jq -n \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            --arg notes "$NOTES" \
+            --arg apk "${BASE}/LifeTrack-${VERSION}-release.apk" \
+            --arg sha "${BASE}/LifeTrack-${VERSION}-release.apk.sha256" \
+            '{version:$version, tag:$tag, notes:$notes, apkUrl:$apk, sha256Url:$sha}')
+          echo "Manifest payload: $MANIFEST"
+          CONTENT=$(printf '%s' "$MANIFEST" | base64 | tr -d '\n')
+
+          CONTENTS_API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/contents/latest.json"
+          # Gitee 对「文件不存在」返回数组而不是 404，必须先判类型再取 sha。
+          EXISTING_RESP=$(curl -sS "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" || echo '')
+          EXISTING_SHA=$(printf '%s' "$EXISTING_RESP" \
+            | jq -r 'if type == "object" then (.sha // empty) else empty end' 2>/dev/null || true)
+          if [ -n "$EXISTING_SHA" ]; then
+            put_resp=$(curl -sS -X PUT "$CONTENTS_API" \
+              --data-urlencode "access_token=${GITEE_TOKEN}" \
+              --data-urlencode "content=${CONTENT}" \
+              --data-urlencode "message=chore: update latest.json for ${TAG}" \
+              --data-urlencode "sha=${EXISTING_SHA}" \
+              --data-urlencode "branch=${GITEE_BRANCH}")
+          else
+            put_resp=$(curl -sS -X POST "$CONTENTS_API" \
+              --data-urlencode "access_token=${GITEE_TOKEN}" \
+              --data-urlencode "content=${CONTENT}" \
+              --data-urlencode "message=chore: add latest.json for ${TAG}" \
+              --data-urlencode "branch=${GITEE_BRANCH}")
+          fi
+          if ! printf '%s' "$put_resp" | jq -e 'type == "object" and (has("content") or has("sha"))' > /dev/null 2>&1; then
+            echo "::error::Failed to write latest.json: $put_resp"
+            exit 1
+          fi
+          echo "已写入：https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/raw/${GITEE_BRANCH}/latest.json"

@@ -412,8 +412,11 @@ jobs:
           CONTENT=$(printf '%s' "$MANIFEST" | base64 | tr -d '\n')
 
           CONTENTS_API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/contents/latest.json"
-          EXISTING_SHA=$(curl -sS "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" \
-            | jq -r '.sha // empty')
+          # Gitee 对「文件不存在」返回的是数组（目录列表语义）而不是 404，
+          # 直接 jq '.sha' 会报 "Cannot index array with string"，必须先判类型。
+          EXISTING_RESP=$(curl -sS "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" || echo '')
+          EXISTING_SHA=$(printf '%s' "$EXISTING_RESP" \
+            | jq -r 'if type == "object" then (.sha // empty) else empty end' 2>/dev/null || true)
           if [ -n "$EXISTING_SHA" ]; then
             put_resp=$(curl -sS -X PUT "$CONTENTS_API" \
               --data-urlencode "access_token=${GITEE_TOKEN}" \
@@ -428,7 +431,7 @@ jobs:
               --data-urlencode "message=chore: update latest.json for ${TAG}" \
               --data-urlencode "branch=${GITEE_BRANCH}")
           fi
-          if ! printf '%s' "$put_resp" | jq -e '.content // .sha // empty' > /dev/null; then
+          if ! printf '%s' "$put_resp" | jq -e 'type == "object" and (has("content") or has("sha"))' > /dev/null 2>&1; then
             echo "::error::Failed to write latest.json to Gitee: $put_resp"
             exit 1
           fi

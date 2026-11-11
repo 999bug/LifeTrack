@@ -23,7 +23,7 @@
 
 <!-- BEGIN AUTO-SNAPSHOT -->
 > 由 `scripts/export_release_pipeline.py --write` 从 `.github/workflows/release.yml` 与 `app/build.gradle.kts` 生成，**不要手改**。
-> 输入指纹：`release.yml` = `091ed2ed085a` · `build.gradle.kts` = `1cab2c1005ec`。
+> 输入指纹：`release.yml` = `1824dcbdacd2` · `build.gradle.kts` = `1cab2c1005ec`。
 
 ### 机器可读事实
 
@@ -61,7 +61,7 @@ mirror=gitee_openapi
 mirror_tag_source=needs.release.outputs.tag
 contents_permission=write
 secrets=GITEE_TOKEN,GITHUB_TOKEN,SIGNING_KEYSTORE_BASE64,SIGNING_KEYSTORE_PASSWORD,SIGNING_KEY_ALIAS,SIGNING_KEY_PASSWORD
-workflow_sha256_12=091ed2ed085a
+workflow_sha256_12=1824dcbdacd2
 build_file_sha256_12=1cab2c1005ec
 step_count=17
 ```

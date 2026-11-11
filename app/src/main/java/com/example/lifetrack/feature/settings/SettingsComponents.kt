@@ -1,7 +1,10 @@
 package com.example.lifetrack.feature.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,13 +30,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.lifetrack.core.security.ScreenCapturePolicy
@@ -88,9 +96,20 @@ internal fun SettingsRow(
     enabled: Boolean = true,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     role: Role = Role.Button,
+    stateDescription: String? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null
 ) {
-    val base = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+    // 折叠行要把「已展开 / 已收起」交给读屏，而不是让用户靠箭头方向猜。
+    val base = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 56.dp)
+        .then(
+            if (stateDescription != null) {
+                Modifier.semantics { this.stateDescription = stateDescription }
+            } else {
+                Modifier
+            }
+        )
     val interactive = if (onClick != null && enabled) {
         base.clickable(role = role, onClick = onClick)
     } else {
@@ -216,4 +235,106 @@ internal fun ScreenCaptureNoticeDialog(
             }
         }
     )
+}
+
+/**
+ * 无标题卡片：设置页的高频主卡与页脚更新块共用。
+ * 前两项是进设置最常做的事，再加一个「常用」标题反而是噪声。
+ */
+@Composable
+internal fun SettingsCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        shape = SettingsShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(content = content)
+    }
+}
+
+/**
+ * 低频且高破坏的分组：默认收起，展开在原地不跳页。
+ * 调用方负责在状态出现时把 expanded 置 true——导出 / 恢复进行中不能把状态藏起来。
+ */
+@Composable
+internal fun CollapsibleSettingsSection(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    SettingsCard(modifier = modifier) {
+        SettingsRow(
+            title = title,
+            subtitle = subtitle,
+            icon = icon,
+            onClick = onToggle,
+            stateDescription = if (expanded) "已展开" else "已收起",
+            trailing = {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "收起$title" else "展开$title",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+        AnimatedVisibility(visible = expanded) {
+            Column(content = content)
+        }
+    }
+}
+
+/** 页脚：版本号与免责文案，沉在设置页最后一段。 */
+@Composable
+internal fun SettingsFooter(versionName: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "生活记 $versionName",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "本地生活记录工具 · 不提供医疗诊断",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** 有可用新版本时挂在「更新日志」行尾，避免更新入口沉到页脚后被错过。 */
+@Composable
+internal fun UpdateBadge(text: String = "有新版本") {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    }
 }

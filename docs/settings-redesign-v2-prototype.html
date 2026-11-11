@@ -239,7 +239,7 @@
   }
   .footer-brand .ver{font-variant-numeric:tabular-nums}
   .footer-action{
-    margin-top:8px;font:inherit;font-size:13px;color:var(--primary);
+    margin:0 0 12px;font:inherit;font-size:13px;color:var(--primary);
     background:none;border:none;padding:9px 16px;border-radius:20px;cursor:pointer;
     min-height:48px;transition:background .15s
   }
@@ -251,7 +251,7 @@
   }
 
   .update-banner{
-    display:none;align-items:center;gap:12px;text-align:left;
+    display:none;align-items:center;gap:12px;text-align:left;margin-bottom:12px;
     background:var(--primary-container);border-radius:16px;padding:14px 16px;
   }
   .update-banner.show{display:flex}
@@ -406,8 +406,8 @@
     </div>
 
     <div class="decision">
-      <h3><span class="num">03</span>版本与更新沉到页面最底</h3>
-      <p>版本号从「关于」中间移到页脚，检查更新跟着一起走。折叠态下页脚落在首屏下沿、轻扫即到；有新版时页脚换成提示卡，首屏「更新日志」行同步出现「有新版本」标记，不会因为下沉而错过。</p>
+      <h3><span class="num">03</span>检查更新紧跟内容区，版本号沉到最底</h3>
+      <p>「检查更新」紧跟「更多」分区最后一行「数据与隐私」，不夹在页脚小字里；版本号与免责文案才落在整页最底部。折叠态下页脚在首屏下沿、轻扫即到；有新版时检查更新换成提示卡，首屏「更新日志」行同步出现「有新版本」标记，不会因为下沉而错过。</p>
     </div>
 
     <div class="metric">
@@ -418,8 +418,8 @@
 
     <p class="hint">
       可以点的部分：数据行展开/收起、外观切换主题（含深色）、应用锁开关（关掉后自动锁定会消失）、
-      更新日志与数据与隐私两个二级页、页脚检查更新。右上角可模拟「有新版本」，
-      此时首屏「更新日志」行会出现标记，页脚换成更新卡（往下轻扫可见）。
+      更新日志与数据与隐私两个二级页、内容区末尾的检查更新。右上角可模拟「有新版本」，
+      此时首屏「更新日志」行会出现标记，检查更新换成提示卡（往下轻扫可见）。
     </p>
   </aside>
 
@@ -639,10 +639,7 @@
           </section>
 
           <footer class="page-footer" id="footer">
-            <div id="footerNormal">
-              <div class="footer-brand">生活记 <span class="ver">0.6.4</span></div>
-              <button class="footer-action" id="checkBtn" onclick="checkUpdate()">检查更新</button>
-            </div>
+            <button class="footer-action" id="checkBtn" onclick="checkUpdate()">检查更新</button>
             <div class="update-banner" id="updateBanner">
               <div class="ub-text">
                 <div class="ub-title">v0.6.5 可用</div>
@@ -650,6 +647,7 @@
               </div>
               <button class="ub-btn" onclick="toast('原型：下载并调起系统安装器')">更新</button>
             </div>
+            <div class="footer-brand">生活记 <span class="ver">0.6.4</span></div>
             <p class="footer-disclaimer">本地生活记录工具 · 不提供医疗诊断</p>
           </footer>
         </div>
@@ -802,7 +800,6 @@
   const lockSub = document.getElementById('lockSub');
   const timeoutBlock = document.getElementById('timeoutBlock');
   const checkBtn = document.getElementById('checkBtn');
-  const footerNormal = document.getElementById('footerNormal');
   const updateBanner = document.getElementById('updateBanner');
   const simUpdate = document.getElementById('simUpdate');
   const updateBadge = document.getElementById('updateBadge');
@@ -888,7 +885,7 @@
   // 页脚沉到底部后，首屏需要一个可发现性兜底：有新版时「更新日志」行同步标记。
   simUpdate.addEventListener('change', function () {
     const on = simUpdate.checked;
-    footerNormal.style.display = on ? 'none' : 'block';
+    checkBtn.style.display = on ? 'none' : 'inline-block';
     updateBanner.classList.toggle('show', on);
     updateBadge.classList.toggle('show', on);
     logSub.textContent = on ? 'v0.6.5 已发布 · 到页脚更新' : '最近 6 个版本的变更';

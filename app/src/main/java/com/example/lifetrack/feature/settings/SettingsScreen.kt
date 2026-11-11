@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,8 +21,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -76,6 +77,7 @@ import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.RetryBackoff
 import com.example.lifetrack.core.security.ScreenCapturePolicy
+import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.lock.canUseAppLock
 import java.time.LocalDateTime
@@ -88,12 +90,16 @@ import kotlinx.coroutines.withContext
 private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 
 /**
- * 设置页：按「记录 / 数据 / 外观 / 安全 / 关于」五段组织，每段一张卡片。
+ * 设置页：按「使用频率 × 破坏性」分层，不再一段功能一张卡平铺。
  *
- * 记录项目管理已拆到独立页面（[ModuleManagementScreen]），
- * 更新、隐私与版本更新日志都收进「关于」（日志点开才展开），
- * 备份改成两行操作 + 一句风险提示，
- * 避免之前六张卡片各写一套内边距、越加越长的问题。
+ * - 无标题主卡：记录项目、外观——进设置最常做的两件事。
+ * - 安全：中频且状态需随时可查，保持独立。
+ * - 数据与备份：低频且高破坏，默认折叠；进行中 / 完成 / 失败时自动展开。
+ * - 更多：只读或一次性入口（更新日志、开源许可、数据与隐私）。
+ * - 页脚：版本号、免责文案与应用更新，沉到页面最后一段。
+ *
+ * 记录项目管理在独立页（[ModuleManagementScreen]）；更新状态机仍由
+ * [UpdateSection] 自己维护，这里只决定它挂在哪一段。
  */
 @Composable
 fun SettingsScreen(
@@ -101,6 +107,7 @@ fun SettingsScreen(
     onOpenModules: () -> Unit
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
@@ -117,6 +124,9 @@ fun SettingsScreen(
     var pendingCount by remember { mutableIntStateOf(0) }
     var currentCount by remember { mutableIntStateOf(0) }
     var privacyExpanded by remember { mutableStateOf(false) }
+    // 数据与备份默认收起；低频项不持久化展开态，下次进来仍是一行。
+    var dataExpanded by remember { mutableStateOf(false) }
+    var themeDialogVisible by remember { mutableStateOf(false) }
     var timeoutDialogVisible by remember { mutableStateOf(false) }
     var appLockError by remember { mutableStateOf<String?>(null) }
     var licensesVisible by remember { mutableStateOf(false) }
@@ -308,6 +318,15 @@ fun SettingsScreen(
         currentCount = if (pending == null) 0 else viewModel.countAllRecords()
     }
 
+    // 状态外溢：导出 / 恢复进行中、刚完成或失败时自动展开，不让状态藏在折叠区里。
+    // 用一次性置位而不是「expanded || busy」，用户随后仍能手动收起。
+    LaunchedEffect(busy, status, failure) {
+        if (busy || status != null || failure != null) dataExpanded = true
+    }
+
+    // 有可下载的新版本时，首屏「更新日志」行同步标记，避免更新入口沉到页脚后被错过。
+    val availableVersion = (updateState as? UpdateRepository.Status.Available)?.release?.version
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -320,7 +339,8 @@ fun SettingsScreen(
     ) {
         Text("设置", style = MaterialTheme.typography.headlineMedium)
 
-        SettingsSection(title = "记录") {
+        // 高频项：不加分区标题，第一张卡就是默认层级。
+        SettingsCard {
             SettingsRow(
                 title = "记录项目",
                 icon = Icons.Filled.Tune,
@@ -332,79 +352,14 @@ fun SettingsScreen(
                 onClick = onOpenModules,
                 trailing = { ChevronTrailing() }
             )
-        }
-
-        SettingsSection(title = "数据") {
-            SettingsRow(
-                title = "导出备份",
-                icon = Icons.Filled.FileUpload,
-                subtitle = "默认加密导出，恢复时需要口令",
-                enabled = !busy,
-                onClick = {
-                    exportAsEncrypted = true
-                    exportPassphrase = ""
-                    exportPassphraseConfirm = ""
-                    exportPassphraseError = null
-                    exportChoiceVisible = true
-                }
-            )
             SettingsDivider()
             SettingsRow(
-                title = "从备份恢复",
-                icon = Icons.Filled.FileDownload,
-                subtitle = "支持加密与明文备份，会替换当前全部记录",
-                titleColor = MaterialTheme.colorScheme.error,
-                enabled = !busy,
-                onClick = {
-                    importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
-                }
+                title = "外观",
+                icon = Icons.Filled.DarkMode,
+                subtitle = themeMode.label,
+                onClick = { themeDialogVisible = true },
+                trailing = { ChevronTrailing() }
             )
-            SettingsDivider()
-            SettingsRow(
-                title = "更换备份口令",
-                icon = Icons.Filled.Key,
-                subtitle = "解旧口令后用新口令重新加密，生成新文件",
-                enabled = !busy,
-                onClick = {
-                    rekeyPickLauncher.launch(
-                        arrayOf("application/json", "text/plain", "application/octet-stream")
-                    )
-                }
-            )
-            if (busy || status != null) {
-                SettingsDivider()
-                Text(
-                    text = status ?: "处理中…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (busy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
-                )
-            }
-            SettingsNote(
-                text = "加密备份需要口令才能恢复，口令遗失无法找回，请与备份文件分开保管。明文备份不加密，能读到文件的人就能查看全部记录。",
-                isWarning = true
-            )
-        }
-
-        SettingsSection(title = "外观") {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Text("主题", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(8.dp))
-                ThemeModeRow(selected = themeMode, onSelect = viewModel::setThemeMode)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "跟随系统时随设备的深色模式切换；仅影响应用显示，不改变记录数据",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
 
         SettingsSection(title = "安全") {
@@ -473,26 +428,86 @@ fun SettingsScreen(
             )
         }
 
-        SettingsSection(title = "关于") {
+        CollapsibleSettingsSection(
+            title = "数据与备份",
+            subtitle = "导出、恢复与更换口令",
+            icon = Icons.Filled.Storage,
+            expanded = dataExpanded,
+            onToggle = { dataExpanded = !dataExpanded }
+        ) {
             SettingsRow(
-                title = "版本",
-                subtitle = "本地生活记录工具 · 不提供医疗诊断",
-                trailing = {
-                    Text(
-                        text = BuildConfig.VERSION_NAME,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                title = "导出备份",
+                icon = Icons.Filled.FileUpload,
+                subtitle = "默认加密导出，恢复时需要口令",
+                enabled = !busy,
+                onClick = {
+                    exportAsEncrypted = true
+                    exportPassphrase = ""
+                    exportPassphraseConfirm = ""
+                    exportPassphraseError = null
+                    exportChoiceVisible = true
                 }
             )
             SettingsDivider()
-            UpdateSection(viewModel = viewModel)
+            SettingsRow(
+                title = "从备份恢复",
+                icon = Icons.Filled.FileDownload,
+                subtitle = "支持加密与明文备份，会替换当前全部记录",
+                titleColor = MaterialTheme.colorScheme.error,
+                enabled = !busy,
+                onClick = {
+                    importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                }
+            )
             SettingsDivider()
+            SettingsRow(
+                title = "更换备份口令",
+                icon = Icons.Filled.Key,
+                subtitle = "解旧口令后用新口令重新加密，生成新文件",
+                enabled = !busy,
+                onClick = {
+                    rekeyPickLauncher.launch(
+                        arrayOf("application/json", "text/plain", "application/octet-stream")
+                    )
+                }
+            )
+            if (busy || status != null) {
+                SettingsDivider()
+                Text(
+                    text = status ?: "处理中…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (busy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                )
+            }
+            SettingsNote(
+                text = "加密备份需要口令才能恢复，口令遗失无法找回，请与备份文件分开保管。明文备份不加密，能读到文件的人就能查看全部记录。",
+                isWarning = true
+            )
+        }
+
+        SettingsSection(title = "更多") {
             SettingsRow(
                 title = "更新日志",
                 icon = Icons.Filled.History,
-                subtitle = "查看各版本的功能变化",
-                onClick = { changelogVisible = true }
+                subtitle = if (availableVersion != null) {
+                    "v$availableVersion 已发布 · 向下查看更新"
+                } else {
+                    "最近 6 个版本的变更"
+                },
+                onClick = { changelogVisible = true },
+                trailing = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (availableVersion != null) UpdateBadge()
+                        ChevronTrailing()
+                    }
+                }
             )
             SettingsDivider()
             SettingsRow(
@@ -546,6 +561,39 @@ fun SettingsScreen(
                 }
             }
         }
+
+        // 应用更新是功能入口，紧跟「更多」分区（其最后一行是「数据与隐私」），
+        // 不能夹在页脚小字里；版本号与免责文案才是整页最底部。
+        SettingsCard {
+            UpdateSection(viewModel = viewModel)
+        }
+        SettingsFooter(versionName = BuildConfig.VERSION_NAME)
+    }
+
+    if (themeDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { themeDialogVisible = false },
+            title = { Text("外观") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "仅影响应用显示，不改变记录数据。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // 复用原有三分段：大字号 52dp 与「系统」缩写适配都保留在这里。
+                    ThemeModeRow(selected = themeMode, onSelect = viewModel::setThemeMode)
+                    Text(
+                        text = "跟随系统时随设备的深色模式自动切换。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { themeDialogVisible = false }) { Text("完成") }
+            }
+        )
     }
 
     if (changelogVisible) {

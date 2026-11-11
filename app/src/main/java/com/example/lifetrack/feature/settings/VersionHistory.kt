@@ -82,9 +82,13 @@ internal val versionHistory: List<VersionNote> = listOf(
     )
 )
 
-/** 更新日志弹窗：默认只在「关于」占一行，展开后列表自身可滚动。 */
+/** 弹窗只列最近几个版本，完整历史仍随发版累积在 [versionHistory] 里。 */
+private const val VISIBLE_VERSION_COUNT = 6
+
+/** 更新日志弹窗：设置页只占一行入口，点开后列表自身可滚动。 */
 @Composable
 internal fun VersionHistoryDialog(onDismiss: () -> Unit) {
+    val recent = versionHistory.take(VISIBLE_VERSION_COUNT)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("更新日志") },
@@ -93,11 +97,19 @@ internal fun VersionHistoryDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                versionHistory.forEachIndexed { index, note ->
+                recent.forEachIndexed { index, note ->
                     if (index > 0) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                     VersionHistoryEntry(note)
+                }
+                if (versionHistory.size > recent.size) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Text(
+                        text = "仅显示最近 $VISIBLE_VERSION_COUNT 个版本，完整历史随版本累积。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         },

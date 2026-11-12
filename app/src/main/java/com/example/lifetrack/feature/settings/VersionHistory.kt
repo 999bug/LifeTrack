@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.9",
+        date = "2026-11-12",
+        summary = "新增经期子应用：日历逐日记录出血量与症状，自动推算周期；备份已含经期明细"
+    ),
+    VersionNote(
         version = "0.6.8",
         date = "2026-11-11",
         summary = "内部改进与稳定性修复"

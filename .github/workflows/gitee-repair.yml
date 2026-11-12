@@ -41,6 +41,11 @@ jobs:
       GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}
       GITEE_BRANCH: ${{ vars.GITEE_BRANCH || 'main' }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Resolve version and release notes
         run: |
           set -euo pipefail

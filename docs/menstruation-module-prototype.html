@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A9 经期子应用 · 交互原型 v4 · 生活记</title>
+<title>A9 经期子应用 · 交互原型 v5 · 生活记</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -117,11 +117,6 @@
   .mod .ct { font-size: .86em; color: var(--text-2); margin-top: 7px; }
   .mod .sm { font-size: .78em; color: var(--text-3); margin-top: 3px; min-height: 1.2em; }
   .mod .go { position: absolute; right: 11px; bottom: 11px; font-size: .78em; color: var(--primary); }
-
-  /* 首页状态行 */
-  .status-line { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--period); border-radius: 12px; padding: 12px 14px; cursor: pointer; box-shadow: var(--shadow); }
-  .status-line .main { font-size: 1.1em; font-weight: 500; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-  .status-line .src { font-size: .78em; color: var(--text-3); margin-top: 5px; line-height: 1.6; }
 
   /* 今日记录 */
   .rec { display: flex; align-items: flex-start; gap: 11px; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -249,7 +244,7 @@
 <body>
 <div class="stage">
   <aside class="notes">
-    <p class="eyebrow">LIFETRACK · A9 经期子应用 v4</p>
+    <p class="eyebrow">LIFETRACK · A9 经期子应用 v5</p>
     <h1>经期子应用<br>交互原型</h1>
     <p class="lede">按 14:03 的指示把经期页改成参考 App 的交互方式：日历置顶选日期，下方一行一行填当天内容，每行带图示，最后加一行日记。点行展开选项，即点即存，不再弹底部表单。</p>
 
@@ -266,7 +261,7 @@
       <p>最后一行是日记，纸笔图示加多行文本，写当天的感受与作息。复用现有事件备注字段，不新增详情字段、不改备份格式；不引入图片与富文本。</p>
     </div>
     <div class="note-box">
-      点工具栏切浅 / 深色、200% 字体、三种数据场景；点日历换日期，点任意行展开填写，改周期 / 经期长度会立即重算预测日期。图示均为内联自绘 SVG，无外链、无渐变、无装饰 emoji。数据为确定性 mock，跨面板自洽。也可用 <code>?page=cycle&amp;row=diary&amp;scroll=form</code> 直达日记行。
+      点工具栏切浅 / 深色、200% 字体、三种数据场景；点日历换日期，点任意行展开填写，改周期 / 经期长度会立即重算预测日期。图示均为内联自绘 SVG，无外链、无渐变、无装饰 emoji。数据为确定性 mock，跨面板自洽。也可用 <code>?page=cycle&amp;row=diary&amp;scroll=form</code> 直达日记行。<br>v5：今天页只保留「月经」模块卡，不再显示周期状态行与截屏提示行；截屏保护机制本身不变。
     </div>
   </aside>
 
@@ -299,7 +294,7 @@
     </div>
 
     <div class="device"><div class="phone" id="phone"></div></div>
-    <p class="caption">412 × 866 · 单文件原型 v4 · 数据固定为 2026-11-12，周期序列 [28, 29, 28, 28, 29, 28]，中位数 28 天 · 底部导航仍为 4 项</p>
+    <p class="caption">412 × 866 · 单文件原型 v5 · 数据固定为 2026-11-12，周期序列 [28, 29, 28, 28, 29, 28]，中位数 28 天 · 底部导航仍为 4 项</p>
   </main>
 </div>
 
@@ -408,8 +403,7 @@
       predicted: uniq([...thisPeriodRemain, ...predicted]).sort(),
       nextStart: (enabled && reliable) ? addDays(lastStart, cycle) : null,
       inPeriod, dayIndex, lastStart,
-      headline: !enabled ? '' : (!reliable ? '记录暂不足，继续记录后可预测' : (inPeriod ? '经期第 ' + dayIndex + ' 天' : '距预计下次经期 ' + diff(TODAY, addDays(lastStart, cycle)) + ' 天')),
-      source: !reliable ? '按设定值估算 · 仅供记录参考' : (S.overridden ? '按设定值估算 · 仅供记录参考' : '按最近 6 个周期估算 · 仅供记录参考')
+      headline: !enabled ? '' : (!reliable ? '记录暂不足，继续记录后可预测' : (inPeriod ? '经期第 ' + dayIndex + ' 天' : '距预计下次经期 ' + diff(TODAY, addDays(lastStart, cycle)) + ' 天'))
     };
   }
 
@@ -486,19 +480,13 @@
         '<span class="go">' + (x.code === 'period' ? '打开' : '记录') + '</span></button>';
     }).join('');
 
-    const status = m.enabled
-      ? '<div class="status-line" data-act="opencycle"><div class="main"><span>' + m.headline + '</span><span class="link">打开经期 →</span></div>' +
-        '<div class="src">' + m.source + '</div></div>'
-      : '';
-
     const rows = recs.map(r => '<div class="rec"><span class="tm tnum">' + r.t + '</span><span class="bd">' + r.name + '<em>' + r.detail + '</em></span></div>').join('');
 
     return '<div class="screen">' +
       '<div class="eb">2026年11月12日 · 周四</div>' +
       '<h1 class="pg">今天</h1>' +
       '<div class="sub">已记录 ' + count + ' 次 · 最近一次 12:30</div>' +
-      '<div class="grid">' + cards + '</div>' + status +
-      (m.enabled ? '<div class="sub" style="margin-top:10px">已开启截屏保护：启用高敏感模块后全应用禁止截屏。</div>' : '') +
+      '<div class="grid">' + cards + '</div>' +
       '<div class="sec-title">今日记录</div>' + rows +
       '</div>' + nav('today');
   }
@@ -660,7 +648,7 @@
       (S.historyMode === 'calendar'
         ? '<div class="card"><div class="cal-head"><span class="ttl">' + g.label + '</span><div class="cal-nav"><button data-act="histprev">←</button><button disabled>→</button></div></div>' +
           '<div class="week">' + WEEK.map(w => '<span>' + w + '</span>').join('') + '</div><div class="cells">' + cells + '</div>' +
-          '<div class="tiny muted" style="margin-top:10px">下一月按钮在本月禁用。预计经期不在这里，请回「今天 → 打开经期」。</div></div>'
+          '<div class="tiny muted" style="margin-top:10px">下一月按钮在本月禁用。预计经期不在这里，请点首页「月经」卡进入经期页。</div></div>'
         : '<div class="small muted">11月12日 · 周四 · 共 ' + TODAY_RECORDS.length + ' 条</div>' + list) +
       '<div class="divider"></div><div class="tiny muted">原型说明：这里保持 0.6.8 的两态结构与「同一份数据的两种密度」口径，不加第三档「经期」。</div>' +
       '</div>' + nav('history');
@@ -727,7 +715,7 @@
     switch (act) {
       case 'nav': S.page = el.getAttribute('data-page'); render(); break;
       case 'back': S.page = 'today'; render(); break;
-      case 'opencycle': case 'openperiod': S.page = 'cycle'; S.monthOffset = 0; S.selectedDate = TODAY; S.openRow = ''; render(); break;
+      case 'openperiod': S.page = 'cycle'; S.monthOffset = 0; S.selectedDate = TODAY; S.openRow = ''; render(); break;
       case 'jumpToday': S.page = 'cycle'; S.monthOffset = 0; S.selectedDate = TODAY; S.openRow = 'diary'; toast('已定位到今天，日记行已展开'); scrollToForm(); break;
       case 'mod': toast('本原型聚焦月经模块，其它编辑器沿用 0.6.8'); break;
       case 'month': S.monthOffset = Math.max(-2, Math.min(3, S.monthOffset + Number(el.getAttribute('data-delta')))); render(); break;

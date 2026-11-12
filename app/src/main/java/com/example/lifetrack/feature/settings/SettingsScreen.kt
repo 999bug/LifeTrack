@@ -77,7 +77,7 @@ import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.RetryBackoff
-import com.example.lifetrack.core.security.ScreenCapturePolicy
+import com.example.lifetrack.core.security.SensitiveTypes
 import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.lock.canUseAppLock
@@ -113,9 +113,6 @@ fun SettingsScreen(
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
     val compactState by viewModel.compactState.collectAsStateWithLifecycle()
-    // 与 MainActivity 共用同一判定口径：窗口已遮挡时，界面必须说得出原因和恢复方法。
-    val captureReasons = ScreenCapturePolicy.reasons(appLockEnabled == true, trackTypes)
-    val captureBlocked = captureReasons.isNotEmpty()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -133,8 +130,6 @@ fun SettingsScreen(
     var appLockError by remember { mutableStateOf<String?>(null) }
     var licensesVisible by remember { mutableStateOf(false) }
     var changelogVisible by remember { mutableStateOf(false) }
-    // null = 不显示；非空 = 展示当时的遮挡原因（点击瞬间 DataStore 还没回写，需现场构造）
-    var captureNoticeReasons by remember { mutableStateOf<List<ScreenCapturePolicy.Reason>?>(null) }
 
     // 导出：先选加密方式；加密要两次口令，明文要过一道风险确认。
     var exportChoiceVisible by remember { mutableStateOf(false) }
@@ -364,10 +359,6 @@ fun SettingsScreen(
                         appLockError = "请先在系统设置中设置锁屏密码（PIN、图案或密码），再开启应用锁。"
                     } else {
                         viewModel.setAppLockEnabled(enable)
-                        if (enable) {
-                            // 点击瞬间 DataStore 还没回写，显式按「开启后」的状态构造原因
-                            captureNoticeReasons = ScreenCapturePolicy.reasons(true, trackTypes)
-                        }
                     }
                 },
                 trailing = {
@@ -383,37 +374,6 @@ fun SettingsScreen(
                     trailing = { ChevronTrailing() }
                 )
             }
-            SettingsDivider()
-            SettingsRow(
-                title = "截屏与录屏",
-                icon = Icons.Filled.PrivacyTip,
-                subtitle = if (captureBlocked) {
-                    "已禁止 · 因${ScreenCapturePolicy.describe(captureReasons)}；本应用所有页面都无法截屏、录屏，最近任务预览也不显示内容"
-                } else {
-                    "正常 · 可截屏、录屏，最近任务预览显示页面内容"
-                },
-                onClick = { captureNoticeReasons = captureReasons },
-                trailing = {
-                    Text(
-                        text = if (captureBlocked) "已禁止" else "正常",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (captureBlocked) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
-            )
-            SettingsNote(
-                text = if (captureBlocked) {
-                    "点上面一行可查看完整说明与恢复方法。解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
-                } else {
-                    "开启应用锁或启用敏感记录项目（" +
-                        ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") { "「$it」" } +
-                        "）时，整个应用会自动禁止截屏与录屏，届时会再次提示。解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
-                }
-            )
         }
 
         CollapsibleSettingsSection(
@@ -657,7 +617,7 @@ fun SettingsScreen(
                 Text(
                     "明文备份不加密：拿到文件的任何人（包括云盘、聊天工具、电脑上的其他应用）" +
                         "都能看到全部记录，其中会包含已启用的敏感记录（" +
-                        ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") +
+                        SensitiveTypes.sensitiveModuleNames.joinToString("、") +
                         "）。加密导出只需要记一个口令，建议改用加密。"
                 )
             },
@@ -966,14 +926,6 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { appLockError = null }) { Text("知道了") }
             }
-        )
-    }
-
-    captureNoticeReasons?.let { reasons ->
-        ScreenCaptureNoticeDialog(
-            reasons = reasons,
-            onOpenModules = onOpenModules,
-            onDismiss = { captureNoticeReasons = null }
         )
     }
 

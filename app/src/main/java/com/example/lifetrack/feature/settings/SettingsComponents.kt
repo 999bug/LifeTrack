@@ -18,14 +18,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.lifetrack.core.security.ScreenCapturePolicy
 
 /**
  * 设置类页面的统一骨架：分区标题 + 一张卡片 + 若干行。
@@ -185,64 +182,6 @@ internal fun ChevronTrailing() {
     )
 }
 
-/**
- * 截屏遮挡的说明弹窗。应用锁与高敏感记录项目触发的是同一个窗口级标志，
- * 文案只留一处，避免两个入口各说一套；也用于用户事后点状态行查原因。
- * 模块名遍历 [ScreenCapturePolicy] 生成，新增高敏感模块不必再改这里。
- * 未遮挡时同样能打开，此时说明「当前可截屏」而不是错误地念出被禁止。
- */
-@Composable
-internal fun ScreenCaptureNoticeDialog(
-    reasons: List<ScreenCapturePolicy.Reason>,
-    suggestAppLock: Boolean = false,
-    onOpenModules: (() -> Unit)? = null,
-    onDismiss: () -> Unit
-) {
-    val blocked = reasons.isNotEmpty()
-    val moduleNames = reasons.mapNotNull { it.moduleName }
-    val goToModules = onOpenModules?.takeIf { moduleNames.isNotEmpty() }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (blocked) "已禁止截屏与录屏" else "截屏与录屏正常") },
-        text = {
-            Text(
-                if (blocked) {
-                    buildString {
-                        append("由于${ScreenCapturePolicy.describe(reasons)}，")
-                        append("本应用的所有页面现在都无法截屏或录屏，最近任务预览也不显示内容。")
-                        append("这是隐私保护设置生效，不是故障。")
-                        if (suggestAppLock) {
-                            append("\n\n这类记录较敏感，建议同时在「设置 → 安全」开启应用锁。")
-                        }
-                        val steps = buildList {
-                            if (reasons.contains(ScreenCapturePolicy.Reason.APP_LOCK)) add("关闭应用锁")
-                            if (moduleNames.isNotEmpty()) {
-                                add("在「设置 → 记录项目」停用${moduleNames.joinToString("、") { "「$it」" }}")
-                            }
-                        }
-                        append("\n\n如需恢复：${steps.joinToString("，并")}；全部关闭后立刻恢复。")
-                        append("当前状态与原因可在「设置 → 安全」随时查看。")
-                    }
-                } else {
-                    val names = ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") { "「$it」" }
-                    "当前没有开启应用锁，也没有启用敏感记录项目（$names），可以正常截屏、录屏，" +
-                        "最近任务预览也会显示页面内容。开启应用锁或启用这些模块时会自动禁止，并再次提示。"
-                }
-            )
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (goToModules != null) {
-                    TextButton(onClick = {
-                        onDismiss()
-                        goToModules()
-                    }) { Text("去关闭") }
-                }
-                TextButton(onClick = onDismiss) { Text("知道了") }
-            }
-        }
-    )
-}
 
 /**
  * 无标题卡片：设置页的高频主卡与页脚更新块共用。

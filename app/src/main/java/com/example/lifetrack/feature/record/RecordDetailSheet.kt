@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.DetailField
 import com.example.lifetrack.core.model.toDetailView
-import com.example.lifetrack.core.security.ScreenCapturePolicy
+import com.example.lifetrack.core.security.SensitiveTypes
 
 /**
  * 记录详情底部弹窗：只读，不提供编辑 / 删除。
@@ -47,7 +47,7 @@ fun RecordDetailSheet(
     // A10 / A9 L1：详情由用户主动点开，视觉上照常展示；读屏只念一句汇总，
     // 不逐字段朗读「保护措施：是」「流量：中」这类内容。关闭按钮留在收敛区之外，仍可操作。
     // 判定按高敏感集合数据驱动，新增敏感模块不必再改这里。
-    val privacySemantics = if (record.event.typeCode in ScreenCapturePolicy.HIGH_SENSITIVITY_TYPES) {
+    val privacySemantics = if (record.event.typeCode in SensitiveTypes.HIGH_SENSITIVITY_TYPES) {
         Modifier.clearAndSetSemantics {
             contentDescription = "已记录一条敏感记录，详情请查看屏幕内容"
         }

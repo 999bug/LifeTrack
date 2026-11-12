@@ -8,7 +8,7 @@ import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.core.security.ScreenCapturePolicy
+import com.example.lifetrack.core.security.SensitiveTypes
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -83,7 +83,7 @@ object RecordSummary {
             }
 
             // 高敏感类型：弹层里只说明「记了一条」，不展示任何字段值，与 L1 收敛一致。
-            in ScreenCapturePolicy.HIGH_SENSITIVITY_TYPES -> "已记录"
+            in SensitiveTypes.HIGH_SENSITIVITY_TYPES -> "已记录"
 
             else -> "该类型来自更新的版本，当前版本无法展示详情"
         }

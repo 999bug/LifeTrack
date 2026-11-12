@@ -29,6 +29,7 @@ import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
@@ -36,6 +37,8 @@ import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
 import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
+import com.example.lifetrack.feature.menstruation.MenstruationEditorDialog
+import com.example.lifetrack.feature.menstruation.PeriodScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.poop.PoopEditorDialog
@@ -125,6 +128,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
                     onIntimacyRecord = { openEditor(IntimacyFields.TYPE_CODE, null) },
+                    onOpenPeriod = { navController.navigate("cycle") },
                     onOpenSettings = { navController.navigate("settings") },
                     onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
@@ -148,6 +152,12 @@ fun LifeTrackApp(viewModel: MainViewModel) {
             }
             composable("modules") {
                 ModuleManagementScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("cycle") {
+                PeriodScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() }
                 )
@@ -182,6 +192,14 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 }
             )
             IntimacyFields.TYPE_CODE -> IntimacyEditorDialog(
+                record = editingRecord,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            MenstruationFields.TYPE_CODE -> MenstruationEditorDialog(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->

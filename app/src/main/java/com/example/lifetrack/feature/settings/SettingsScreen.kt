@@ -409,7 +409,9 @@ fun SettingsScreen(
                 text = if (captureBlocked) {
                     "点上面一行可查看完整说明与恢复方法。解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
                 } else {
-                    "开启应用锁或启用「亲密关系」记录项目时，整个应用会自动禁止截屏与录屏，届时会再次提示。解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
+                    "开启应用锁或启用敏感记录项目（" +
+                        ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") { "「$it」" } +
+                        "）时，整个应用会自动禁止截屏与录屏，届时会再次提示。解锁使用系统指纹或锁屏密码，应用不保存任何生物识别信息。"
                 }
             )
         }
@@ -654,8 +656,9 @@ fun SettingsScreen(
             text = {
                 Text(
                     "明文备份不加密：拿到文件的任何人（包括云盘、聊天工具、电脑上的其他应用）" +
-                        "都能看到全部记录，其中会包含已启用的亲密关系记录。" +
-                        "加密导出只需要记一个口令，建议改用加密。"
+                        "都能看到全部记录，其中会包含已启用的敏感记录（" +
+                        ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") +
+                        "）。加密导出只需要记一个口令，建议改用加密。"
                 )
             },
             confirmButton = {

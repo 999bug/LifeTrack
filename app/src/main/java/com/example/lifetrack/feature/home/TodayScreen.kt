@@ -26,6 +26,7 @@ import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
@@ -58,6 +59,7 @@ fun TodayScreen(
     onCoffeeRecord: () -> Unit,
     onSportRecord: () -> Unit,
     onIntimacyRecord: () -> Unit,
+    onOpenPeriod: () -> Unit,
     onOpenSettings: () -> Unit,
     onShowDetail: (BackupRecord) -> Unit,
     onEdit: (BackupRecord) -> Unit,
@@ -133,13 +135,22 @@ fun TodayScreen(
                             horizontalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
                         ) {
                             rowTypes.forEach { type ->
+                                // 月经卡是导航入口（进入经期子应用），不是「记一条」；其余模块沿用原动作。
+                                val isPeriod = type.code == MenstruationFields.TYPE_CODE
                                 ModuleCard(
                                     type = type,
                                     count = countsByType[type.code] ?: 0,
                                     summary = moduleSummary(records, type),
                                     quickAction = type.isQuickAction,
-                                    onRecord = { moduleAction(type, onQuickRecord, onWaterQuick, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)() },
-                                    onDetail = { moduleDetail(type, onDetailedRecord, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)() },
+                                    detailLabel = if (isPeriod) "打开" else null,
+                                    onRecord = {
+                                        if (isPeriod) onOpenPeriod()
+                                        else moduleAction(type, onQuickRecord, onWaterQuick, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)()
+                                    },
+                                    onDetail = {
+                                        if (isPeriod) onOpenPeriod()
+                                        else moduleDetail(type, onDetailedRecord, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)()
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
                             }

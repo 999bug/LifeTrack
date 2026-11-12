@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.security.ScreenCapturePolicy
 import com.example.lifetrack.feature.home.MainViewModel
 
@@ -51,8 +50,8 @@ fun ModuleManagementScreen(
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val stacked = LocalDensity.current.fontScale > 1.3f
-    // A10：首次启用高敏感模块时提示一次，不阻断启用动作。
-    var intimacyNoticeShown by rememberSaveable { mutableStateOf(false) }
+    // A10/A9：首次启用任一高敏感模块时提示一次，不阻断启用动作。
+    var sensitiveNoticeShown by rememberSaveable { mutableStateOf(false) }
     var captureNoticeReasons by remember { mutableStateOf<List<ScreenCapturePolicy.Reason>?>(null) }
 
     Column(
@@ -98,15 +97,11 @@ fun ModuleManagementScreen(
                         stacked = stacked,
                         onToggle = { code, enabled ->
                             viewModel.setTypeEnabled(code, enabled)
-                            if (code == IntimacyFields.TYPE_CODE && enabled && !intimacyNoticeShown) {
-                                intimacyNoticeShown = true
+                            if (code in ScreenCapturePolicy.HIGH_SENSITIVITY_TYPES && enabled && !sensitiveNoticeShown) {
+                                sensitiveNoticeShown = true
                                 // 回调里 types 还是启用前的值，显式按启用后的状态构造原因
                                 val enabledTypes = types.map {
-                                    if (it.code == IntimacyFields.TYPE_CODE) {
-                                        it.copy(enabled = true)
-                                    } else {
-                                        it
-                                    }
+                                    if (it.code == code) it.copy(enabled = true) else it
                                 }
                                 captureNoticeReasons = ScreenCapturePolicy.reasons(
                                     appLockEnabled = appLockEnabled == true,

@@ -2,6 +2,7 @@ package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 
@@ -9,7 +10,7 @@ import com.example.lifetrack.core.model.WaterFields
  * 通用详情的字段规格。
  *
  * 结构级校验（key 命名、数量、长度）在 [DetailLimits]，业务级规则由各类型在此注册。
- * A6 起注册饮水、A7 咖啡 / 茶、A8 运动、A10 亲密关系；后续加类型只需在这里加一项，
+ * A6 起注册饮水、A7 咖啡 / 茶、A8 运动、A10 亲密关系、A9 月经；后续加类型只需在这里加一项，
  * 不必再动备份格式或 Room schema。
  *
  * [requireValidatorsForAllFields] 在构造时强制「声明了字段就必须有校验器」，
@@ -81,6 +82,23 @@ object DetailSpecRegistry {
                 IntimacyFields.PROTECTION to { it in IntimacyFields.PROTECTION_VALUES },
                 IntimacyFields.EXPERIENCE to { it in IntimacyFields.EXPERIENCE_VALUES },
                 IntimacyFields.DURATION to IntimacyFields::isValidDuration
+            )
+        ),
+        MenstruationFields.TYPE_CODE to DetailSpec(
+            typeCode = MenstruationFields.TYPE_CODE,
+            allowedFields = setOf(
+                MenstruationFields.FLOW,
+                MenstruationFields.PAIN,
+                MenstruationFields.SYMPTOMS,
+                MenstruationFields.MOOD,
+                MenstruationFields.DISCHARGE
+            ),
+            validators = mapOf(
+                MenstruationFields.FLOW to MenstruationFields::isValidFlow,
+                MenstruationFields.PAIN to MenstruationFields::isValidPain,
+                MenstruationFields.SYMPTOMS to MenstruationFields::isValidSymptoms,
+                MenstruationFields.MOOD to MenstruationFields::isValidMood,
+                MenstruationFields.DISCHARGE to MenstruationFields::isValidDischarge
             )
         )
     )

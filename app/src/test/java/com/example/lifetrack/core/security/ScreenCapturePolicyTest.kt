@@ -58,7 +58,7 @@ class ScreenCapturePolicyTest {
         )
     }
 
-    /** 只有亲密关系是高敏感模块，别把其它启用中的模块也判成遮挡原因。 */
+    /** 只有亲密关系与月经是高敏感模块，别把其它启用中的模块也判成遮挡原因。 */
     @Test
     fun otherEnabledModulesDoNotBlock() {
         val types = listOf(type("poop"), type("water"), type("coffee"), type("sport"))
@@ -71,6 +71,56 @@ class ScreenCapturePolicyTest {
         assertFalse(
             ScreenCapturePolicy.isBlocked(false, listOf(type("intimacy", enabled = false)))
         )
+    }
+
+    @Test
+    fun menstruationModuleOnly_blocksEvenWhenAppLockIsOff() {
+        val reasons = ScreenCapturePolicy.reasons(false, listOf(type("menstruation")))
+        assertEquals(listOf(ScreenCapturePolicy.Reason.MENSTRUATION_MODULE), reasons)
+        assertEquals("「月经」记录项目已启用", ScreenCapturePolicy.describe(reasons))
+    }
+
+    /** 原因顺序固定为亲密关系→月经，与传入类型列表的顺序无关。 */
+    @Test
+    fun bothHighSensitivityModules_reportInFixedOrder() {
+        val reasons = ScreenCapturePolicy.reasons(false, listOf(type("menstruation"), type("intimacy")))
+        assertEquals(
+            listOf(
+                ScreenCapturePolicy.Reason.INTIMACY_MODULE,
+                ScreenCapturePolicy.Reason.MENSTRUATION_MODULE
+            ),
+            reasons
+        )
+        assertEquals(
+            "「亲密关系」记录项目已启用、「月经」记录项目已启用",
+            ScreenCapturePolicy.describe(reasons)
+        )
+    }
+
+    @Test
+    fun appLockAndBothModules_reportAllThreeInFixedOrder() {
+        val reasons = ScreenCapturePolicy.reasons(true, listOf(type("intimacy"), type("menstruation")))
+        assertEquals(
+            listOf(
+                ScreenCapturePolicy.Reason.APP_LOCK,
+                ScreenCapturePolicy.Reason.INTIMACY_MODULE,
+                ScreenCapturePolicy.Reason.MENSTRUATION_MODULE
+            ),
+            reasons
+        )
+    }
+
+    @Test
+    fun disabledMenstruationTypeDoesNotBlock() {
+        assertFalse(
+            ScreenCapturePolicy.isBlocked(false, listOf(type("menstruation", enabled = false)))
+        )
+    }
+
+    @Test
+    fun highSensitivityTypesCoverIntimacyAndMenstruation() {
+        assertEquals(setOf("intimacy", "menstruation"), ScreenCapturePolicy.HIGH_SENSITIVITY_TYPES)
+        assertEquals(listOf("亲密关系", "月经"), ScreenCapturePolicy.sensitiveModuleNames)
     }
 
     /** MainActivity 在数据库 Flow 尚未发射 / 出错时会用空列表兜底，此时只认应用锁。 */

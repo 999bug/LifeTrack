@@ -45,6 +45,9 @@ import com.example.lifetrack.core.ui.LifeTrackTokens
  *
  * 卡片右下角的「详细」只出现在快捷记录型卡片上，用于明确进入编辑器；
  * 其余卡片整卡点击本身就是编辑，不再重复提供入口。
+ *
+ * [detailLabel] 非空时（如月经的「打开」）整卡是导航入口而非「记一条」：
+ * 右下角显示该文案、右上角不再画加号，避免把「进入子应用」误读成「新增记录」。
  */
 @Composable
 internal fun ModuleCard(
@@ -54,7 +57,8 @@ internal fun ModuleCard(
     quickAction: Boolean,
     onRecord: () -> Unit,
     onDetail: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    detailLabel: String? = null
 ) {
     val accent = LifeTrackTokens.ModuleColors.of(type.code)
     val meta = buildString {
@@ -121,7 +125,7 @@ internal fun ModuleCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        if (quickAction) {
+                        if (quickAction || detailLabel != null) {
                             // 用带最小尺寸的可点区域而不是裸文字：11sp 的「详细」字面只有 22×14dp，
                             // 直接 clickable 会让触摸目标小到点不中。宽度用 widthIn 而不是固定值，
                             // 否则 200% 字体下「详细」会被压成「详」。
@@ -136,7 +140,7 @@ internal fun ModuleCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "详细",
+                                    text = detailLabel ?: "详细",
                                     fontSize = 11.sp,
                                     maxLines = 1,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -147,22 +151,25 @@ internal fun ModuleCard(
                 }
             }
 
-            // 右上角的加号只是提示「这里能加一条」，不做独立点击区，避免和整卡动作打架
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(13.dp)
-                )
+            // 右上角的加号只是提示「这里能加一条」，不做独立点击区，避免和整卡动作打架。
+            // 导航型卡片（detailLabel 非空）不画加号，整卡语义是「打开」而非「新增」。
+            if (detailLabel == null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
     }

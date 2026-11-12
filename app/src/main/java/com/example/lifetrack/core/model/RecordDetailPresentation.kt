@@ -93,6 +93,7 @@ private fun BackupRecord.detailFields(): List<DetailField> = when (event.typeCod
     CoffeeFields.TYPE_CODE -> coffeeFields(genericFields())
     SportFields.TYPE_CODE -> sportFields(genericFields())
     IntimacyFields.TYPE_CODE -> intimacyFields(genericFields())
+    MenstruationFields.TYPE_CODE -> menstruationFields(genericFields())
     else -> listOf(
         DetailField("详情", "该类型来自更新的版本，当前版本无法展示详情", muted = true)
     )
@@ -135,3 +136,16 @@ private fun intimacyFields(fields: Map<String, String>): List<DetailField> = lis
     field("主观感受", fields[IntimacyFields.EXPERIENCE]?.let(IntimacyFields::experienceLabel)),
     field("时长", fields[IntimacyFields.DURATION]?.let(IntimacyFields::durationLabel))
 )
+
+private fun menstruationFields(fields: Map<String, String>): List<DetailField> = listOf(
+    field("流量", fields[MenstruationFields.FLOW]?.let(MenstruationFields::flowLabel)),
+    field("痛经", fields[MenstruationFields.PAIN]?.let(MenstruationFields::painLabel)),
+    field("症状", fields[MenstruationFields.SYMPTOMS]?.let(::symptomsLabel)),
+    field("心情", fields[MenstruationFields.MOOD]?.let(MenstruationFields::moodLabel)),
+    field("分泌物", fields[MenstruationFields.DISCHARGE]?.let(MenstruationFields::dischargeLabel))
+)
+
+/** 症状存 `|` 分隔的 code 串，展示时解码成中文并用顿号连接；日记走「备注」不在此列。 */
+private fun symptomsLabel(value: String): String =
+    MenstruationFields.decodeSymptoms(value)
+        .joinToString("、") { MenstruationFields.symptomLabel(it) }

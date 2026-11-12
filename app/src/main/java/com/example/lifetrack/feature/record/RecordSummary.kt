@@ -4,9 +4,11 @@ import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
+import com.example.lifetrack.core.security.ScreenCapturePolicy
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -81,7 +83,7 @@ object RecordSummary {
             }
 
             // 高敏感类型：弹层里只说明「记了一条」，不展示任何字段值，与 L1 收敛一致。
-            IntimacyFields.TYPE_CODE -> "已记录"
+            in ScreenCapturePolicy.HIGH_SENSITIVITY_TYPES -> "已记录"
 
             else -> "该类型来自更新的版本，当前版本无法展示详情"
         }
@@ -95,6 +97,7 @@ object RecordSummary {
         WaterFields.TYPE_CODE to "饮水",
         CoffeeFields.TYPE_CODE to "咖啡 / 茶",
         SportFields.TYPE_CODE to "运动",
-        IntimacyFields.TYPE_CODE to "亲密关系"
+        IntimacyFields.TYPE_CODE to "亲密关系",
+        MenstruationFields.TYPE_CODE to "月经"
     )
 }

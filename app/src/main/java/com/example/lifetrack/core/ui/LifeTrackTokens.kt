@@ -2,6 +2,7 @@ package com.example.lifetrack.core.ui
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalCafe
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 
@@ -63,12 +65,14 @@ object LifeTrackTokens {
         private val lightCoffee = Color(0xFF9A7134)
         private val lightSport = Color(0xFF4C7A57)
         private val lightIntimacy = Color(0xFF8A5F72)
+        private val lightMenstruation = Color(0xFFA35B52)
 
         private val darkPoop = Color(0xFFC9A382)
         private val darkWater = Color(0xFF8FC0D8)
         private val darkCoffee = Color(0xFFD9B173)
         private val darkSport = Color(0xFF9CC7A6)
         private val darkIntimacy = Color(0xFFC99BAE)
+        private val darkMenstruation = Color(0xFFE0A79B)
 
         /** 主题未知时的兜底色，与主色一致。 */
         private val fallback = Color(0xFF426B50)
@@ -79,6 +83,7 @@ object LifeTrackTokens {
             CoffeeFields.TYPE_CODE -> lightCoffee
             SportFields.TYPE_CODE -> lightSport
             IntimacyFields.TYPE_CODE -> lightIntimacy
+            MenstruationFields.TYPE_CODE -> lightMenstruation
             else -> fallback
         }
 
@@ -88,6 +93,7 @@ object LifeTrackTokens {
             CoffeeFields.TYPE_CODE -> darkCoffee
             SportFields.TYPE_CODE -> darkSport
             IntimacyFields.TYPE_CODE -> darkIntimacy
+            MenstruationFields.TYPE_CODE -> darkMenstruation
             else -> fallback
         }
 
@@ -107,6 +113,7 @@ object LifeTrackTokens {
             CoffeeFields.TYPE_CODE -> Icons.Filled.LocalCafe
             SportFields.TYPE_CODE -> Icons.Filled.DirectionsRun
             IntimacyFields.TYPE_CODE -> Icons.Filled.Favorite
+            MenstruationFields.TYPE_CODE -> Icons.Filled.Bloodtype
             else -> Icons.Filled.Loop
         }
     }

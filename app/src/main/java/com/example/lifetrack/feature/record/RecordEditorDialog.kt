@@ -61,6 +61,7 @@ data class RecordEditorValue(
  *
  * [content] 是详情插槽，由各类型提供；状态仍由调用方持有，壳层不认识任何领域草稿类型。
  * [resetKey] 变化（例如从「新增」切到「编辑」）时重新初始化全部状态。
+ * [noteLabel] 定制备注框标题，月经把「备注」叫「日记」，数据仍落在 `note`。
  */
 @Composable
 fun RecordEditorDialog(
@@ -71,6 +72,7 @@ fun RecordEditorDialog(
     initialMillis: Long? = null,
     initialZoneId: String? = null,
     initialNote: String = "",
+    noteLabel: String = "备注（可选）",
     saveEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit = {}
 ) {
@@ -141,7 +143,7 @@ fun RecordEditorDialog(
                     value = note,
                     onValueChange = { note = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("备注（可选）") },
+                    label = { Text(noteLabel) },
                     minLines = 2
                 )
             }

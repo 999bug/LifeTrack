@@ -186,8 +186,9 @@ internal fun ChevronTrailing() {
 }
 
 /**
- * 截屏遮挡的说明弹窗。应用锁与「亲密关系」模块触发的是同一个窗口级标志，
+ * 截屏遮挡的说明弹窗。应用锁与高敏感记录项目触发的是同一个窗口级标志，
  * 文案只留一处，避免两个入口各说一套；也用于用户事后点状态行查原因。
+ * 模块名遍历 [ScreenCapturePolicy] 生成，新增高敏感模块不必再改这里。
  * 未遮挡时同样能打开，此时说明「当前可截屏」而不是错误地念出被禁止。
  */
 @Composable
@@ -198,9 +199,8 @@ internal fun ScreenCaptureNoticeDialog(
     onDismiss: () -> Unit
 ) {
     val blocked = reasons.isNotEmpty()
-    val goToModules = onOpenModules?.takeIf {
-        reasons.contains(ScreenCapturePolicy.Reason.INTIMACY_MODULE)
-    }
+    val moduleNames = reasons.mapNotNull { it.moduleName }
+    val goToModules = onOpenModules?.takeIf { moduleNames.isNotEmpty() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (blocked) "已禁止截屏与录屏" else "截屏与录屏正常") },
@@ -214,12 +214,19 @@ internal fun ScreenCaptureNoticeDialog(
                         if (suggestAppLock) {
                             append("\n\n这类记录较敏感，建议同时在「设置 → 安全」开启应用锁。")
                         }
-                        append("\n\n如需恢复：关闭应用锁，并在「设置 → 记录项目」停用「亲密关系」；")
-                        append("两项都关闭后立刻恢复。当前状态与原因可在「设置 → 安全」随时查看。")
+                        val steps = buildList {
+                            if (reasons.contains(ScreenCapturePolicy.Reason.APP_LOCK)) add("关闭应用锁")
+                            if (moduleNames.isNotEmpty()) {
+                                add("在「设置 → 记录项目」停用${moduleNames.joinToString("、") { "「$it」" }}")
+                            }
+                        }
+                        append("\n\n如需恢复：${steps.joinToString("，并")}；全部关闭后立刻恢复。")
+                        append("当前状态与原因可在「设置 → 安全」随时查看。")
                     }
                 } else {
-                    "当前没有开启应用锁，也没有启用「亲密关系」记录项目，可以正常截屏、录屏，" +
-                        "最近任务预览也会显示页面内容。开启应用锁或启用该模块时会自动禁止，并再次提示。"
+                    val names = ScreenCapturePolicy.sensitiveModuleNames.joinToString("、") { "「$it」" }
+                    "当前没有开启应用锁，也没有启用敏感记录项目（$names），可以正常截屏、录屏，" +
+                        "最近任务预览也会显示页面内容。开启应用锁或启用这些模块时会自动禁止，并再次提示。"
                 }
             )
         },

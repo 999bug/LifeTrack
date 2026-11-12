@@ -2,6 +2,7 @@ package com.example.lifetrack.core.backup
 
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
+import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
 import org.junit.Assert.assertEquals
@@ -44,11 +45,12 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `registry has builtin water coffee sport and intimacy specs and falls back to injected specs`() {
+    fun `registry has builtin water coffee sport intimacy and menstruation specs and falls back to injected specs`() {
         assertNotNull(DetailSpecRegistry.specFor(WaterFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(SportFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(IntimacyFields.TYPE_CODE))
+        assertNotNull(DetailSpecRegistry.specFor(MenstruationFields.TYPE_CODE))
         assertNull(DetailSpecRegistry.specFor("mood"))
         val mood = DetailSpec("mood", allowedFields = setOf("score"), validators = mapOf("score" to { it == "3" }))
         assertEquals(mood, DetailSpecRegistry.specFor("mood", mapOf("mood" to mood)))
@@ -62,7 +64,8 @@ class DetailSpecTest {
             WaterFields.TYPE_CODE,
             CoffeeFields.TYPE_CODE,
             SportFields.TYPE_CODE,
-            IntimacyFields.TYPE_CODE
+            IntimacyFields.TYPE_CODE,
+            MenstruationFields.TYPE_CODE
         )
         assertEquals(expected, BackupDecodeOptions.Default.supportedDetailTypes)
         assertEquals(expected, SUPPORTED_DETAIL_TYPES)
@@ -174,6 +177,38 @@ class DetailSpecTest {
             assertTrue(it, spec.validators[IntimacyFields.EXPERIENCE]!!(it))
         }
         assertFalse(spec.validators[IntimacyFields.EXPERIENCE]!!("great"))
+        assertFalse(spec.isFieldsValid(mapOf("partnerName" to "someone")))
+    }
+
+    @Test
+    fun `menstruation spec enforces enums and the symptoms whitelist`() {
+        val spec = DetailSpecRegistry.specFor(MenstruationFields.TYPE_CODE)!!
+        assertEquals(
+            setOf(
+                MenstruationFields.FLOW,
+                MenstruationFields.PAIN,
+                MenstruationFields.SYMPTOMS,
+                MenstruationFields.MOOD,
+                MenstruationFields.DISCHARGE
+            ),
+            spec.allowedFields
+        )
+        assertTrue(spec.isFieldsValid(emptyMap()))
+        MenstruationFields.FLOW_VALUES.forEach { assertTrue(it, spec.validators[MenstruationFields.FLOW]!!(it)) }
+        MenstruationFields.PAIN_VALUES.forEach { assertTrue(it, spec.validators[MenstruationFields.PAIN]!!(it)) }
+        MenstruationFields.MOOD_VALUES.forEach { assertTrue(it, spec.validators[MenstruationFields.MOOD]!!(it)) }
+        MenstruationFields.DISCHARGE_VALUES.forEach { assertTrue(it, spec.validators[MenstruationFields.DISCHARGE]!!(it)) }
+        assertFalse(spec.validators[MenstruationFields.FLOW]!!("gushing"))
+        assertFalse(spec.validators[MenstruationFields.PAIN]!!("extreme"))
+        assertTrue(spec.validators[MenstruationFields.SYMPTOMS]!!("cramps|fatigue"))
+        assertFalse(spec.validators[MenstruationFields.SYMPTOMS]!!("cramps|fever"))
+        assertFalse(spec.validators[MenstruationFields.SYMPTOMS]!!("cramps|cramps"))
+        assertFalse(
+            spec.validators[MenstruationFields.SYMPTOMS]!!(
+                MenstruationFields.encodeSymptoms(MenstruationFields.SYMPTOM_CODES.take(9))
+            )
+        )
+        assertFalse(spec.isFieldsValid(mapOf("diary" to "今天腹痛")))
         assertFalse(spec.isFieldsValid(mapOf("partnerName" to "someone")))
     }
 }

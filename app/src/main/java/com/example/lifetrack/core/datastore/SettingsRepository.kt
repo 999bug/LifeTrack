@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.lifetrack.core.model.AppLockTimeout
+import com.example.lifetrack.core.model.CycleCalculator
 import com.example.lifetrack.core.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -22,6 +23,8 @@ class SettingsRepository(private val context: Context) {
     private val appLockTimeoutKey = intPreferencesKey("app_lock_timeout_minutes")
     private val lastUpdateCheckAtKey = longPreferencesKey("last_update_check_at")
     private val lastKnownLatestVersionKey = stringPreferencesKey("last_known_latest_version")
+    private val cycleLengthDaysKey = intPreferencesKey("cycle_length_days")
+    private val periodLengthDaysKey = intPreferencesKey("period_length_days")
 
     val darkTheme: Flow<Boolean> = context.settingsDataStore.data.map { preferences ->
         preferences[darkThemeKey] ?: false
@@ -71,6 +74,31 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    /**
+     * 周期长度（P9）：默认 28，范围与 [CycleCalculator.CYCLE_RANGE] 同源。
+     * 只作为样本不足时的回退值 / 用户覆盖，预测结果本身不落库。
+     */
+    val cycleLengthDays: Flow<Int> = context.settingsDataStore.data.map { preferences ->
+        (preferences[cycleLengthDaysKey] ?: DEFAULT_CYCLE_LENGTH_DAYS).coerceIn(CycleCalculator.CYCLE_RANGE)
+    }
+
+    /** 经期长度（P9）：默认 5，范围 1–14；同样只作回退 / 覆盖值。 */
+    val periodLengthDays: Flow<Int> = context.settingsDataStore.data.map { preferences ->
+        (preferences[periodLengthDaysKey] ?: DEFAULT_PERIOD_LENGTH_DAYS).coerceIn(PERIOD_LENGTH_RANGE)
+    }
+
+    suspend fun setCycleLengthDays(days: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[cycleLengthDaysKey] = days.coerceIn(CycleCalculator.CYCLE_RANGE)
+        }
+    }
+
+    suspend fun setPeriodLengthDays(days: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[periodLengthDaysKey] = days.coerceIn(PERIOD_LENGTH_RANGE)
+        }
+    }
+
     /** 上次成功查询更新的时间（epoch millis）；0 表示从未成功查过。 */
     suspend fun lastUpdateCheckAt(): Long =
         context.settingsDataStore.data.first()[lastUpdateCheckAtKey] ?: 0L
@@ -90,5 +118,11 @@ class SettingsRepository(private val context: Context) {
                 preferences[lastKnownLatestVersionKey] = latestVersion
             }
         }
+    }
+
+    companion object {
+        const val DEFAULT_CYCLE_LENGTH_DAYS = 28
+        const val DEFAULT_PERIOD_LENGTH_DAYS = 5
+        val PERIOD_LENGTH_RANGE = 1..14
     }
 }

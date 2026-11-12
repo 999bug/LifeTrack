@@ -21,6 +21,10 @@ import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.model.WaterFields
+import com.example.lifetrack.core.model.CycleCalculator
+import com.example.lifetrack.core.model.CycleSnapshot
+import com.example.lifetrack.core.model.MenstruationFields
+import com.example.lifetrack.core.model.PeriodFill
 import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
@@ -32,20 +36,26 @@ import com.example.lifetrack.feature.statistics.observeStatistics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 
 /** 首页饮水卡一键记录的默认杯量（ml）。 */
@@ -137,6 +147,63 @@ class MainViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 经期子应用：宽区间取月经记录，供周期推算、日历染色与简报；派生数据一律不落库。 */
+    val periodRecords: StateFlow<List<BackupRecord>> = todayDate
+        .flatMapLatest { today ->
+            repository.observeRecordsInRange(
+                today.minusYears(3).toString(),
+                today.toString(),
+                typeCode = MenstruationFields.TYPE_CODE
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 周期 / 经期长度（P9）：样本不足时的回退值与用户覆盖，预测结果本身不持久化。 */
+    val cycleLengthDays: StateFlow<Int> = settingsRepository.cycleLengthDays
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            SettingsRepository.DEFAULT_CYCLE_LENGTH_DAYS
+        )
+
+    val periodLengthDays: StateFlow<Int> = settingsRepository.periodLengthDays
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            SettingsRepository.DEFAULT_PERIOD_LENGTH_DAYS
+        )
+
+    /** 记录或设置一变就重算周期快照；放在 Default 线程，避免主线程聚合掉帧。 */
+    val cycleSnapshot: StateFlow<CycleSnapshot> = combine(
+        periodRecords,
+        todayDate,
+        cycleLengthDays,
+        periodLengthDays
+    ) { records, today, cycleDays, periodDays ->
+        val dates = records.mapNotNullTo(mutableSetOf()) {
+            runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
+        }
+        CycleCalculator.calculate(dates, today, cycleDays, periodDays)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            CycleCalculator.calculate(
+                emptySet(),
+                LocalDate.now(ZoneId.systemDefault()),
+                SettingsRepository.DEFAULT_CYCLE_LENGTH_DAYS,
+                SettingsRepository.DEFAULT_PERIOD_LENGTH_DAYS
+            )
+        )
+
+    private val periodFeedbackChannel = Channel<String>(Channel.BUFFERED)
+
+    /** 起止动作的一次性反馈（补齐 N 天 / 间隔过远），子应用收集后弹 Snackbar。 */
+    val periodFeedback = periodFeedbackChannel.receiveAsFlow()
+
+    /** 串行化经期写入：逐行即点即存与起止补齐可能并发，避免同一天重复落库。 */
+    private val periodWriteMutex = Mutex()
 
     /** 统计口径：null = 全部类型。统计页顶部的类型筛选直接写这里。 */
     private val statsTypeFilter = MutableStateFlow<String?>(null)
@@ -381,6 +448,113 @@ class MainViewModel(
             else repository.updateRecord(eventId, draft)
             refreshToday()
         }
+    }
+
+    /**
+     * 子应用逐行填写：把选中日的体征 + 日记 upsert 成一条月经事件，按 `(typeCode, localDate)` 幂等。
+     * [fields] 已由 [com.example.lifetrack.core.model.PeriodDayFormModel.toFields] 收敛（空键不写、症状编码），
+     * 全空时落 `detail = null` 的仅标记事件，与恢复路径一致。
+     */
+    fun savePeriodDay(date: LocalDate, fields: Map<String, String>, note: String) {
+        viewModelScope.launch {
+            periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val existing = repository.observeRecordsInRange(
+                        date.toString(), date.toString(), MenstruationFields.TYPE_CODE
+                    ).first().firstOrNull()
+                    val zone = runCatching {
+                        ZoneId.of(existing?.event?.zoneId ?: ZoneId.systemDefault().id)
+                    }.getOrDefault(ZoneId.systemDefault())
+                    val millis = existing?.event?.occurredAtEpochMillis
+                        ?: date.atTime(LocalTime.NOON).atZone(zone).toInstant().toEpochMilli()
+                    val draft = RecordDraft(
+                        typeCode = MenstruationFields.TYPE_CODE,
+                        occurredAtEpochMillis = millis,
+                        zoneId = zone.id,
+                        note = note,
+                        detail = if (fields.isEmpty()) {
+                            null
+                        } else {
+                            RecordDetail.Generic(MenstruationFields.TYPE_CODE, fields)
+                        }
+                    )
+                    if (existing == null) repository.addRecord(draft)
+                    else repository.updateRecord(existing.event.id, draft)
+                }
+                refreshToday()
+            }
+        }
+    }
+
+    /** 「大姨妈来了」：当天没有月经事件就补一条仅标记事件，已有则不覆盖（转为下方逐行编辑）。 */
+    fun markPeriodStart(date: LocalDate) {
+        viewModelScope.launch {
+            val message = periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val existing = repository.observeRecordsInRange(
+                        date.toString(), date.toString(), MenstruationFields.TYPE_CODE
+                    ).first().firstOrNull()
+                    if (existing == null) {
+                        repository.addRecord(periodMarkDraft(date))
+                        "已标记 ${date.monthValue}月${date.dayOfMonth}日 为经期起始日"
+                    } else {
+                        "这一天已有月经记录，可在下方逐行补充"
+                    }
+                }
+            }
+            refreshToday()
+            periodFeedbackChannel.trySend(message)
+        }
+    }
+
+    /**
+     * 「大姨妈走了」：从最近一段经期首日到选中日补齐缺失日期（仅标记，不覆盖已有详情）。
+     * 间隔超过 [PeriodFill.MAX_GAP_DAYS] 天不自动补，返回提示要求逐日确认（设计 §5.2）。
+     */
+    fun markPeriodEnd(date: LocalDate) {
+        viewModelScope.launch {
+            val message = periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val records = repository.observeRecordsInRange(
+                        date.minusYears(3).toString(), date.toString(), MenstruationFields.TYPE_CODE
+                    ).first()
+                    val today = LocalDate.now(ZoneId.systemDefault())
+                    val dates = records.mapNotNullTo(mutableSetOf()) {
+                        runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
+                    }
+                    when (val plan = PeriodFill.plan(dates, date, today)) {
+                        is PeriodFill.Plan.TooFar ->
+                            "间隔超过 ${PeriodFill.MAX_GAP_DAYS} 天，请逐日确认后再补齐"
+                        is PeriodFill.Plan.Fill -> {
+                            plan.dates.forEach { repository.addRecord(periodMarkDraft(it)) }
+                            "已标记结束，并补齐 ${plan.dates.size} 天（已有记录不覆盖）"
+                        }
+                    }
+                }
+            }
+            refreshToday()
+            periodFeedbackChannel.trySend(message)
+        }
+    }
+
+    fun setCycleLengthDays(days: Int) {
+        viewModelScope.launch { settingsRepository.setCycleLengthDays(days) }
+    }
+
+    fun setPeriodLengthDays(days: Int) {
+        viewModelScope.launch { settingsRepository.setPeriodLengthDays(days) }
+    }
+
+    /** 仅标记事件：detail = null、note 空，时刻取当天正午避开夏令时边界。 */
+    private fun periodMarkDraft(date: LocalDate): RecordDraft {
+        val zone = ZoneId.systemDefault()
+        return RecordDraft(
+            typeCode = MenstruationFields.TYPE_CODE,
+            occurredAtEpochMillis = date.atTime(LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
+            zoneId = zone.id,
+            note = "",
+            detail = null
+        )
     }
 
     fun deleteRecord(eventId: String) {

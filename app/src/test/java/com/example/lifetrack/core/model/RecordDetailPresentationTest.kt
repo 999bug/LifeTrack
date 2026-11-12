@@ -119,6 +119,60 @@ class RecordDetailPresentationTest {
     }
 
     @Test
+    fun `menstruation detail labels all five fields`() {
+        val view = generic(
+            MenstruationFields.TYPE_CODE,
+            mapOf(
+                MenstruationFields.FLOW to "medium",
+                MenstruationFields.PAIN to "mild",
+                MenstruationFields.SYMPTOMS to "cramps|backache|headache",
+                MenstruationFields.MOOD to "low",
+                MenstruationFields.DISCHARGE to "eggwhite"
+            )
+        ).toDetailView()
+
+        assertEquals("月经 · 08:30", view.title)
+        assertEquals(
+            listOf("中", "轻", "腹痛、腰酸、头痛", "低落", "蛋清"),
+            values(view.sections[1])
+        )
+        assertTrue(view.sections[1].fields.none { it.muted })
+    }
+
+    @Test
+    fun `menstruation detail without any field shows placeholders`() {
+        val view = generic(MenstruationFields.TYPE_CODE, emptyMap()).toDetailView()
+
+        assertEquals(5, view.sections[1].fields.size)
+        assertTrue(view.sections[1].fields.all { it.value == "未记录" && it.muted })
+    }
+
+    @Test
+    fun `menstruation symptoms field decodes pipe separated codes`() {
+        val view = generic(
+            MenstruationFields.TYPE_CODE,
+            mapOf(MenstruationFields.SYMPTOMS to "fatigue|insomnia")
+        ).toDetailView()
+
+        assertEquals("乏力、失眠", view.sections[1].fields[2].value)
+    }
+
+    @Test
+    fun `menstruation diary lives in note not in detail fields`() {
+        val view = BackupRecord(
+            event(typeCode = MenstruationFields.TYPE_CODE, note = "今天有点累"),
+            RecordDetail.Generic(
+                MenstruationFields.TYPE_CODE,
+                mapOf(MenstruationFields.FLOW to "light")
+            )
+        ).toDetailView()
+
+        assertEquals("今天有点累", view.sections[0].fields[2].value)
+        assertEquals(5, view.sections[1].fields.size)
+        assertEquals("少", view.sections[1].fields[0].value)
+    }
+
+    @Test
     fun `missing generic fields are marked as not recorded`() {
         val view = generic("water", mapOf("amountMl" to "200")).toDetailView()
 

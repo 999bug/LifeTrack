@@ -66,11 +66,28 @@ val DEFAULT_INTIMACY_TYPE = TrackTypeEntity(
     schemaVersion = 1
 )
 
+/**
+ * A9：高敏感模块，默认停用，由用户在「设置 → 记录项目」主动开启。
+ * 一条事件 = 一个经期日，周期段与预测全部由 CycleCalculator 派生，不新增表、不升 Room。
+ * 用已有 body 类别，避免记录项目页显示原始英文串；与 A6–A10 一样只注册类型与字段规格。
+ */
+val DEFAULT_MENSTRUATION_TYPE = TrackTypeEntity(
+    code = "menstruation",
+    name = "月经",
+    iconKey = "menstruation",
+    category = "body",
+    trackingMode = "EVENT",
+    enabled = false,
+    sortOrder = 60,
+    schemaVersion = 1
+)
+
 /** 新增内置类型时只改这里，ensureDefaultTypes 与备份恢复兜底会一起生效。 */
 val DEFAULT_TYPES: List<TrackTypeEntity> = listOf(
     DEFAULT_POOP_TYPE,
     DEFAULT_WATER_TYPE,
     DEFAULT_COFFEE_TYPE,
     DEFAULT_SPORT_TYPE,
-    DEFAULT_INTIMACY_TYPE
+    DEFAULT_INTIMACY_TYPE,
+    DEFAULT_MENSTRUATION_TYPE
 )

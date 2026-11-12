@@ -92,6 +92,7 @@
 | 发布 0.6.6 | `12399b6` | APK 5.19 MB（22 MB 的 1/4）；GitHub 侧全绿，Gitee 镜像写 `latest.json` 时 jq 报错失败，已修根因并补写 |
 | 发布 0.6.7 | `a657ad5` | **mirror-gitee 首次全绿**：jq 修复生效，`latest.json` 由 CI 自动从 0.6.6 更新到 0.6.7；APK 5.19 MB，两个 job 均 success |
 | A9 月经模块（E1） | 2026-11-12 | 经期子应用（日历置顶 + 逐行填写 + 日记）、`CycleCalculator` 周期派生、起止动作自动补齐；66 项新单测（共 336 项 / 0 失败）；模拟器走查通过（启用 / 停用、FLAG_SECURE、补齐、持久化、200% 字体 / 360dp / 深色）；Room 仍 v3、备份格式不变；`VersionHistory.kt` 条目留待发版补 |
+| A9 经期自动延续 + 移除截屏限制 | 2026-11-12 | ① 点一次「来了」后 `ongoingPeriodStart` 记起点，`syncOngoingPeriod` 每天把 `[起点..昨天]` 补成仅标记事件、今天由 `PeriodOngoing.span` 派生，点「走了」按 `closingDates` 收尾；日历「经期中的今天」改模块色实心。② 删除 `FLAG_SECURE`：`ScreenCapturePolicy` → `SensitiveTypes`，设置页截屏状态行 / 模块启用弹窗一并删除。单测 339 项 / 0 失败，`lintDebug` 全绿；Room 仍 v3、备份格式不变 |
 
 ---
 

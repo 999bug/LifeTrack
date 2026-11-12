@@ -6,6 +6,7 @@
 > 修订 v4（2026-11-12 14:03，用户指示）：把经期子应用内的**交互形态改成参考 App 的方式**——日历置顶选日期，下方一行一行填当天内容，每行带图示，并**新增一行日记**；点行展开选项、即点即存，取消子应用内的底部弹层编辑器。日记复用 `TrackEventEntity.note`，不新增详情字段、不改备份格式。本轮只改文档 v4 与原型 v4，**仍不写 Compose 代码**。改动集中在 §1 / §2 #7 / §4 P4、P12 / §5.3 / §5.4 / §5.7–§5.10 / §6 / §7。
 > 修订 v5（2026-11-12 14:47，用户拍板）：**今天页关于月经只保留一张「月经」模块卡**，删除 v2 起加在模块网格下方的周期状态行（「经期第 3 天 / 打开经期 → / 按最近 6 个周期估算」）与紧随其后的「已开启截屏保护」提示行；**其它四张模块卡、今日记录、底部导航全部保留**。周期状态只在经期子应用内呈现；`FLAG_SECURE` 机制本身不变，仅首页不再重复说明。改动集中在 §4 P6/P7/P10 / §5.4 ① / §5.5 / §5.7 / §5.8 / §5.9 / §5.10 / §6 / §7。本轮只改文档 v5 与原型 v5，**仍不写 Compose 代码**。
 > 落地记录（2026-11-12，用户指示「按设计文档完成并交付」）：按 v5 完成 **E1 全部代码**并自测通过——纯 JVM 域（`MenstruationFields` / `MenstrualCycle`+`CycleCalculator`+`PeriodFill` / `PeriodMonth` / `PeriodDayFormModel`）、类型与字段规格注册、`ScreenCapturePolicy` 数据驱动隐私收敛、记录展示分派、备份往返、自绘图示、`MenstruationEditorDialog`、经期子应用（`PeriodScreen` / `PeriodCalendarView` / `PeriodDayForm`）、`MainViewModel` 起止与逐行保存、首页 / 导航 / token 集成。单测 **336 项 / 0 失败**（本模块新增 66 项），`assembleDebug` 与 `lintDebug` 全绿（新增 / 改动文件无 lint findings）；模拟器（API 37）走查通过：默认停用 → 启用弹截屏说明 → 点模块卡进子应用（非编辑器）→ 日历默认今天 → 来了 / 走了自动补齐（已有详情不覆盖）→ 逐行即点即存 → 未来日只读 → 强停重进持久化 → 编辑 / 删除 → 明文导出点名 → 200% 字体 / 360dp / 深色无溢出 → 停用后 `FLAG_SECURE` 解除、入口隐藏而历史保留。**Room 仍 version 3、备份正文 schemaVersion 2 / 加密容器 3 不变**；台账 A9 已由 ⛔ 改 ✅；`VersionHistory.kt` 条目与版本号留待发版时补，本轮不动。
+> 修订 v6（2026-11-12 20:40，用户拍板）：① 起止动作改为参考 App 的「一次开始、自动延续」——点「大姨妈来了」记下进行中的起点，之后每天自动标记（`[起点..昨天]` 逐日补写「仅标记」事件，今天由派生显示），点「大姨妈走了」才结束；日历上「经期中的今天」改用模块色实心，点完立刻有反馈。② **移除 `FLAG_SECURE`**：应用锁与高敏感模块都不再禁止截屏 / 录屏，`ScreenCapturePolicy` 收敛为只登记高敏感类型的 `SensitiveTypes`，设置页「截屏与录屏」状态行、模块首次启用弹窗一并删除。改动集中在 §5.2 / §5.5 / §5.8 验收第 5 条；交互原型见 `docs/period-ongoing-prototype.html`。
 > 用户指示：「把记录月经的功能加上，参考美佑 app，他的那些功能抄过来，先出设计文档」。参考对象按**美柚（Meiyou，经期记录 / 女性健康管理 App）**理解，下文简称「参考 App」。
 > 解禁说明：A9 原为 ⛔（用户 2026-11-10「先不开发，留着」），2026-11-12 用户指示「按设计文档完成并交付」视为解禁；代码落地并自测通过后，台账 A9 已同步从 ⛔ 改 ✅（见 `PROGRESS.md` 第 1 / 2 节），避免「文档已改、功能未做」的状态错位。
 > 代码基线：`main` `d7de0cb`；`app/build.gradle.kts:19-20` versionCode 14 / versionName 0.6.8，最高 tag `v0.6.8`；`AppDatabase.kt:22` Room **version 3**；备份正文 `SCHEMA_VERSION = 2`（`BackupCodec.kt:37`）、加密容器 `ENCRYPTED_SCHEMA_VERSION = 3`（`:41`）。
@@ -146,6 +147,7 @@ CycleSnapshot(
 - 「大姨妈来了 / 走了」是**写当天一条事件**的快捷动作，不是独立实体：
   - 「来了」：当天已有同类型事件则转为编辑，否则写入；`detail` 可为 `null`（只标记，未填体征）。
   - 「走了」：若存在最近一次「来了」且间隔 ≤ 14 天，**自动为中间缺失日期各补一条「仅标记」事件**（`detail = null`），保证经期段连续、经期天数准确；UI 明确提示「已补齐 N 天，可逐日补充流量与症状」。补齐按 `(typeCode, localDate)` 幂等，已有事件一律跳过、不覆盖已有详情；超过 14 天不自动补，要求用户确认，防止误触批量写入。
+  - **进行中自动延续（v6）**：`SettingsRepository.ongoingPeriodStart` 只存起点（ISO 日期，DataStore，不进 Room、不进备份）。点「来了」且起点距今天 ≤ `PeriodOngoing.MAX_AUTO_DAYS`（14 天）时写入起点，之后每次进入 / 跨天由 `syncOngoingPeriod` 把 `[起点..昨天]` 里缺的日期补成「仅标记」事件（幂等，不覆盖详情）；**今天由 `PeriodOngoing.span` 派生显示、不提前落库**，点「走了」时按 `closingDates(起点, 结束日)` 一次补齐并清空起点。这样「今天」不会在用户还没过完时就入库，结束时也不会留下多余记录；起点距今超过 14 天只标当天，避免误触把整月染成经期。恢复备份后起点清零（整体替换，旧起点可能指向已不存在的数据）。
   - 用户也可在任意一天直接打开月经编辑器逐日记录，不强制走起止动作。
 - 编辑 / 删除沿用现有链路（`saveGenericRecord` / `RecordRow` 的删除）；删除区间中间某日会打断经期段，弹窗里提示一次，不阻止操作。
 - 不做一键打卡：`MainViewModel` 的 `quickRecord()` 硬编码 `addPoopRecord`（A10 已列为非目标），本模块同样不碰。
@@ -216,10 +218,8 @@ CycleSnapshot(
 
 ### 5.5 隐私改造（把 A10 的一次性硬编码收口）
 
-- `ScreenCapturePolicy.kt`：把 `Reason.INTIMACY_MODULE` 扩为数据驱动 `HIGH_SENSITIVITY_TYPES = setOf(intimacy, menstruation)`，`reasons()` 按启用中的高敏感类型生成原因文案；`MainActivity.kt:46-49` 只调 `isBlocked`，无需改动。
-- `ModuleManagementScreen.kt:101-115` 的首次启用提示、`SettingsScreen.kt:412/657-658` 与 `SettingsComponents.kt:217-222` 的文案，改为遍历高敏感类型生成，避免第三次加模块又改四处。
-- `RecordDetailSheet.kt:49`、`RecordSummary.kt:84` 的收敛判定同步改为集合判定。
-- **v5 说明收敛**：首页删掉「已开启截屏保护」提示行后，这句说明由 `ModuleManagementScreen.kt:101-115` 的首次启用提示与 `SettingsScreen.kt:412/657-658` 的安全区文案承担，用户仍能知道「启用高敏感模块后全应用禁止截屏」；`ScreenCapturePolicy` / `MainActivity` 的判定与 `FLAG_SECURE` 机制一行不改。
+- **v6：截屏限制整体移除**。`ScreenCapturePolicy` 删除，改为只登记类型的 `SensitiveTypes`（`HIGH_SENSITIVITY_TYPES` / `sensitiveModuleNames`）；`MainActivity` 不再设置 `FLAG_SECURE`；设置页「截屏与录屏」状态行、`ModuleManagementScreen` 的首次启用弹窗、`SettingsComponents.ScreenCaptureNoticeDialog` 一并删除。应用锁只负责「进正文前验证」，与窗口标志无关。
+- 高敏感类型仍保留 L1 读屏收敛：`RecordDetailSheet.kt`、`RecordSummary.kt` 按集合判定，列表只显示类型与时间、读屏一句汇总。
 - 明文导出全量包含月经记录，不按类型排除（项目红线：静默丢数据），只在风险确认文案中点名。
 - 不写日志、不进异常文本、通知为零（P7）。
 
@@ -269,7 +269,7 @@ CycleSnapshot(
 2. 版本核对：Room 仍 v3、`app/schemas/` 只有 1/2/3.json 且无 diff、备份三个版本常量与 DTO 无 diff、DAO / Repository 无 diff。
 3. 装机主路径：默认停用 → 启用 → **点首页「月经」模块卡进入子应用（不是编辑器）** → 日历默认选中今天、下方逐行填写区可见 → 记「来了」→ 记「走了」自动补齐 → 点行展开填流量 / 症状 / 日记 → 点日历切到过去某日补记 → 状态条、日历染色、简报数字同步正确 → 编辑 / 删除 / 重启保持。
 4. 备份往返：v3 加密与 v2 明文各导一次并恢复，字段与补齐事件完整回来；坏字段（`symptoms` 含非法 token、未知字段、超长）明确拒绝且不破坏现有数据。
-5. 隐私：`FLAG_SECURE` 生效期间截图全黑（按 `profile §9` 用 `uiautomator dump` 与 `dumpsys window` 作替代证据），TalkBack 列表与详情各只一句汇总，应用锁关闭时仍遮挡，明文导出文案点名；**首页虽无截屏提示行，「设置 → 记录项目」的首次启用提示仍明确说明全应用禁止截屏**。
+5. 隐私：**系统截屏与最近任务预览照常可用**（应用锁开启、月经启用都不再遮挡），TalkBack 列表与详情各只一句汇总，明文导出文案点名；设置页已无「截屏与录屏」状态行，启用模块也不再弹截屏说明。
 6. UI：窄屏 360dp / 深色 / 200% 字体 / 宽屏各走一遍；行式表单的选项与已填值标签自动分行、无横向裁切；日历格与行容器用 `heightIn` 不用固定 `height`；200% 字体下起止动作、图示、日记输入框与「完成」按钮分行不重叠；**首屏能同时看到日历与逐行填写区开头**（原型实测基线：压缩日历格后首屏可见 3 行）。
 7. 兼容：0.6.8 备份恢复成功且模块保持停用；含月经的备份在旧版被明确拒绝（双版本环境具备则实测，否则单测覆盖）。
 8. 布局零回归：底部导航仍 4 项；子应用隐藏底导且返回正常；**历史页两态、`CalendarMonthView`、`DayRecordsSheet`、`CalendarMonth.of()` 与 `CalendarMonthTest` 均无 diff**；子应用能连续向后翻 2 个月并正确显示预测经期；模块停用时今天页与 0.6.8 截图一致，**启用后首页只多一张「月经」卡，无周期状态行、无截屏保护提示行，其余四张模块卡与今日记录位置不变**。

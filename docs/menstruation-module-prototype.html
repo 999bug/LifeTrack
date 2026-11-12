@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A9 经期子应用 · 交互原型 v3 · 生活记</title>
+<title>A9 经期子应用 · 交互原型 v4 · 生活记</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -27,7 +27,6 @@
     --water: #3D7391;
     --coffee: #9A7134;
     --sport: #4C7A57;
-    --intimacy: #8A5F72;
     --period: #A35B52;
     --period-soft: #F6EAE8;
     --note-bg: #F1F4EF;
@@ -51,7 +50,6 @@
     --water: #8FC0D8;
     --coffee: #D9B173;
     --sport: #9CC7A6;
-    --intimacy: #C99BAE;
     --period: #E0A79B;
     --period-soft: #33211F;
     --note-bg: #1A231C;
@@ -91,18 +89,16 @@
   .screen::-webkit-scrollbar { display: none; }
   .row { display: flex; align-items: center; }
   .between { justify-content: space-between; }
-  .gap8 { gap: 8px; }
   .grow { flex: 1; min-width: 0; }
   h1.pg { font-size: 2em; line-height: 1.2; font-weight: 600; margin: 2px 0 0; letter-spacing: -.3px; }
   .eb { font-size: .85em; color: var(--text-3); letter-spacing: .3px; }
   .sub { font-size: .88em; color: var(--text-3); margin-top: 5px; }
   .sec-title { font-size: 1.15em; font-weight: 600; margin: 22px 0 10px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px; box-shadow: var(--shadow); }
   .muted { color: var(--text-3); }
   .tiny { font-size: .8em; line-height: 1.6; }
   .small { font-size: .88em; line-height: 1.6; }
   .tnum { font-variant-numeric: tabular-nums; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: .76em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); }
   .link { color: var(--primary); cursor: pointer; font-size: .88em; background: none; border: none; padding: 0; font-family: inherit; }
   .divider { height: 1px; background: var(--border); margin: 14px 0; }
 
@@ -134,24 +130,24 @@
   .rec .bd { flex: 1; min-width: 0; font-size: .92em; }
   .rec .bd em { font-style: normal; color: var(--text-3); font-size: .88em; display: block; margin-top: 3px; }
 
-  /* 周期页 */
+  /* 经期页顶栏与日历 */
   .topbar { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; }
   .icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; font-size: 1em; }
   .topbar h2 { font-size: 1.3em; font-weight: 600; margin: 0; flex: 1; }
-  .hero { background: var(--primary-soft); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
-  .hero .big { font-size: 1.75em; font-weight: 600; letter-spacing: -.3px; line-height: 1.3; }
-  .hero .meta { font-size: .88em; color: var(--text-2); margin-top: 9px; line-height: 1.7; }
-  .hero .badge { display: inline-block; font-size: .76em; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); margin-bottom: 10px; }
+  .pstatus { background: var(--primary-soft); border: 1px solid var(--border); border-radius: 14px; padding: 11px 13px; }
+  .pstatus .lead { font-size: 1.5em; font-weight: 600; line-height: 1.25; letter-spacing: -.3px; }
+  .pstatus .meta { font-size: .8em; color: var(--text-2); line-height: 1.65; margin-top: 5px; }
+  .pstatus .badge { display: inline-block; font-size: .74em; padding: 2px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); margin-bottom: 8px; }
 
-  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
   .cal-head .ttl { font-size: 1.05em; font-weight: 600; }
   .cal-nav { display: flex; gap: 6px; }
   .cal-nav button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); cursor: pointer; font: inherit; font-size: .95em; }
   .cal-nav button:disabled { opacity: .35; cursor: default; }
-  .week { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 5px; }
-  .week span { text-align: center; font-size: .76em; color: var(--text-3); padding: 2px 0; }
+  .week { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 4px; }
+  .week span { text-align: center; font-size: .76em; color: var(--text-3); padding: 1px 0; }
   .cells { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
-  .cell { position: relative; aspect-ratio: 1/1; min-height: 36px; border: 1px solid transparent; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: .88em; color: var(--text-2); background: none; font-family: inherit; cursor: pointer; padding: 0; }
+  .cell { position: relative; height: 34px; min-height: 34px; border: 1px solid transparent; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .88em; color: var(--text-2); background: none; font-family: inherit; cursor: pointer; padding: 0; }
   .cell.blank { cursor: default; }
   .cell.actual { background: var(--period-soft); border-color: var(--period); color: var(--text); }
   .cell.predicted { border: 1px dashed var(--period); color: var(--period); }
@@ -161,11 +157,50 @@
   .cell.today .mark { background: var(--on-primary); }
   .cell.actual .mark { background: var(--period); }
   .cell .dn { line-height: 1; }
-  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: .78em; color: var(--text-3); }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; font-size: .78em; color: var(--text-3); }
   .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   .legend .a { background: var(--period-soft); border: 1px solid var(--period); }
   .legend .p { border: 1px dashed var(--period); }
   .legend .t { background: var(--primary); }
+
+  /* 选中日 + 行式填写 */
+  .selbar { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
+  .selbar .d { font-size: 1.2em; font-weight: 600; }
+  .selbar .hint { font-size: .78em; color: var(--text-3); }
+  .pkacts { display: flex; gap: 8px; margin: 8px 0 9px; }
+  .pkacts button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--period-soft); border: 1px solid var(--period); color: var(--text); border-radius: 10px; padding: 10px 6px; font: inherit; font-size: .86em; cursor: pointer; min-height: 40px; }
+  .pkacts svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+  .dayform { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
+  .frow { width: 100%; display: flex; align-items: flex-start; gap: 11px; padding: 10px 12px; background: none; border: none; border-bottom: 1px solid var(--border); text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .frow.last { border-bottom: none; }
+  .frow.open { background: var(--surface-2); }
+  .fico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--surface-2); color: var(--period); flex: 0 0 auto; }
+  .frow.open .fico { background: var(--surface); }
+  .fico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+  .fbody { flex: 1; min-width: 0; display: block; }
+  .fname { display: block; font-size: .92em; font-weight: 500; }
+  .fval { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; font-size: .8em; color: var(--text-3); margin-top: 4px; line-height: 1.5; }
+  .fval.filled { color: var(--text-2); }
+  .fchev { color: var(--text-3); font-size: 1em; flex: 0 0 auto; padding-top: 5px; }
+  .mini { width: 32px; height: 13px; flex: 0 0 auto; }
+  .mini.face { width: 17px; height: 17px; }
+  .fval .mini { color: var(--period); }
+  .tag { display: inline-flex; align-items: center; gap: 4px; font-size: .96em; padding: 1px 7px; border-radius: 999px; background: var(--period-soft); border: 1px solid var(--border); color: var(--text-2); }
+  .tagdot { width: 5px; height: 5px; border-radius: 50%; background: var(--period); display: inline-block; }
+  .opts { padding: 2px 12px 13px 46px; display: flex; flex-wrap: wrap; gap: 7px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .opt { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: .84em; padding: 7px 10px; min-height: 34px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .opt.on { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
+  .opt svg { width: 32px; height: 13px; flex: 0 0 auto; }
+  .opt svg.face { width: 17px; height: 17px; }
+  .diary { padding: 2px 12px 13px 46px; background: var(--surface-2); }
+  .note-input { width: 100%; font: inherit; font-size: .9em; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; resize: none; outline: none; line-height: 1.7; }
+  .note-input:focus { border-color: var(--primary); }
+  .cnt { text-align: right; font-size: .74em; color: var(--text-3); margin-top: 5px; }
+  .formfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .formfoot .tiny { flex: 1; min-width: 150px; }
+  .btn-done { flex: 0 0 auto; font: inherit; font-size: .9em; padding: 9px 18px; border-radius: 10px; border: none; background: var(--primary); color: var(--on-primary); cursor: pointer; }
+  .ro { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; font-size: .86em; color: var(--text-3); line-height: 1.8; }
+  .ro b { display: block; color: var(--text-2); font-size: 1.05em; margin-bottom: 5px; }
 
   .trend { display: flex; align-items: flex-end; gap: 8px; height: 76px; margin: 12px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
   .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
@@ -173,14 +208,15 @@
   .bar .v { font-size: .76em; color: var(--text-2); }
   .trend-labels { display: flex; gap: 8px; margin-top: 6px; }
   .trend-labels span { flex: 1; text-align: center; font-size: .76em; color: var(--text-3); }
-
+  .brief { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .brief .item { background: var(--surface-2); border-radius: 10px; padding: 10px; }
+  .brief .item b { display: block; font-size: 1.12em; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .brief .item span { display: block; font-size: .76em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
   .cfg-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; gap: 10px; flex-wrap: wrap; }
   .cfg-row + .cfg-row { border-top: 1px solid var(--border); }
   .stepper { display: flex; align-items: center; gap: 10px; }
   .stepper button { width: 27px; height: 27px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; }
   .stepper b { font-size: .95em; min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
-  .btn-primary { display: block; width: 100%; border: none; border-radius: 12px; background: var(--primary); color: var(--on-primary); font: inherit; font-size: 1em; padding: 13px; cursor: pointer; margin-top: 18px; }
-  .btn-ghost { display: block; width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text-2); font: inherit; font-size: .95em; padding: 11px; cursor: pointer; margin-top: 9px; }
   .disclaimer { font-size: .78em; line-height: 1.7; color: var(--text-3); margin: 14px 2px 4px; }
 
   /* 历史页（不变） */
@@ -189,45 +225,18 @@
   .switcher button.on { background: var(--primary); color: var(--on-primary); }
   .unchanged { display: inline-flex; align-items: center; gap: 6px; font-size: .76em; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 999px; padding: 4px 10px; margin-bottom: 10px; }
 
-  /* 编辑器弹层 */
-  .scrim { position: absolute; inset: 0; background: rgba(10,16,12,.52); display: flex; align-items: flex-end; z-index: 20; }
-  .sheet { width: 100%; max-height: 88%; overflow-y: auto; background: var(--surface); border-radius: 24px 24px 0 0; padding: 18px 18px 0; scrollbar-width: none; }
-  .sheet::-webkit-scrollbar { display: none; }
-  .sheet h3 { font-size: 1.2em; margin: 0 0 3px; font-weight: 600; }
-  .field-label { font-size: .88em; color: var(--text-2); margin: 16px 0 8px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-  .chip { font: inherit; font-size: .86em; padding: 7px 12px; min-height: 32px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); cursor: pointer; }
-  .chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-  .quick { display: flex; gap: 8px; margin-top: 12px; }
-  .quick button { flex: 1; font: inherit; font-size: .88em; padding: 10px 6px; border-radius: 10px; border: 1px solid var(--period); background: var(--period-soft); color: var(--text); cursor: pointer; }
-  .note-input { width: 100%; font: inherit; font-size: .9em; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; resize: none; outline: none; }
-  .sheet-actions { display: flex; gap: 9px; margin-top: 18px; position: sticky; bottom: 0; z-index: 2; background: var(--surface); border-top: 1px solid var(--border); padding-top: 12px; padding-bottom: 20px; }
-  .sheet-actions button { flex: 1; font: inherit; font-size: .95em; padding: 12px; border-radius: 12px; cursor: pointer; }
-  .sheet-actions .save { background: var(--primary); color: var(--on-primary); border: none; }
-  .sheet-actions .cancel { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); }
-
-  /* 日期详情浮层 */
-  .daypop { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 15; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 15px; box-shadow: 0 18px 44px -18px rgba(0,0,0,.5); }
   .toast { position: absolute; left: 50%; bottom: 88px; transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); font-size: .84em; padding: 9px 16px; border-radius: 999px; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
   .placeholder { padding: 60px 12px; text-align: center; color: var(--text-3); font-size: .92em; line-height: 1.9; }
 
-  /* 经期子应用首屏 */
-  .hero2 { background: var(--primary-soft); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
-  .hero2 .big2 { font-size: 2em; font-weight: 600; line-height: 1.25; letter-spacing: -.3px; }
-  .hero2 .sub2 { font-size: .86em; color: var(--text-2); margin-top: 8px; line-height: 1.7; }
-  .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .metrics .mv { display: block; font-size: 1.18em; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .metrics .ml { display: block; font-size: .74em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
-  .cta { display: block; width: 100%; background: var(--primary); color: var(--on-primary); border: none; border-radius: 12px; padding: 14px; font: inherit; font-size: 1.05em; cursor: pointer; margin-top: 14px; }
-  .cta-sub { display: flex; gap: 8px; margin-top: 8px; }
-  .cta-sub button { flex: 1; background: var(--period-soft); border: 1px solid var(--period); color: var(--text); border-radius: 10px; padding: 10px 6px; font: inherit; font-size: .88em; cursor: pointer; }
-  .topline { font-size: .78em; color: var(--text-3); margin-top: 8px; line-height: 1.6; }
-  .brief { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .brief .item { background: var(--surface-2); border-radius: 10px; padding: 10px; }
-  .brief .item b { display: block; font-size: 1.12em; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .brief .item span { display: block; font-size: .76em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
-  html[data-font="large"] .metrics, html[data-font="large"] .brief { grid-template-columns: 1fr; }
-  html[data-font="large"] .cta-sub { flex-wrap: wrap; }
+  html[data-font="large"] .brief, html[data-font="large"] .metrics { grid-template-columns: 1fr; }
+  html[data-font="large"] .cell { height: 40px; min-height: 40px; }
+  html[data-font="large"] .pkacts { flex-wrap: wrap; }
+  html[data-font="large"] .pkacts button { flex: 1 1 100%; }
+  html[data-font="large"] .fchev { display: none; }
+  html[data-font="large"] .opts, html[data-font="large"] .diary { padding-left: 13px; }
+  html[data-font="large"] .opt { font-size: .9em; }
+  html[data-font="large"] .formfoot .tiny { flex: 1 1 100%; }
+  html[data-font="large"] .btn-done { margin-left: auto; }
 
   @media (max-width: 900px) {
     .stage { grid-template-columns: 1fr; gap: 22px; padding: 22px 16px 40px; }
@@ -240,24 +249,24 @@
 <body>
 <div class="stage">
   <aside class="notes">
-    <p class="eyebrow">LIFETRACK · A9 经期子应用 v3</p>
+    <p class="eyebrow">LIFETRACK · A9 经期子应用 v4</p>
     <h1>经期子应用<br>交互原型</h1>
-    <p class="lede">按 13:39 拍板：点首页「记录月经」卡直接进入一个完整的经期子应用，首屏信息架构接近参考 App，让使用者无缝使用。全局布局与历史页不动，数据仍走同一套事件表。</p>
+    <p class="lede">按 14:03 的指示把经期页改成参考 App 的交互方式：日历置顶选日期，下方一行一行填当天内容，每行带图示，最后加一行日记。点行展开选项，即点即存，不再弹底部表单。</p>
 
     <div class="decision">
-      <h3><i>01</i> 点卡直接进子应用</h3>
-      <p>首页「月经」模块卡与状态行都指向同一个「经期」页；卡片右下角由「记录」改为「打开」。快速记一条移到子应用首屏的「今天记一笔」主按钮。</p>
+      <h3><i>01</i> 日历在上，选日驱动</h3>
+      <p>经期页第一屏就是可翻未来月的日历。点任意日期，下方标题、起止动作与逐行表单整体切到那一天；未来日期只给只读提示，不编造记录。</p>
     </div>
     <div class="decision">
-      <h3><i>02</i> 首屏就是完整闭环</h3>
-      <p>状态大卡、今天记一笔、大姨妈来了 / 走了、可翻未来月的经期日历、本周期简报、趋势与设置依次排布。抄的是信息架构与交互，视觉沿用 LifeTrack token。</p>
+      <h3><i>02</i> 一行一行填，内容有图示</h3>
+      <p>流量 / 痛经 / 症状 / 心情 / 分泌物各占一行，行首是功能图示，已填值带等级格或表情图示。点行展开选项，选中即保存，同一天只记一条。</p>
     </div>
     <div class="decision">
-      <h3><i>03</i> 边界与历史页不变</h3>
-      <p>不做账号 / 云同步 / 社区 / 电商 / 资讯 / 孕产模式 / 推送。现有月历 <code>require(offset &lt;= 0)</code> 禁止翻未来，历史页仍是列表 / 月历两态并带「本页不改」角标。</p>
+      <h3><i>03</i> 新增日记行</h3>
+      <p>最后一行是日记，纸笔图示加多行文本，写当天的感受与作息。复用现有事件备注字段，不新增详情字段、不改备份格式；不引入图片与富文本。</p>
     </div>
     <div class="note-box">
-      点工具栏切浅 / 深色、200% 字体、三种数据场景；点「今天记一笔」打开按天记录编辑器，点日历中过去的日期可直接补记该天，未来日期只给只读提示；改周期 / 经期长度会立即重算预测日期。数据为确定性 mock，跨页面自洽，无外链、无渐变。
+      点工具栏切浅 / 深色、200% 字体、三种数据场景；点日历换日期，点任意行展开填写，改周期 / 经期长度会立即重算预测日期。图示均为内联自绘 SVG，无外链、无渐变、无装饰 emoji。数据为确定性 mock，跨面板自洽。也可用 <code>?page=cycle&amp;row=diary&amp;scroll=form</code> 直达日记行。
     </div>
   </aside>
 
@@ -286,11 +295,11 @@
         <button data-set="scenario" data-value="off">未启用</button>
       </div>
       <span class="tb-sep"></span>
-      <button class="tb-btn" data-act="openEditor">打开记录</button>
+      <button class="tb-btn" data-act="jumpToday">跳到今天</button>
     </div>
 
     <div class="device"><div class="phone" id="phone"></div></div>
-    <p class="caption">412 × 866 · 单文件原型 v3 · 数据固定为 2026-11-12，周期序列 [28, 29, 28, 28, 29, 28]，中位数 28 天 · 底部导航仍为 4 项</p>
+    <p class="caption">412 × 866 · 单文件原型 v4 · 数据固定为 2026-11-12，周期序列 [28, 29, 28, 28, 29, 28]，中位数 28 天 · 底部导航仍为 4 项</p>
   </main>
 </div>
 
@@ -305,14 +314,28 @@
   const SYMPTOMS = ['腹痛','腰酸','头痛','乳房胀痛','腹胀','恶心','乏力','失眠','情绪波动','食欲变化','痤疮','头晕'];
   const WEEK = ['一','二','三','四','五','六','日'];
 
+  const FIELDS = [
+    { key:'flow', name:'流量', icon:'flow', vals:[['spotting','点滴'],['light','少'],['medium','中'],['heavy','多']] },
+    { key:'pain', name:'痛经', icon:'pain', vals:[['none','无'],['mild','轻'],['moderate','中'],['severe','重']] },
+    { key:'symptoms', name:'症状', icon:'symptoms', multi:true },
+    { key:'mood', name:'心情', icon:'mood', vals:[['calm','平静'],['happy','愉快'],['sensitive','敏感'],['low','低落'],['irritable','易怒']] },
+    { key:'discharge', name:'分泌物', icon:'discharge', vals:[['dry','干燥'],['sticky','黏稠'],['creamy','乳白'],['watery','水样'],['eggwhite','蛋清']] },
+    { key:'diary', name:'日记', icon:'diary', text:true }
+  ];
+
+  // 确定性 mock：同一天的记录内容在所有面板里都是同一份
+  const DAY_DATA = {
+    '2026-11-10': { flow:'light', pain:'mild', symptoms:['腰酸'], mood:'calm', discharge:'', diary:'第一天，量不多，先记一下。' },
+    '2026-11-11': { flow:'heavy', pain:'moderate', symptoms:['腹痛','乏力','失眠'], mood:'low', discharge:'', diary:'下午腹痛明显，晚上早睡。' },
+    '2026-11-12': { flow:'medium', pain:'mild', symptoms:['腹痛','腰酸'], mood:'calm', discharge:'', diary:'' },
+    '2026-10-13': { flow:'light', pain:'none', symptoms:[], mood:'happy', discharge:'sticky', diary:'' }
+  };
+
   const S = {
     page: 'today', theme: 'light', font: 'normal', scenario: 'full',
     monthOffset: 0, cycleDays: 28, periodDays: 5, overridden: false,
-    settingsOpen: false, editorOpen: false, dayPop: null,
-    historyMode: 'list', toast: '',
-    quick: '', editorDate: TODAY,
-    form: { flow:'medium', pain:'mild', symptoms:['腹痛','腰酸'], mood:'calm', discharge:'', note:'' },
-    savedDetails: {}
+    settingsOpen: false, historyMode: 'list', toast: '',
+    selectedDate: TODAY, openRow: '', dayData: {}, marked: [], savedDays: {}
   };
 
   const MODULES = [
@@ -340,6 +363,19 @@
   function median(a) { const s = a.slice().sort((x,y) => x-y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : Math.floor((s[m-1] + s[m]) / 2); }
   function range(start, n) { return Array.from({length:n}, (_,i) => addDays(start, i)); }
   function uniq(a) { return Array.from(new Set(a)); }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function blankDay() { return { flow:'', pain:'', symptoms:[], mood:'', discharge:'', diary:'' }; }
+  function dayData(date) {
+    if (S.dayData[date]) return S.dayData[date];
+    const base = DAY_DATA[date] || blankDay();
+    return { flow:base.flow, pain:base.pain, symptoms:base.symptoms.slice(), mood:base.mood, discharge:base.discharge, diary:base.diary };
+  }
+  function writeDay(date, fn) {
+    const d = dayData(date);
+    S.dayData[date] = d;
+    fn(d);
+    S.savedDays[date] = true;
+  }
 
   function model() {
     const enabled = S.scenario !== 'off';
@@ -352,7 +388,7 @@
     const cycle = S.overridden ? S.cycleDays : medCycle;
     const plen = S.overridden ? S.periodDays : medPeriod;
 
-    const actual = uniq(starts.flatMap(s => range(s, 5).filter(d => d <= TODAY))).sort();
+    const actual = uniq(starts.flatMap(s => range(s, 5).filter(d => d <= TODAY)).concat(S.marked)).sort();
     const lastStart = starts[starts.length - 1];
     const inPeriod = actual.indexOf(TODAY) >= 0;
     const dayIndex = inPeriod ? diff(lastStart, TODAY) + 1 : 0;
@@ -368,8 +404,8 @@
       }
     }
     return {
-      enabled, sparse, reliable, starts, intervals, cycle, plen,
-      actual, predicted: uniq([...thisPeriodRemain, ...predicted]).sort(),
+      enabled, sparse, reliable, starts, intervals, cycle, plen, actual,
+      predicted: uniq([...thisPeriodRemain, ...predicted]).sort(),
       nextStart: (enabled && reliable) ? addDays(lastStart, cycle) : null,
       inPeriod, dayIndex, lastStart,
       headline: !enabled ? '' : (!reliable ? '记录暂不足，继续记录后可预测' : (inPeriod ? '经期第 ' + dayIndex + ' 天' : '距预计下次经期 ' + diff(TODAY, addDays(lastStart, cycle)) + ' 天')),
@@ -391,6 +427,34 @@
     };
   }
 
+  // 自绘功能图示：行首图标、等级格、表情、起止动作
+  const PATHS = {
+    flow: '<path d="M9 2.4 C9 2.4 4 8 4 11 A5 5 0 0 0 14 11 C14 8 9 2.4 9 2.4 Z"/>',
+    pain: '<path d="M2 9 h2.3 l1.4 -4.2 2.2 8.4 2 -6.2 1.4 2 H16"/>',
+    symptoms: '<circle cx="9" cy="9" r="6.6"/><path d="M9 5.5 V9 l2.4 1.7"/>',
+    mood: '<circle cx="9" cy="9" r="6.6"/><path d="M6.2 10.7 Q9 13 11.8 10.7"/><path d="M6.7 7.3 h.01 M11.3 7.3 h.01"/>',
+    discharge: '<path d="M3 5.5 H15 M3 9 H15 M3 12.5 H15"/>',
+    diary: '<path d="M4 2.5 H13 L15 4.5 V15.5 H4 Z"/><path d="M6.6 7.6 H12.2 M6.6 10.5 H12.2 M6.6 13.3 H10.2"/><path d="M13 2.5 V4.5 H15"/>',
+    check: '<path d="M3 9.4 L7 13.4 L15 4.6"/>'
+  };
+  function glyph(kind, cls) {
+    return '<svg class="' + (cls || '') + '" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">' + (PATHS[kind] || '') + '</svg>';
+  }
+  function levelIcon(n, total) {
+    let s = '';
+    for (let i = 0; i < total; i++) {
+      s += '<rect x="' + (1 + i * 4.6).toFixed(1) + '" y="1" width="3.3" height="6" rx="1.1" fill="' + (i < n ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1"/>';
+    }
+    return '<svg class="mini" viewBox="0 0 ' + (total * 4.6 + 1).toFixed(1) + ' 8">' + s + '</svg>';
+  }
+  function faceIcon(k) {
+    const mouth = {
+      calm:'M6.2 10.6 H11.8', happy:'M6.2 9.9 Q9 12.9 11.8 9.9', sensitive:'M6.2 11 Q9 9 11.8 11',
+      low:'M6.2 11.2 Q9 8.6 11.8 11.2', irritable:'M6.2 10.8 l1.4 -1.2 1.4 1.2 1.4 -1.2 1.4 1.2'
+    }[k] || 'M6.2 10.6 H11.8';
+    return '<svg class="mini face" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="9" cy="9" r="6.6"/><circle cx="6.9" cy="7.4" r=".8" fill="currentColor" stroke="none"/><circle cx="11.1" cy="7.4" r=".8" fill="currentColor" stroke="none"/><path d="' + mouth + '"/></svg>';
+  }
   function icon(kind) {
     const paths = {
       today: '<path d="M2 9 L9 2 L16 9 V16 H2 Z"/>',
@@ -439,6 +503,62 @@
       '</div>' + nav('today');
   }
 
+  function valueHtml(f, d) {
+    if (f.key === 'diary') {
+      return d.diary
+        ? '<span class="tagdot"></span><span>' + esc(d.diary.length > 22 ? d.diary.slice(0, 22) + '…' : d.diary) + '</span>'
+        : '<span>写点今天的感受与作息</span>';
+    }
+    if (f.multi) {
+      return d.symptoms.length
+        ? d.symptoms.map(x => '<span class="tag"><span class="tagdot"></span>' + x + '</span>').join('')
+        : '<span>选择身体感受，最多 8 项</span>';
+    }
+    const i = f.vals.findIndex(v => v[0] === d[f.key]);
+    if (i < 0) return '<span>未填写</span>';
+    return (f.key === 'mood' ? faceIcon(f.vals[i][0]) : levelIcon(i + 1, f.vals.length)) + '<span>' + f.vals[i][1] + '</span>';
+  }
+  function isFilled(f, d) {
+    if (f.key === 'diary') return !!d.diary;
+    if (f.multi) return d.symptoms.length > 0;
+    return !!d[f.key];
+  }
+  function optionsHtml(f, d) {
+    if (f.text) {
+      return '<div class="diary"><textarea class="note-input" rows="3" maxlength="500" data-input="diary" placeholder="记录今天的身体感受、作息或想说的话">' + esc(d.diary) + '</textarea>' +
+        '<div class="cnt" data-cnt="1">' + d.diary.length + ' / 500</div></div>';
+    }
+    const items = f.multi ? SYMPTOMS.map(x => [x, x]) : f.vals;
+    return '<div class="opts">' + items.map((v, i) => {
+      const on = f.multi ? d.symptoms.indexOf(v[0]) >= 0 : d[f.key] === v[0];
+      const mark = f.multi
+        ? (on ? glyph('check', 'face') : '<span class="tagdot"></span>')
+        : (f.key === 'mood' ? faceIcon(v[0]) : levelIcon(i + 1, items.length));
+      return '<button class="opt' + (on ? ' on' : '') + '" data-act="opt" data-key="' + f.key + '" data-value="' + v[0] + '">' + mark + '<span>' + v[1] + '</span></button>';
+    }).join('') + '</div>';
+  }
+  function dayForm(m, date) {
+    if (date > TODAY) {
+      const isPred = m.predicted.indexOf(date) >= 0;
+      return '<div class="ro"><b>' + (isPred ? '预计经期 · 不是记录' : '未来的日期') + '</b>' +
+        (isPred ? '这是按已记录周期推算的日期，不是已记录的数据。' : '这一天还没有到来。') +
+        '未来日期不能填写，可在日历上点过去任意一天补记。</div>';
+    }
+    const d = dayData(date);
+    const rows = FIELDS.map((f, i) => {
+      const open = S.openRow === f.key;
+      return '<button class="frow' + (open ? ' open' : '') + (i === FIELDS.length - 1 ? ' last' : '') + '" data-act="row" data-key="' + f.key + '">' +
+          '<span class="fico">' + glyph(f.icon) + '</span>' +
+          '<span class="fbody"><span class="fname">' + f.name + '</span>' +
+            '<span class="fval' + (isFilled(f, d) ? ' filled' : '') + '">' + valueHtml(f, d) + '</span></span>' +
+          '<span class="fchev">' + (open ? '−' : '›') + '</span></button>' +
+        (open ? optionsHtml(f, d) : '');
+    }).join('');
+    return '<div class="dayform">' + rows + '</div>' +
+      '<div class="formfoot"><span class="tiny muted">选择后即时保存，同一天只记一条；不填也可以。</span>' +
+        '<button class="btn-done" data-act="done">完成</button></div>';
+  }
+
   function cyclePage(m) {
     if (!m.enabled) {
       return '<div class="screen"><div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>经期</h2></div>' +
@@ -453,20 +573,15 @@
       if (daySet.has(c.iso)) cls.push('actual');
       else if (predSet.has(c.iso)) cls.push('predicted');
       if (c.iso === TODAY) cls.push('today');
-      if (S.dayPop === c.iso) cls.push('selected');
-      const mark = (daySet.has(c.iso) || c.iso === TODAY || S.savedDetails[c.iso]) ? '<span class="mark"></span>' : '';
+      if (S.selectedDate === c.iso) cls.push('selected');
+      const mark = (daySet.has(c.iso) || c.iso === TODAY || S.savedDays[c.iso]) ? '<span class="mark"></span>' : '';
       return '<button class="' + cls.join(' ') + '" data-act="cell" data-date="' + c.iso + '"><span class="dn tnum">' + c.day + '</span>' + mark + '</button>';
     }).join('');
 
     const badge = m.reliable ? (S.overridden ? '按设定值估算' : '按最近 6 个周期估算') : '记录暂不足';
-    const sub2 = m.reliable
-      ? '本期 ' + cn(m.lastStart) + ' 起 · 今天是第 ' + (diff(m.lastStart, TODAY) + 1) + ' 天 · 累计 ' + m.actual.length + ' 个经期日'
+    const meta = m.reliable
+      ? '本期 ' + cn(m.lastStart) + ' 起 · 第 ' + (diff(m.lastStart, TODAY) + 1) + ' 天 · 下次预计 ' + cn(m.nextStart)
       : '目前只有 1 段记录，还不能推算周期。继续记录几个周期后会自动给出预计日期。';
-    const metrics = [
-      [m.cycle + ' 天', '中位数周期'],
-      [m.reliable ? cn(m.nextStart) : '—', '下次预计'],
-      [m.plen + ' 天', '经期长度']
-    ].map(x => '<div><span class="mv tnum">' + x[0] + '</span><span class="ml">' + x[1] + '</span></div>').join('');
 
     const bars = TREND.map(v => '<div class="bar"><span class="v tnum">' + v + '</span><span class="stem" style="height:' + (18 + (v - 26) * 8) + 'px"></span></div>').join('');
     const cfg = S.settingsOpen
@@ -475,7 +590,6 @@
         cfgRow('经期长度', S.periodDays, 'periodDays', '1', '14') +
         '<div class="tiny muted" style="margin-top:10px">手动调整后按设定值估算，页面会立即重算预测日期。</div>'
       : '';
-
     const briefItems = m.reliable ? [
       [median(TREND) + ' 天', '最近 6 个周期中位数'],
       [Math.max.apply(null, TREND) + ' / ' + Math.min.apply(null, TREND) + ' 天', '最长 / 最短周期'],
@@ -489,17 +603,20 @@
     ];
     const brief = '<div class="brief">' + briefItems.map(x => '<div class="item"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>').join('') + '</div>';
 
+    const date = S.selectedDate;
+    const canEdit = date <= TODAY;
+    const acts = canEdit
+      ? '<div class="pkacts"><button data-act="periodAct" data-kind="start">' + glyph('flow') + '大姨妈来了</button>' +
+        '<button data-act="periodAct" data-kind="end">' + glyph('check') + '大姨妈走了</button></div>' +
+        '<div class="tiny muted" style="margin:0 0 9px">起止动作补齐中间日期，已有记录不覆盖。</div>'
+      : '';
+
     return '<div class="screen">' +
       '<div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>经期</h2>' +
         '<button class="link" data-act="settings">' + (S.settingsOpen ? '收起设置' : '周期设置') + '</button></div>' +
-      '<div class="hero2"><span class="badge">' + badge + '</span>' +
-        '<div class="big2">' + m.headline + '</div><div class="sub2">' + sub2 + '</div>' +
-        '<div class="metrics">' + metrics + '</div></div>' +
-      '<button class="cta" data-act="openEditor">今天记一笔</button>' +
-      '<div class="cta-sub"><button data-act="quick" data-kind="start">大姨妈来了</button>' +
-        '<button data-act="quick" data-kind="end">大姨妈走了</button></div>' +
-      '<div class="topline">起止动作会自动补齐中间日期，已有记录不覆盖；点日历中过去的任意一天可直接补记。</div>' +
-      '<div class="sec-title">经期日历</div>' +
+      '<div class="pstatus"><span class="badge">' + badge + '</span>' +
+        '<div class="lead">' + m.headline + '</div><div class="meta">' + meta + '</div></div>' +
+      '<div class="sec-title" style="margin-top:18px">经期日历</div>' +
       '<div class="card"><div class="cal-head"><span class="ttl">' + g.label + '</span><div class="cal-nav">' +
         '<button data-act="month" data-delta="-1"' + (S.monthOffset <= -2 ? ' disabled' : '') + '>←</button>' +
         '<button data-act="month" data-delta="1"' + (S.monthOffset >= 3 ? ' disabled' : '') + '>→</button>' +
@@ -507,8 +624,11 @@
       '<div class="week">' + WEEK.map(w => '<span>' + w + '</span>').join('') + '</div>' +
       '<div class="cells">' + cells + '</div>' +
       '<div class="legend"><span><i class="a"></i>已记录经期</span><span><i class="p"></i>预计经期</span><span><i class="t"></i>今天</span></div>' +
-      (m.reliable ? '<div class="tiny muted" style="margin-top:10px">可向右翻到未来月份看预计经期；点过去日期直接打开当天的记录编辑器。</div>' : '<div class="tiny muted" style="margin-top:10px">样本不足时不绘制预测经期，避免给出没有依据的日期。</div>') +
+      '<div class="tiny muted" style="margin-top:8px">可向右翻到未来月份；点任意一天，下方内容跟着切换。</div>' +
       '</div>' +
+      '<div class="selbar"><span class="d">' + cn(date) + ' · 周' + weekday(date) + (date === TODAY ? ' · 今天' : '') + '</span>' +
+        '<span class="hint">' + (canEdit ? '逐行填写当天记录' : '只读') + '</span></div>' +
+      acts + dayForm(m, date) +
       '<div class="sec-title">本周期简报</div>' +
       '<div class="card">' + brief + '<div class="tiny muted" style="margin-top:10px">只统计已填写的内容，不推算健康结论，也不给调理建议。</div></div>' +
       '<div class="sec-title">周期长度趋势</div>' +
@@ -540,7 +660,7 @@
       (S.historyMode === 'calendar'
         ? '<div class="card"><div class="cal-head"><span class="ttl">' + g.label + '</span><div class="cal-nav"><button data-act="histprev">←</button><button disabled>→</button></div></div>' +
           '<div class="week">' + WEEK.map(w => '<span>' + w + '</span>').join('') + '</div><div class="cells">' + cells + '</div>' +
-          '<div class="tiny muted" style="margin-top:10px">下一月按钮在本月禁用。预计经期不在这里，请回「今天 → 查看周期」。</div></div>'
+          '<div class="tiny muted" style="margin-top:10px">下一月按钮在本月禁用。预计经期不在这里，请回「今天 → 打开经期」。</div></div>'
         : '<div class="small muted">11月12日 · 周四 · 共 ' + TODAY_RECORDS.length + ' 条</div>' + list) +
       '<div class="divider"></div><div class="tiny muted">原型说明：这里保持 0.6.8 的两态结构与「同一份数据的两种密度」口径，不加第三档「经期」。</div>' +
       '</div>' + nav('history');
@@ -550,50 +670,23 @@
     return '<div class="screen"><h1 class="pg">' + title + '</h1><div class="placeholder">本原型聚焦月经模块的布局与交互。<br>这一页保持 0.6.8 的结构不变。</div></div>' + nav(title === '统计' ? 'statistics' : 'settings');
   }
 
-  function editor() {
-    const chip = (group, value, label) => {
-      const on = group === 'symptoms' ? S.form.symptoms.indexOf(value) >= 0 : S.form[group] === value;
-      return '<button class="chip' + (on ? ' on' : '') + '" data-act="chip" data-group="' + group + '" data-value="' + value + '">' + label + '</button>';
-    };
-    const group = (label, key, vals) => '<div class="field-label">' + label + '</div><div class="chips">' + vals.map(v => chip(key, v[0], v[1])).join('') + '</div>';
-    return '<div class="scrim" data-act="closeEditor"><div class="sheet" data-stop="1">' +
-      '<h3>记录月经</h3><div class="tiny muted">' + cn(S.editorDate) + ' · 周' + weekday(S.editorDate) + ' 08:20 · 按记录所在地时区保存：Asia/Shanghai</div>' +
-      '<div class="quick"><button class="chip' + (S.quick === 'start' ? ' on' : '') + '" data-act="quick" data-kind="start">大姨妈来了</button>' +
-        '<button class="chip' + (S.quick === 'end' ? ' on' : '') + '" data-act="quick" data-kind="end">大姨妈走了</button></div>' +
-      '<div class="tiny muted" style="margin-top:7px">点「走了」会补齐上次起始日以来的中间日期，已有记录不覆盖。</div>' +
-      group('流量', 'flow', [['spotting','点滴'],['light','少'],['medium','中'],['heavy','多']]) +
-      group('痛经', 'pain', [['none','无'],['mild','轻'],['moderate','中'],['severe','重']]) +
-      group('症状（最多 8 项）', 'symptoms', SYMPTOMS.map(x => [x, x])) +
-      group('心情', 'mood', [['calm','平静'],['happy','愉快'],['sensitive','敏感'],['low','低落'],['irritable','易怒']]) +
-      group('分泌物', 'discharge', [['dry','干燥'],['sticky','黏稠'],['creamy','乳白'],['watery','水样'],['eggwhite','蛋清']]) +
-      '<div class="field-label">备注</div><textarea class="note-input" rows="2" placeholder="可不填" data-input="note">' + S.form.note + '</textarea>' +
-      '<div class="sheet-actions"><button class="cancel" data-act="closeEditor">取消</button><button class="save" data-act="save">保存</button></div>' +
-      '</div></div>';
-  }
-
-  function dayPop(m) {
-    const date = S.dayPop;
-    const isPred = m.predicted.indexOf(date) >= 0;
-    return '<div class="daypop"><div class="row between"><b>' + cn(date) + ' · 周' + weekday(date) + '</b><span class="link" data-act="closeDay">关闭</span></div>' +
-      '<div class="small muted" style="margin-top:8px">' + (isPred ? '预计经期' : '未来日期') + '</div>' +
-      '<div class="tiny muted" style="margin-top:6px">' +
-        (isPred ? '这是按已记录周期推算的日期，不是记录数据。' : '这一天还没有到来。') +
-        '未来日期暂不能记录；过去的日期点开即可直接补记。</div>' +
-      '</div>';
-  }
-
+  let lastRenderedPage = '';
   function render() {
-    const m = model();
     const root = document.getElementById('phone');
+    const prevScreen = root.querySelector('.screen');
+    // 逐行表单在长页面下方，重建 DOM 时必须保住滚动位置，否则每点一个选项都会跳回日历
+    const keepScroll = (lastRenderedPage === S.page && prevScreen) ? prevScreen.scrollTop : 0;
+    lastRenderedPage = S.page;
+    const m = model();
     let html;
     if (S.page === 'today' || S.page === 'statistics' || S.page === 'settings') {
       html = S.page === 'today' ? todayPage(m) : simplePage(S.page === 'statistics' ? '统计' : '设置');
     } else if (S.page === 'cycle') html = cyclePage(m);
     else html = historyPage();
-    if (S.editorOpen) html += editor();
-    else if (S.dayPop && S.page === 'cycle') html += dayPop(m);
     if (S.toast) html += '<div class="toast">' + S.toast + '</div>';
     root.innerHTML = html;
+    const nextScreen = root.querySelector('.screen');
+    if (nextScreen && keepScroll) nextScreen.scrollTop = keepScroll;
 
     document.documentElement.setAttribute('data-theme', S.theme);
     document.documentElement.setAttribute('data-font', S.font);
@@ -601,6 +694,12 @@
       const key = g.getAttribute('data-group');
       g.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.getAttribute('data-value') === S[key]));
     });
+  }
+
+  function scrollToForm() {
+    const s = document.querySelector('.screen'), f = document.querySelector('.dayform');
+    if (!s || !f) return;
+    s.scrollTop = f.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 70;
   }
 
   let toastTimer;
@@ -616,30 +715,23 @@
     if (setBtn) {
       const key = setBtn.getAttribute('data-set');
       S[key] = setBtn.getAttribute('data-value');
-      if (key === 'page') { S.dayPop = null; S.editorOpen = false; }
-      if (key === 'scenario') { S.overridden = false; S.cycleDays = 28; S.periodDays = 5; S.monthOffset = 0; S.dayPop = null; }
+      if (key === 'page') S.openRow = '';
+      if (key === 'scenario') { S.overridden = false; S.cycleDays = 28; S.periodDays = 5; S.monthOffset = 0; }
       render();
       return;
     }
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.getAttribute('data-act');
-    if (act === 'closeEditor' && e.target.closest('[data-stop]') && !e.target.closest('.cancel') && !e.target.closest('.save') && !e.target.closest('button')) return;
 
     switch (act) {
-      case 'nav': S.page = el.getAttribute('data-page'); S.dayPop = null; render(); break;
-      case 'back': S.page = 'today'; S.dayPop = null; render(); break;
-      case 'opencycle': case 'openperiod': S.page = 'cycle'; S.monthOffset = 0; S.dayPop = null; render(); break;
+      case 'nav': S.page = el.getAttribute('data-page'); render(); break;
+      case 'back': S.page = 'today'; render(); break;
+      case 'opencycle': case 'openperiod': S.page = 'cycle'; S.monthOffset = 0; S.selectedDate = TODAY; S.openRow = ''; render(); break;
+      case 'jumpToday': S.page = 'cycle'; S.monthOffset = 0; S.selectedDate = TODAY; S.openRow = 'diary'; toast('已定位到今天，日记行已展开'); scrollToForm(); break;
       case 'mod': toast('本原型聚焦月经模块，其它编辑器沿用 0.6.8'); break;
-      case 'month': S.monthOffset = Math.max(-2, Math.min(3, S.monthOffset + Number(el.getAttribute('data-delta')))); S.dayPop = null; render(); break;
-      case 'cell': {
-        const picked = el.getAttribute('data-date');
-        S.dayPop = null;
-        if (picked > TODAY) S.dayPop = picked;
-        else { S.editorDate = picked; S.editorOpen = true; }
-        render(); break;
-      }
-      case 'closeDay': S.dayPop = null; render(); break;
+      case 'month': S.monthOffset = Math.max(-2, Math.min(3, S.monthOffset + Number(el.getAttribute('data-delta')))); render(); break;
+      case 'cell': S.selectedDate = el.getAttribute('data-date'); S.openRow = ''; render(); break;
       case 'settings': S.settingsOpen = !S.settingsOpen; render(); break;
       case 'cfg': {
         const key = el.getAttribute('data-key'), delta = Number(el.getAttribute('data-delta'));
@@ -650,38 +742,68 @@
       }
       case 'hview': S.historyMode = el.getAttribute('data-mode'); render(); break;
       case 'histprev': toast('历史月历可继续往前翻页，本原型只展示当月'); break;
-      case 'openEditor': S.editorDate = TODAY; S.editorOpen = true; S.dayPop = null; render(); break;
-      case 'closeEditor': S.editorOpen = false; render(); break;
-      case 'quick': S.quick = el.getAttribute('data-kind'); toast(el.getAttribute('data-kind') === 'start' ? '已标记今天为经期起始日' : '已标记结束，并补齐中间缺失日期'); break;
-      case 'chip': {
-        const g = el.getAttribute('data-group'), v = el.getAttribute('data-value');
-        if (g === 'symptoms') {
-          const i = S.form.symptoms.indexOf(v);
-          if (i >= 0) S.form.symptoms.splice(i, 1);
-          else if (S.form.symptoms.length < 8) S.form.symptoms.push(v);
-          else toast('症状最多选 8 项');
-        } else S.form[g] = v;
-        render(); break;
-      }
-      case 'save': {
-        S.savedDetails[S.editorDate] = true;
-        S.editorOpen = false; S.page = 'cycle';
-        toast('已保存 ' + cn(S.editorDate) + ' 的月经记录（同一天只记一条）');
+      case 'periodAct': {
+        const date = S.selectedDate;
+        if (date > TODAY) { toast('未来日期不能记录'); break; }
+        const kind = el.getAttribute('data-kind');
+        if (kind === 'start') {
+          if (S.marked.indexOf(date) < 0) S.marked.push(date);
+          toast('已标记 ' + cn(date) + ' 为经期起始日');
+        } else {
+          const seg = model().starts.filter(s => s <= date).pop() || date;
+          const gap = diff(seg, date);
+          if (gap > 14) { toast('间隔超过 14 天，请逐日确认后再补齐'); break; }
+          const fill = range(seg, gap + 1).filter(d => d <= TODAY);
+          const before = S.marked.length;
+          S.marked = uniq(S.marked.concat(fill));
+          toast('已标记结束，并补齐 ' + (S.marked.length - before) + ' 天（已有记录不覆盖）');
+        }
         break;
       }
+      case 'row': {
+        const key = el.getAttribute('data-key');
+        S.openRow = S.openRow === key ? '' : key;
+        render(); break;
+      }
+      case 'opt': {
+        const date = S.selectedDate;
+        if (date > TODAY) break;
+        const key = el.getAttribute('data-key'), v = el.getAttribute('data-value');
+        const f = FIELDS.find(x => x.key === key);
+        if (f.multi) {
+          const d = dayData(date);
+          if (d.symptoms.indexOf(v) >= 0) {
+            writeDay(date, x => { x.symptoms = x.symptoms.filter(y => y !== v); });
+          } else if (d.symptoms.length >= 8) { toast('症状最多选 8 项'); break; }
+          else writeDay(date, x => { x.symptoms.push(v); });
+        } else {
+          writeDay(date, x => { x[key] = x[key] === v ? '' : v; });
+        }
+        render(); break;
+      }
+      case 'done': S.openRow = ''; toast('已保存 ' + cn(S.selectedDate) + ' 的记录，同一天只记一条'); break;
     }
   });
 
   document.addEventListener('input', function (e) {
-    if (e.target.getAttribute && e.target.getAttribute('data-input') === 'note') S.form.note = e.target.value;
+    if (e.target.getAttribute && e.target.getAttribute('data-input') === 'diary') {
+      const v = e.target.value.slice(0, 500);
+      const date = S.selectedDate;
+      writeDay(date, d => { d.diary = v; });
+      const cnt = document.querySelector('[data-cnt]');
+      if (cnt) cnt.textContent = v.length + ' / 500';
+    }
   });
 
   const q = new URLSearchParams(location.search);
   ['theme','font','page','scenario'].forEach(k => { if (q.get(k)) S[k] = q.get(k); });
   if (q.get('month')) S.monthOffset = Number(q.get('month'));
+  if (q.get('date')) S.selectedDate = q.get('date');
+  if (q.get('row')) S.openRow = q.get('row');
   if (q.get('settings') === '1') S.settingsOpen = true;
-  if (q.get('editor') === '1') S.editorOpen = true;
+  if (q.get('editor') === '1') { S.page = 'cycle'; S.openRow = 'diary'; }
   render();
+  if (q.get('scroll') === 'form') scrollToForm();
 })();
 </script>
 </body>

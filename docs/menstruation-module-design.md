@@ -1,0 +1,273 @@
+# A9 月经记录模块 · 设计文档（待评审）
+
+> 建立日期：2026-11-12 · 对应台账 `docs/PROGRESS.md` A9 · 状态：**设计评审中，本轮不写任何代码**
+> 用户指示：「把记录月经的功能加上，参考美佑 app，他的那些功能抄过来，先出设计文档」。参考对象按**美柚（Meiyou，经期记录 / 女性健康管理 App）**理解，下文简称「参考 App」。
+> 解禁说明：A9 原为 ⛔（用户 2026-11-10「先不开发，留着」，见 `PROGRESS.md:17,109`），本次指示视为解禁动议。**台账状态不改**，等本设计评审通过、代码落地时再一并从 ⛔ 改起，避免「文档已改、功能未做」的状态错位。
+> 代码基线：`main` `d7de0cb`；`app/build.gradle.kts:19-20` versionCode 14 / versionName 0.6.8，最高 tag `v0.6.8`；`AppDatabase.kt:22` Room **version 3**；备份正文 `SCHEMA_VERSION = 2`（`BackupCodec.kt:37`）、加密容器 `ENCRYPTED_SCHEMA_VERSION = 3`（`:41`）。
+> 规范依据：`AGENTS.md` 1.13.0 分流 → `lang-android.md` / `discipline.md` / `commit.md`；项目事实以 `.agents/project-profile.md` 为准。设计体例沿用 `docs/intimacy-module-confirmation.md`（设计前确认单）。
+
+---
+
+## 1. 目标、约束与非目标
+
+**目标**：在现有 Local First 记录框架内，新增第 6 个记录类型 `menstruation`，做到「按天记录经期与当日体征 → 自动归并成经期段 → 推算周期与预计下次经期 → 日历可视化 → 周期概览」，并完成高敏感数据应有的隐私收敛、备份往返与测试覆盖。
+
+**项目硬约束（决定哪些功能不能抄）**，依据 `README.md:159-181`、`project-profile.md §9`、`docs/security-hardening-confirmation.md`：
+
+| 约束 | 含义 |
+| --- | --- |
+| Local First / 无服务端 | 数据只在本地 SQLCipher 加密库；`allowBackup=false`；无账号、无云同步、无社区 |
+| 网络唯一例外 | `INTERNET` 只服务于「应用内检查更新」（`AndroidManifest.xml:8-9`）。新增任何网络能力需重走安全边界评审 |
+| 数据最小化 | A10 已确立：不记录可识别第三方身份、不按类型排除备份、不在日志/异常里拼记录内容 |
+| 不升依赖 / 不加中间件 | 已发布的加密库与备份格式对兼容性极敏感，能不升 Room、不改备份格式就不动 |
+| 免责定位 | `README.md` 页脚已有免责文案；不做诊断、不给医疗结论、不宣称预测准确率 |
+
+**非目标（本模块一律不做）**：备孕 / 怀孕 / 育儿三模式、社区与内容资讯、电商返现、云账号与多设备同步、亲友共享、AI 健康建议与调理方案、拍照识别排卵试纸、蓝牙体温计与 Health Kit 接入、应用外推送通知（见 P7）。
+
+---
+
+## 2. 参考 App 功能盘点与取舍
+
+盘点来源：美柚官网功能列表、`view.seeyouyima.com/help/help_jilu.html` 官方帮助页「如何记录经期 / 心情 / 爱爱 / 体重体温 / 分析」、以及第三方软件站的功能说明（后者含营销成分，只用于补全条目，不作为字段或算法依据）。
+
+| # | 参考 App 功能 | 取舍 | 期次 | 理由 / 落点 |
+| --- | --- | --- | --- | --- |
+| 1 | 日历选日 →「大姨妈来了 / 走了」 | **抄** | M1 | 核心交互；本项目改为「按天记录 + 起止动作自动补齐中间日」，见 §5.2 |
+| 2 | 日历按天标注经期 / 预测经期 / 排卵期 / 易孕期 / 安全期 | **部分抄** | M1 只做前两项 | 排卵期/易孕期/安全期属避孕相关结论，医学可靠性有争议且本项目无医师审核，不做；v2 如要做仅作「记录参考」并强免责 |
+| 3 | 月经流量（水滴按钮，轻 / 中 / 重） | **抄** | M1 | `flow` 四档（含点滴） |
+| 4 | 痛经程度 | **抄** | M1 | `pain` 四档 |
+| 5 | 身体症状多选（腹痛、腰酸、头痛、情绪波动等） | **抄（收敛）** | M1 | 固定 12 项白名单，不开放自由输入；自定义标签推 v2（需新的持久化结构） |
+| 6 | 自定义症状标签 | 暂不抄 | M2 | 需可配置存储，会外溢到备份格式 |
+| 7 | 心情日记（表情 + 事项 + 图片） | **抄字段，不抄日记** | M1 | 只留 `mood` 枚举；不引入图片、富文本与媒体存储 |
+| 8 | 分泌物 / 宫颈黏液 | **抄** | M1 | `discharge` 五档，纯枚举，成本极低 |
+| 9 | 体重 / 体温记录与趋势图 | 暂不抄 | M2 | 数值范围 + 趋势 Canvas 是独立工作量；v1 不改变现有统计页结构 |
+| 10 | 爱爱记录与保护措施 | **不重复抄** | — | 已由 A10 `intimacy` 覆盖（`feature/intimacy/`） |
+| 11 | 周期智能预测（越记越准） | **抄机制，不抄话术** | M1 | 用可解释的中位数算法，不宣称「98% 准确率」，见 §5.1 |
+| 12 | 经期 / 排卵日提醒推送 | **不抄（v1）** | M3 | 需 `POST_NOTIFICATIONS` + WorkManager/AlarmManager，当前全仓零通知代码，且通知内容会泄露高敏感数据，须重走 C9 |
+| 13 | 健康分析报告（周期波动、症状统计、身体变化追踪） | **抄（简化）** | M1 概览 / M2 报告 | M1 只做首页周期卡上的「最近 6 个周期长度 + 常见症状」；完整报告页放 M2 |
+| 14 | 四模式切换（经期 / 备孕 / 怀孕 / 育儿） | **不抄** | — | 与「通用个人记录工具」定位不符，且孕期/育儿是另两套数据模型 |
+| 15 | 云同步 / 隐私密码 / 亲友共享 | **不抄（云）/ 已有（锁）** | — | 云同步违反 Local First；应用锁与截屏保护已有（C7 / A10） |
+| 16 | 她她圈社区、购物返现、知识资讯流 | **不抄** | — | 需账号与网络，且与本项目隐私定位冲突 |
+| 17 | 食物能不能吃、B 超解读、产检提醒 | **不抄** | — | 医疗内容，超出记录工具范围 |
+
+**一句话结论**：能抄且值得抄的是「记录 → 归并 → 预测 → 日历 → 概览」这条数据闭环（#1–#5、#7–#8、#11、#13）；其余要么是另一个产品（社区 / 电商 / 孕产），要么会破坏本项目的隐私与离线边界。
+
+---
+
+## 3. 现状核对（代码依据，非推测）
+
+| 结论 | 依据 |
+| --- | --- |
+| **核心矛盾：现有模型是「时刻点事件」，月经是「跨天区间」** | `TrackEventEntity` 存 `occurredAtEpochMillis` + `localDate` + `zoneId`，一天可多条；`RecordDetail.Generic` 只有 `Map<String,String>`（`RecordDetail.kt:23-26`）。全仓**未找到**周期区间表、周期长度、相邻记录间隔类函数（仅 `StatsAggregator.kt:88-102` 有「窗口内连续有记录天数」的 `longestStreak`） |
+| 新增类型可不动 Room 与备份格式 | `DefaultTypes.kt:70-76` 注册 → `RoomTrackRepository.kt:79-81` `insertIgnoreAll`；`EventDetailEntity` / `RecordDetailCodec` / `BackupCodec.parseDetail():366-401` 都不认具体 typeCode；`DetailSpec.kt:93` `SUPPORTED_DETAIL_TYPES` 由 `builtIn.keys` 派生 |
+| 但表现层有 8 处硬编码分派必须同步 | `LifeTrackApp.kt:158-201`（**`else -> PoopEditorDialog`，漏改会把月经记录当排便草稿落库**）、`TodayScreen.kt:194-226`（两处 `else -> onWaterRecord`）、`RecordRow.kt:45-92`、`RecordDetailPresentation.kt:90-99`、`RecordSummary.kt:38-99`、`LifeTrackTokens.kt:76-111`、`ModuleManagementScreen.kt:237-242`、`DetailSpec.kt:36-86` |
+| 字段规格只支持字符串值 | `DetailSpec.kt:18-32` validator 为 `(String) -> Boolean`；`DetailLimits`（`:105-118`）`MAX_FIELDS=16`、`MAX_VALUE_LENGTH=256`、key 需 `[a-z][a-zA-Z0-9_]*`。多选值必须自行编码，见 P8 |
+| 备份单向兼容 | `BackupCodec.kt:388-390` 未注册类型 → `UNSUPPORTED_DETAIL_TYPE` 明确拒绝；`RoomTrackRepository.kt:208-211` 恢复旧备份时按 `DEFAULT_TYPES` 补齐缺失类型行 |
+| 高敏感机制目前**硬绑 intimacy** | `ScreenCapturePolicy.kt:17-28` `Reason` 只有 `APP_LOCK` / `INTIMACY_MODULE`，判定写死 `IntimacyFields.TYPE_CODE`；`RecordDetailSheet.kt:49-55`、`RecordSummary.kt:83-84`、`IntimacyRecordItem.kt:56-60` 为 L1 收敛样板；`SettingsScreen.kt:650-667` 与 `SettingsComponents.kt:217-222` 文案硬编码「亲密关系」 |
+| 日历可复用 | `CalendarMonth.kt:51-66` 固定 42 格、`withCounts/withTypes`；`CalendarMonthView.kt:153-223` 格子已有类型图标、今日高亮、读屏汇总、点击回调；`DayRecordsSheet.kt:49-106` 当天记录弹层；DAO `observeRecordsInRange(start,end,typeCode?)`（`TrackEventDao.kt:71-82`）已支持按类型取区间 |
+| 通知能力为零 | `SettingsRepository.kt:19-24` 仅 6 个键，无提醒键；`app/build.gradle.kts:118-158` 无 `androidx.work`；Manifest 无 `POST_NOTIFICATIONS`、无 `<receiver>` / `<service>`；全仓无 Notification / AlarmManager / WorkManager 代码 |
+| 注册新类型必然踩的测试 | `DetailSpecTest.kt:59-70` 硬编码 `expected = {water, coffee, sport, intimacy}` 断言放行集合，注册后必失败；负向样例统一用 `mood`（`project-profile.md §9`），不得改成真实类型名；`ScreenCapturePolicyTest.kt:45-67` 锁定「只有 intimacy 是高敏感」与「reasons 恰为两条」 |
+| 统计口径是「按条计数」 | `StatsAggregator.kt:59-127` 以事件条数算总次数 / 日均 / 单日最高；首页次数卡、历史、月历、统计共用全部类型口径（A11）。按天记经期会直接抬高「总次数」，见 P2 |
+| 数据库为加密库 | `AppDatabase.kt:33-39` SQLCipher `SupportOpenHelperFactory`；`DatabaseEncryption.kt:48` `TABLES` 硬编码四张表用于迁移行数比对。**新增独立表会牵动这条链路** |
+
+---
+
+## 4. 必须先拍板的决策
+
+> 每个决策给推荐值与备选；推荐值即 §5 展开的方案。未拍板前不写任何代码。
+
+| 编号 | 问题 | 推荐值 | 备选 | 关键影响 |
+| --- | --- | --- | --- | --- |
+| **P1** | **数据模型**：经期是跨天区间，怎么落库 | **A：按天一条 `menstruation` 事件，周期段与预测全部由纯函数派生，不新增表、不升 Room、不改备份格式** | B：新增 `menstrual_cycle` 表存起止（Room v4 + 备份 v4 + 加密迁移比对）；C：独立子系统另起表与页面 | B 会同时改动 `AppDatabase` / `Migrations` / `schemas/4.json` / `DatabaseEncryption.TABLES` / 备份 DTO / 迁移测试，且旧版无法读新备份；C 破坏「首页 / 历史 / 月历 / 统计同口径」 |
+| **P2** | 统计口径 | **一条 = 一天，如实计入「全部」次数，不为此类型开特例；周期页另给「经期天数 / 周期长度」等专属指标**，并在 README 写清口径 | 从次数统计中排除月经；或给 `track_type.trackingMode` 引入 `DAY` 让统计按天去重 | 排除会破坏 A11 跨面板自洽；`DAY` 是新概念，外溢到 `modeLabel` 与所有聚合查询 |
+| **P3** | 隐私等级与默认启用 | **沿用 A10 的 L1：默认停用、列表只显示类型与时间、读屏一句汇总、启用期间无条件 `FLAG_SECURE`、明文导出风险文案点名**；把 `ScreenCapturePolicy` 从硬编码改成数据驱动的高敏感类型集合 | L0 不作遮蔽；L2 全遮蔽 + 强制应用锁 | 月经数据与 A10 同级敏感；L2 会改变已发布用户的全局锁行为 |
+| **P4** | v1 字段集 | **5 个枚举/列表字段 + 通用备注**：`flow` / `pain` / `symptoms` / `mood` / `discharge`，全部可空 | 极简（仅 `flow` + `pain`）；或一步到位加体重 / 体温 / 基础体温曲线 | 字段越多，编辑器与 200% 字体回归面越大；体重体温推 M2 |
+| **P5** | 预测算法与免责 | **纯 JVM `CycleCalculator` + 中位数，样本不足时明确显示「记录不足，暂不预测」；只预测经期，不做排卵日 / 易孕期 / 安全期结论；不宣称准确率，标注「仅供记录参考，不用于避孕或医疗判断」** | 抄参考 App 的「自适应算法 / 3 个周期后 98%」；或加排卵期估算 | 无法验证的准确率话术属虚假陈述；避孕相关结论有实质风险 |
+| **P6** | 界面落点 | **首页加「周期概览卡」+ 历史页月历加「经期视图」切换**，复用现有 `CalendarMonthView` 与 `DayRecordsSheet`，不动底部导航、不动统计页结构 | 新增第 5 个底部 Tab「周期」；或独立页面 | 新增 Tab 会改动导航骨架与所有页面的回归面；v1 优先复用 |
+| **P7** | 经期提醒 | **v1 不做推送**，只在首页周期卡显示「距预计下次经期 X 天」；提醒放 M3 且需重走 C9 隐私评审 | v1 就做通知（+ `POST_NOTIFICATIONS` + WorkManager） | 通知标题/内容在锁屏可见，是高敏感数据最直接的泄露面 |
+| **P8** | 症状多选编码 | **`symptoms` 单字段存 `\|` 分隔的 code 串**，validator 校验每个 token 在白名单、无重复、≤ 8 项、总长 ≤ 256 | 为每个症状各开一个布尔字段；或改 `DetailSpec` 支持 List | 现有 `fields: Map<String,String>` 不支持重复 key，也不支持 List；改规格表会外溢到备份校验 |
+| **P9** | 用户设置 | **DataStore 增 2 键**：`cycle_length_days`（默认 28，15–60）、`period_length_days`（默认 5，1–14），只作为样本不足时的回退值 / 用户覆盖；**预测结果不落库** | 完全不设，写死 28 / 5；或把预测结果存表 | 落库派生数据必然出现「记录变了、预测没变」的一致性问题 |
+
+---
+
+## 5. 推荐方案（按 P1–P9 推荐值展开）
+
+### 5.1 领域模型：周期全部派生，不落库
+
+新增纯 JVM 类 `core/model/MenstrualCycle.kt`（无 Android 依赖，可被 `testDebugUnitTest` 直接覆盖）：
+
+```text
+CycleCalculator.calculate(
+    recordedDates: Set<LocalDate>,      // 所有 menstruation 事件的 localDate，去重
+    today: LocalDate,
+    configuredCycleDays: Int,          // P9 回退值
+    configuredPeriodDays: Int,
+    sampleSize: Int = 6
+): CycleSnapshot
+
+CycleSegment(start: LocalDate, end: LocalDate, lengthDays: Int)
+CycleSnapshot(
+    segments: List<CycleSegment>,       // 连续日期归并后的经期段
+    cycleLengths: List<Int>,            // 相邻段首日之差
+    medianCycleDays: Int?,
+    medianPeriodDays: Int?,
+    currentPhase: Phase,                // IN_PERIOD(dayIndex) / BEFORE_NEXT(days) / DELAYED(days) / INSUFFICIENT
+    predictedPeriods: List<DateRange>,  // 未来最多 3 个预测经期窗口
+    sampleReliable: Boolean
+)
+```
+
+规则（全部用 `LocalDate`，不涉及时刻与时区，天然避开 `RecordTimeMapper` 的跨时区复杂度）：
+
+1. **归并**：日期升序去重，相邻差 1 天合并为一段；孤立单日也算一段；忽略未来日期。
+2. **周期长度**：相邻两段 `start` 之差；落在 `[15, 60]` 之外视为异常样本剔除，不参与中位数，但段本身保留展示。
+3. **中位数**：取最近 6 个有效样本，偶数个取中间两数均值向下取整；**有效样本 < 3 段 → `sampleReliable = false`**，用 P9 配置值并在 UI 明确标「按设定值估算」。
+4. **经期长度**：最近 6 段 `lengthDays` 的中位数，同样不足则取配置值。
+5. **预测**：`lastStart + medianCycleDays` 为下次预计开始，按 `medianPeriodDays` 展开窗口；最多给未来 3 个周期，不做无限外推。
+6. **当前阶段**：今天落在某段内 → 「经期第 N 天」；否则算与下次预计开始的天数差，为负显示「已推迟 N 天」；样本不可靠或窗口外 → 「记录暂不足，继续记录后可预测」。
+7. **不产出**：受孕概率、排卵日、安全期、健康风险提示、任何调理建议。
+
+单测清单：空集 / 单日 / 连续 5 天 / 中间漏记 1 天断段 / 跨月跨年 / 异常周期剔除 / 偶数样本中位数 / 样本不足回退 / 今天在经期中 / 已推迟 / 未来日期忽略 / 夏令时无关的 `LocalDate` 用例。
+
+### 5.2 记录写入：一条事件 = 一个经期日
+
+- 新增 `DEFAULT_MENSTRUATION_TYPE`：`code = "menstruation"`，名称「月经」，`category = "body"`，`trackingMode = "EVENT"`，`enabled = false`（P3），`sortOrder = 60`，`schemaVersion = 1`。用已有 `body` 类别可避免 `ModuleManagementScreen.categoryLabel():237-242` 显示原始英文串。
+- 「大姨妈来了 / 走了」是**写当天一条事件**的快捷动作，不是独立实体：
+  - 「来了」：当天已有同类型事件则转为编辑，否则写入；`detail` 可为 `null`（只标记，未填体征）。
+  - 「走了」：若存在最近一次「来了」且间隔 ≤ 14 天，**自动为中间缺失日期各补一条「仅标记」事件**（`detail = null`），保证经期段连续、经期天数准确；UI 明确提示「已补齐 N 天，可逐日补充流量与症状」。补齐按 `(typeCode, localDate)` 幂等，已有事件一律跳过、不覆盖已有详情；超过 14 天不自动补，要求用户确认，防止误触批量写入。
+  - 用户也可在任意一天直接打开月经编辑器逐日记录，不强制走起止动作。
+- 编辑 / 删除沿用现有链路（`saveGenericRecord` / `RecordRow` 的删除）；删除区间中间某日会打断经期段，弹窗里提示一次，不阻止操作。
+- 不做一键打卡：`MainViewModel` 的 `quickRecord()` 硬编码 `addPoopRecord`（A10 已列为非目标），本模块同样不碰。
+
+### 5.3 字段规格（`DetailSpec` 注册，零存储改动）
+
+`core/model/MenstruationFields.kt` 定义常量与 validator，编辑器与备份规格共用一处（沿用 A6 经验）。字段值统一字符串，全部可空：
+
+| key | 取值 | 校验 | 展示 |
+| --- | --- | --- | --- |
+| `flow` | `spotting` / `light` / `medium` / `heavy` | 枚举白名单 | 点滴 / 少 / 中 / 多 |
+| `pain` | `none` / `mild` / `moderate` / `severe` | 枚举白名单 | 无 / 轻 / 中 / 重 |
+| `symptoms` | `\|` 分隔 code | token ∈ 12 项白名单、无重复、≤ 8 项、串长 ≤ 256 | 腹痛、腰酸、头痛、乳房胀痛、腹胀、恶心、乏力、失眠、情绪波动、食欲变化、痤疮、头晕 |
+| `mood` | `calm` / `happy` / `sensitive` / `low` / `irritable` | 枚举白名单 | 平静 / 愉快 / 敏感 / 低落 / 易怒 |
+| `discharge` | `dry` / `sticky` / `creamy` / `watery` / `eggwhite` | 枚举白名单 | 干燥 / 黏稠 / 乳白 / 水样 / 蛋清 |
+| — | 通用备注 `TrackEventEntity.note` | 沿用共用壳 | 读屏收敛区内不拼原文 |
+
+备注之外的自由文本、伴侣/第三方身份、图片、位置一律不记。
+
+### 5.4 UI 落点
+
+**首页周期概览卡**（仅在模块启用时有数据，数据驱动）：当前阶段一句（「经期第 3 天」/「距预计下次经期 12 天」/「记录暂不足」）、本期天数、最近 6 个周期长度的文本迷你趋势、常见症状 Top 3；不可靠时显式标注「按设定值估算」。不放营销文案、不用渐变、不摆装饰图形。
+
+**历史页「经期视图」**：在现有「列表 / 月历」分段控件加第三档（沿用 B4 的 `selectable` + `fontScale > 1.3f` 抬高度经验）。复用 `CalendarMonthView`：格子在现有类型图标之外叠加经期与预测经期的底色/描边，今天高亮保留；读屏汇总句追加「经期第 N 天 / 预计经期」；点日期仍弹 `DayRecordsSheet`，并在弹层加「记录今日经期」入口。颜色全部取自 `LifeTrackTokens`，深浅色各验一次。
+
+**编辑器**：`feature/menstruation/MenstruationEditorDialog.kt` 复用 `RecordEditorDialog`（`feature/record/RecordEditorDialog.kt:66-203`）的日期 / 时间 / 时区 / 备注壳，尾随 `content` 插槽用 `ChoiceChipRow`（`feature/record/RecordChoiceFields.kt:57-79`，自带大字号分行）。症状 12 项用分组多行 chip，不用横向滚动（A7 教训）。
+
+**列表与详情**：`MenstruationRecordItem.kt` 按 L1 只显示「月经 · 日期」，编辑/删除按钮保留；`RecordDetailPresentation` 与 `RecordSummary` 加 `menstruation` 分支；`RecordDetailSheet` 的读屏收敛从硬编码 `intimacy` 改为按高敏感集合判定。
+
+**设置**：`SettingsRepository` 增 P9 两键，收在「设置 → 记录项目」的月经行二级项或「安全」旁的设置入口（具体位置实现时按 `SettingsSection` 骨架定，不新增卡片样式）；可修正「末次月经起始日」等价于跳到对应日期补记录，不单独存一份可能不一致的数据。
+
+### 5.5 隐私改造（把 A10 的一次性硬编码收口）
+
+- `ScreenCapturePolicy.kt`：把 `Reason.INTIMACY_MODULE` 扩为数据驱动 `HIGH_SENSITIVITY_TYPES = setOf(intimacy, menstruation)`，`reasons()` 按启用中的高敏感类型生成原因文案；`MainActivity.kt:46-49` 只调 `isBlocked`，无需改动。
+- `ModuleManagementScreen.kt:101-115` 的首次启用提示、`SettingsScreen.kt:412/657-658` 与 `SettingsComponents.kt:217-222` 的文案，改为遍历高敏感类型生成，避免第三次加模块又改四处。
+- `RecordDetailSheet.kt:49`、`RecordSummary.kt:84` 的收敛判定同步改为集合判定。
+- 明文导出全量包含月经记录，不按类型排除（项目红线：静默丢数据），只在风险确认文案中点名。
+- 不写日志、不进异常文本、通知为零（P7）。
+
+### 5.6 存储与兼容性
+
+| 项 | 结论 |
+| --- | --- |
+| Room | **保持 `version = 3`**，`Migrations.kt` / `app/schemas/1,2,3.json` / `DatabaseEncryption.TABLES` 全部无 diff |
+| 备份 | `SCHEMA_VERSION = 2` / `ENCRYPTED_SCHEMA_VERSION = 3` / `SUPPORTED_VERSIONS = {1,2}` / `BASE_TYPE = "poop"` / 全部 DTO **无 diff**；只在 `DetailSpecRegistry.builtIn` 注册 `menstruation` |
+| 旧备份 → 新版 | `restoreBackup():208-211` 补进一条默认停用的月经类型行，不报错 |
+| 新版备份 → 0.6.8 及更早 | 含 `menstruation` 详情的备份被旧版以 `UNSUPPORTED_DETAIL_TYPE` 明确拒绝，不静默丢数据；README 补单向兼容说明（与 A10 同口径） |
+| 覆盖安装 | `insertIgnoreAll(DEFAULT_TYPES)` 不覆盖用户已设的 `enabled` / `sortOrder`；老用户升级后该模块保持默认停用 |
+| 排便专用链路 | `BASE_TYPE` / `observeStatDetails`（写死 `'poop'`）/ 形态分布卡 / `quickRecord()` 一律不碰（A10 确认单 §2 列为 A9 耦合边界，本轮同样避开） |
+
+### 5.7 文件清单（预估，实现时按实际收敛）
+
+**新增**
+
+- `app/src/main/java/com/example/lifetrack/core/model/MenstruationFields.kt`
+- `app/src/main/java/com/example/lifetrack/core/model/MenstrualCycle.kt`（`CycleCalculator` / `CycleSnapshot`，纯 JVM）
+- `app/src/main/java/com/example/lifetrack/feature/menstruation/MenstruationEditorDialog.kt` / `MenstruationRecordItem.kt` / `PeriodCard.kt` / `PeriodCalendarView.kt`
+- `app/src/test/java/.../core/model/MenstrualCycleTest.kt`、`MenstruationFieldsTest.kt`、`core/backup/BackupMenstruationDetailTest.kt`
+- 本文档 `docs/menstruation-module-design.md`
+
+**修改**
+
+- 注册与规格：`core/database/DefaultTypes.kt`、`core/backup/DetailSpec.kt`
+- 硬编码分派：`feature/home/TodayScreen.kt`、`core/navigation/LifeTrackApp.kt`、`feature/record/RecordRow.kt`、`core/model/RecordDetailPresentation.kt`、`feature/record/RecordSummary.kt`、`core/ui/LifeTrackTokens.kt`
+- 隐私：`core/security/ScreenCapturePolicy.kt`、`feature/record/RecordDetailSheet.kt`、`feature/settings/ModuleManagementScreen.kt`、`feature/settings/SettingsScreen.kt`、`feature/settings/SettingsComponents.kt`
+- 设置与日历：`core/datastore/SettingsRepository.kt`、`feature/history/HistoryScreen.kt`、`feature/history/CalendarMonthView.kt`、`feature/history/DayRecordsSheet.kt`
+- 测试：`core/backup/DetailSpecTest.kt`（放行集合）、`core/security/ScreenCapturePolicyTest.kt`（原因集合）、`core/model/RecordDetailPresentationTest.kt`
+- 文档：`README.md`（已实现范围、统计口径、单向兼容、相关文档）、`docs/PROGRESS.md`（A9 状态）、`app/.../feature/settings/VersionHistory.kt`（实现发版时补条目，非本轮）
+
+### 5.8 测试与验收
+
+**单测**（纯 JVM，新增 ≥ 25 项）：`CycleCalculator` 12 项边界、`MenstruationFields`（含 `symptoms` 编码：空 / 单项 / 多项 / 重复 / 超 8 项 / 超长 / 非法 token）7 项、备份往返与坏文件拒绝 6 项、详情与摘要映射、`ScreenCapturePolicy` 双模块原因。既有 `DetailSpecTest:59-70` 与 `ScreenCapturePolicyTest:45-67` 按新增集合同步扩断言，**改的是样例，不放宽校验**；负向样例保持 `mood`。
+
+**验收命令**（`lang-android.md` 四层）：
+
+1. `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` 全绿；基线单测数不回退、lint 无新增 error。
+2. 版本核对：Room 仍 v3、`app/schemas/` 只有 1/2/3.json 且无 diff、备份三个版本常量与 DTO 无 diff、DAO / Repository 无 diff。
+3. 装机主路径：默认停用 → 启用 → 记「来了」→ 记「走了」自动补齐 → 逐日补流量/症状 → 周期卡与经期视图显示正确 → 编辑 / 删除 / 重启保持。
+4. 备份往返：v3 加密与 v2 明文各导一次并恢复，字段与补齐事件完整回来；坏字段（`symptoms` 含非法 token、未知字段、超长）明确拒绝且不破坏现有数据。
+5. 隐私：`FLAG_SECURE` 生效期间截图全黑（按 `profile §9` 用 `uiautomator dump` 与 `dumpsys window` 作替代证据），TalkBack 列表与详情各只一句汇总，应用锁关闭时仍遮挡，明文导出文案点名。
+6. UI：窄屏 360dp / 深色 / 200% 字体 / 宽屏各走一遍；症状 chips 首屏完整、无横向裁切；周期卡与月历格用 `heightIn` 不用固定 `height`。
+7. 兼容：0.6.8 备份恢复成功且模块保持停用；含月经的备份在旧版被明确拒绝（双版本环境具备则实测，否则单测覆盖）。
+8. 收尾：工作区只留本次改动，模拟器字号 / 分辨率 / 主题还原，无遗留后台任务。
+
+### 5.9 风险与对策
+
+| 编号 | 风险 | 缓解 |
+| --- | --- | --- |
+| W1 | 跨天区间塞进点事件模型，漏记中间日导致经期天数失真 | §5.2 起止动作自动补齐（≤14 天、幂等、不覆盖），`CycleCalculator` 明确按「连续有记录日」分段并在 UI 说明口径 |
+| W2 | 按天记事件抬高「总次数」，用户误读统计 | P2 明确口径并写进 README；周期专属指标单独呈现；不从统计里偷偷排除 |
+| W3 | `LifeTrackApp.kt:192-199` 的 `else` 落到排便编辑器，月经记录被当排便草稿落库 | 文件清单单独标出；验收覆盖「点编辑打开的是月经编辑器」 |
+| W4 | 漏改 `RecordDetailPresentation` / `RecordSummary` / `LifeTrackTokens` | 三处列入硬编码分派清单；验收逐页走详情弹窗与月历图标 |
+| W5 | 注册新类型后 `DetailSpecTest` 必然失败；误把 `menstruation` 当负向样例 | 扩放行集合断言；负向样例一律保持 `mood` / `unknown_type`（`profile §9` 已两次记录同类踩坑） |
+| W6 | 扩 `ScreenCapturePolicy` 影响 0.6.8 既有用户、或漏掉某处硬编码「亲密关系」 | 改成集合驱动后 `MainActivity` 无需改；按 §5.5 列全 6 处文案并逐处验收；`ScreenCapturePolicyTest` 同步更新 |
+| W7 | 预测被当成医疗/避孕依据 | 只做经期窗口，不做排卵/易孕/安全期；不做健康建议；页面常驻免责一句；不写准确率 |
+| W8 | 症状多选超出 `DetailLimits.MAX_VALUE_LENGTH = 256` | P8 编码 + 8 项上限 + validator 长度校验 + 单测覆盖 |
+| W9 | 引入通知导致高敏感数据出现在锁屏 | P7 v1 明确不做；M3 需重走 C9 并单独评审通知文案 |
+| W10 | 为支持周期而升 Room v4 / 备份 v4，牵动加密库迁移与旧版兼容 | P1 选 A，从设计上避免；验收第 2 条强制核对无 diff |
+| W11 | 自动补齐写入用户没主动记的事件，被理解为「造假数据」 | 补齐事件 `detail = null` 且 UI 明示「已补齐 N 天，可逐日补充」；上限 14 天、超长需确认、可逐条删除 |
+| W12 | 工作区存在其他会话的暂存改动，提交时误卷入 | 只 `git add <本文档路径>`，提交前核对 `git status`；必要时用 `git commit --only <路径>` 隔离 |
+
+### 5.10 分期
+
+| 期次 | 范围 | 退出条件 |
+| --- | --- | --- |
+| **M1（本设计对应）** | 类型注册、按天记录、起止与补齐、`CycleCalculator`、字段 5 项、周期概览卡、经期视图、L1 隐私收敛、备份往返、单测与验收 | §5.8 全部通过，README / 台账同步 |
+| **M2** | 体重 / 体温数值字段与趋势、自定义症状标签、周期健康报告页、症状频次统计、排卵日「记录参考」（强免责） | 单独出补充设计，评估是否仍不升 Room |
+| **M3（需单独评审）** | 提醒通知（`POST_NOTIFICATIONS` + WorkManager）、四模式切换 | 重走 C9 隐私评审与 Local First 边界评审；不承诺实施 |
+
+---
+
+## 6. 待确认清单
+
+> 用户拍板后，把结论回填本节，再进入编码。推荐值已写入 §5，若无异议可直接按推荐值开动。
+
+| 编号 | 问题 | 推荐值 | 需要用户特别留意的取舍 |
+| --- | --- | --- | --- |
+| V1 | P1 数据模型 | A：按天事件 + 派生周期，不升 Room | 区间段由「连续有记录日」推导，起止动作会自动补齐中间日 |
+| V2 | P2 统计口径 | 一条 = 一天，如实计入全部次数 | 首页 / 统计的「总次数」会随经期天数上升 |
+| V3 | P3 隐私与默认状态 | 默认停用 + L1 收敛 + 启用期间截屏遮挡 | 升级后需主动到「设置 → 记录项目」开启 |
+| V4 | P4 字段集 | 5 字段（流量 / 痛经 / 症状 / 心情 / 分泌物）+ 备注 | 体重体温、自定义症状推 M2 |
+| V5 | P5 预测范围 | 只预测经期，中位数，不做排卵期 / 易孕期 / 安全期 | 与参考 App 日历相比会少几种颜色标注 |
+| V6 | P6 界面落点 | 首页周期卡 + 历史页经期视图，不加新 Tab | 不新增独立「周期」底部入口 |
+| V7 | P7 提醒 | v1 不做推送 | 少了参考 App 的「提前 N 天提醒」 |
+| V8 | 功能范围 | 只抄 §2 中标「抄」的条目 | 社区 / 电商 / 云同步 / 孕产模式 / 内容资讯明确不做 |
+| V9 | 分期 | 先做 M1，M2/M3 另开 | 参考 App 的「健康分析报告」v1 只有概览，没有完整报告页 |
+| V10 | 本轮交付边界 | **只交设计文档，不改代码、不改台账、不发版** | 用户说「开动」后再进入实现 |
+
+---
+
+## 7. 参考来源
+
+- 美柚官网功能说明：https://www.meiyou.com/mobile.html 、https://meiyou.com/
+- 美柚官方帮助「如何记录经期 / 心情 / 爱爱 / 体重体温 / 分析」：http://view.seeyouyima.com/help/help_jilu.html?lang=zh
+- 第三方功能条目（用于补全盘点，含营销描述，未作为字段或算法依据）：https://www.onlinedown.net/soft/601897.htm 、https://m.pc6.com/s/1706710 、https://g.pconline.com.cn/x/200/20065576.html
+- 项目内部依据：`README.md`、`docs/PROGRESS.md`、`docs/intimacy-module-confirmation.md`、`docs/security-hardening-confirmation.md`、`.agents/project-profile.md §9`

@@ -6,7 +6,7 @@
 > 安装时已按探测结果填过初稿。还剩「未定」的，跑 `/ai-dev-standards:profile` 补齐。
 > **升级不会改这个文件**；需要按新模板重整时，手动跑同一条命令。
 >
-> 生成方式：detect-profile.sh 探测 + 用户确认（2026-11-06）。未跑通的验证项与待确认项见 §9。
+> 生成方式：detect-profile.sh 探测 + 用户确认（2026-11-06）；2026-11-12 随规范 1.13.0 迁移到新结构（规范本体在全局目录，项目侧只留本文件与两个指针），已确认值原样保留。未跑通的验证项与待确认项见 §9。
 
 ## 0. 遇到「未定」怎么办
 
@@ -35,8 +35,8 @@ languages:                         # 只填实际用到的，版本写实际值
   java: 17                         # 仅 JVM target / compileOptions 版本
 framework: Android (Jetpack Compose + Material 3)   # Room 2.8.5 + KSP、DataStore、Navigation Compose
 package_manager: gradle
-build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-09，产物 app/build/outputs/apk/debug/LifeTrack-0.4.0-debug.apk）
-test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（2026-11-09，115 项）
+build_command: ./gradlew :app:assembleDebug     # 已验证通过（2026-11-12，产物 app/build/outputs/apk/debug/LifeTrack-0.6.8-debug.apk）
+test_command: ./gradlew :app:testDebugUnitTest   # 已验证通过（2026-11-12，260 项）
 dev_command: ./gradlew :app:installDebug        # 已通过 adb install -r 实测（emulator-5554，API 37）
 ```
 
@@ -57,7 +57,7 @@ push_policy: on-request            # 只提交，push 等用户授权
 ```yaml
 deploy_target: GitHub Releases（权威）+ Gitee Releases（国内分发镜像）  # 同一份签名 APK，CI 同步附件，无服务端
 release_trigger: manual            # Actions workflow_dispatch 手动触发；版本号由 CI 自动递增（可手填覆盖）
-version_scheme: 语义化 semver       # 已发布 v0.1.0 ~ v0.6.0（versionCode 1~6）；下次由 CI 自动升到 0.6.1 / 7
+version_scheme: 语义化 semver       # 已发布 v0.1.0 ~ v0.6.8（versionCode 1~14）；下次由 CI 自动递增
 registry: none
 pages: no
 ```
@@ -68,6 +68,8 @@ pages: no
 secrets_location: GitHub Repository secrets   # 4 个签名 secret + GITEE_TOKEN（Gitee 私人令牌），见 §9
 never_commit:
   - local.properties               # 本机 SDK 路径
+  - keystore.properties            # 签名口令（.gitignore 已拦）
+  - "*.jks / *.keystore"           # 签名密钥本体（.gitignore 已拦）
   - captures/                      # 设备截图
   - "*.iml"
 internal_endpoints:
@@ -81,8 +83,8 @@ ai_scope:
   - app/src/main/java
   - app/src/main/res
 log_language: en
-verify_build: ./gradlew :app:assembleDebug       # 已验证（2026-11-09）
-verify_test: ./gradlew :app:testDebugUnitTest    # 已验证（2026-11-09，115 项全绿）
+verify_build: ./gradlew :app:assembleDebug       # 已验证（2026-11-12）
+verify_test: ./gradlew :app:testDebugUnitTest    # 已验证（2026-11-12，260 项全绿）
 verify_lint: ./gradlew :app:lintDebug            # 已验证（2026-11-09，无 error）
 verify_instrumented: ./gradlew :app:connectedDebugAndroidTest   # 已验证（2026-11-09，emulator API 37，5 项全绿）
 verify_test_policy: full
@@ -104,6 +106,8 @@ related_docs:                      # 先读这些再动手，优先级高于通�
   - docs/module-extension-confirmation.md        # 通用编辑器 / 通用详情 / 备份 v2
   - docs/water-module-confirmation.md            # 饮水模块与 Room v2
   - docs/coffee-module-confirmation.md           # 咖啡 / 茶模块
+  - docs/release-lessons.md        # 发版教训清单，发版前过一遍
+  - docs/github-release-to-gitee-sync.md         # Gitee 同步方案与附件坑表
 ```
 
 ## 8. 覆盖与例外
@@ -114,7 +118,7 @@ related_docs:                      # 先读这些再动手，优先级高于通�
 overrides:
   - 规则: lang-java.md（Java 编码规范）
     偏离: 不直接适用——项目为 Kotlin/Android，无 .java 源文件
-    理由: Kotlin/Compose 代码按 .agents/lang-android.md 与官方 Kotlin 风格执行；lang-java.md 保留但不在分流表引用
+    理由: Kotlin/Compose 代码按全局规范的 lang-android 模块与官方 Kotlin 风格执行；lang-java 模块保留但不在分流表引用
 ```
 
 ## 9. 已知的雷区

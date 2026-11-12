@@ -23,8 +23,10 @@ import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.CycleCalculator
 import com.example.lifetrack.core.model.CycleSnapshot
+import com.example.lifetrack.core.model.DateRange
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PeriodFill
+import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
@@ -46,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -57,6 +60,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /** 首页饮水卡一键记录的默认杯量（ml）。 */
 private const val QUICK_WATER_AMOUNT_ML = 250
@@ -75,6 +79,15 @@ class MainViewModel(
 
     init {
         viewModelScope.launch { repository.ensureDefaultTypes() }
+        // 进行中的经期跨天自动延续：起点或日期一变，就把 [起点..昨天] 里缺的日子补进库。
+        // 用「昨天」而不是「今天」，是为了不提前写还没过完的那一天，点「走了」时也不会留下多余记录。
+        viewModelScope.launch {
+            combine(
+                settingsRepository.ongoingPeriodStart,
+                todayDate
+            ) { startIso, today -> startIso to today }
+                .collect { (startIso, today) -> syncOngoingPeriod(startIso, today) }
+        }
     }
 
     val todayRecords: StateFlow<List<BackupRecord>> = todayDate
@@ -174,16 +187,28 @@ class MainViewModel(
             SettingsRepository.DEFAULT_PERIOD_LENGTH_DAYS
         )
 
-    /** 记录或设置一变就重算周期快照；放在 Default 线程，避免主线程聚合掉帧。 */
+    /**
+     * 进行中的经期起点（null = 当前没有）。点「大姨妈来了」写入，点「大姨妈走了」清空。
+     * 只存起点，区间 [起点..今天] 由 [PeriodOngoing.span] 派生显示，逐日落库见 [syncOngoingPeriod]。
+     */
+    val ongoingPeriodStart: StateFlow<LocalDate?> = settingsRepository.ongoingPeriodStart
+        .map { iso -> iso?.let(::parseDateOrNull) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * 记录或设置一变就重算周期快照；放在 Default 线程，避免主线程聚合掉帧。
+     * 进行中的区间按「起点到今天」并入日期集合，所以状态条、日历、简报都自动跟上，
+     * 不需要为还没过完的日子提前写记录。
+     */
     val cycleSnapshot: StateFlow<CycleSnapshot> = combine(
         periodRecords,
         todayDate,
         cycleLengthDays,
-        periodLengthDays
-    ) { records, today, cycleDays, periodDays ->
-        val dates = records.mapNotNullTo(mutableSetOf()) {
-            runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
-        }
+        periodLengthDays,
+        ongoingPeriodStart
+    ) { records, today, cycleDays, periodDays, ongoingStart ->
+        val dates = records.mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+        if (ongoingStart != null) dates += PeriodOngoing.span(ongoingStart, today)
         CycleCalculator.calculate(dates, today, cycleDays, periodDays)
     }.flowOn(Dispatchers.Default)
         .stateIn(
@@ -357,6 +382,9 @@ class MainViewModel(
 
     suspend fun restoreBackup(payload: BackupPayload) {
         withContext(Dispatchers.IO) { repository.restoreBackup(payload) }
+        // 恢复是整体替换：旧的「进行中起点」可能指向已不存在的数据，直接清掉，
+        // 让用户在新数据上自己决定要不要重新点「大姨妈来了」。
+        settingsRepository.setOngoingPeriodStart(null)
         refreshToday()
     }
 
@@ -486,19 +514,46 @@ class MainViewModel(
         }
     }
 
-    /** 「大姨妈来了」：当天没有月经事件就补一条仅标记事件，已有则不覆盖（转为下方逐行编辑）。 */
+    /**
+     * 「大姨妈来了」：写当天一条仅标记事件（已有则不动），并记下进行中的起点。
+     *
+     * 起点到今天不超过 [PeriodOngoing.MAX_AUTO_DAYS] 天时进入「自动延续」：
+     * 之后每天由 [syncOngoingPeriod] 补齐，日历整段染色，直到点「大姨妈走了」。
+     * 更早的历史日期只标当天，避免一次误触把整月染成经期。
+     */
     fun markPeriodStart(date: LocalDate) {
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
+                    val today = LocalDate.now(ZoneId.systemDefault())
                     val existing = repository.observeRecordsInRange(
                         date.toString(), date.toString(), MenstruationFields.TYPE_CODE
                     ).first().firstOrNull()
-                    if (existing == null) {
-                        repository.addRecord(periodMarkDraft(date))
-                        "已标记 ${date.monthValue}月${date.dayOfMonth}日 为经期起始日"
-                    } else {
-                        "这一天已有月经记录，可在下方逐行补充"
+                    if (existing == null) repository.addRecord(periodMarkDraft(date))
+
+                    // 前一天已经记过（用户先逐日补了几天才点「来了」）时，进行中起点取当天所在
+                    // 连续段的段首，保证状态条「第 N 天」、日历染色与点「走了」时补齐的起点一致；
+                    // 段首与今天无关时（孤立记录 / 断段），才用选中的这一天。
+                    val recentDates = repository.observeRecordsInRange(
+                        today.minusYears(3).toString(), today.toString(), MenstruationFields.TYPE_CODE
+                    ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+                    val segmentStart = CycleCalculator.segmentsOf(recentDates, today)
+                        .firstOrNull { date in DateRange(it.start, it.end) }?.start
+                        ?: date
+
+                    val ongoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    when {
+                        ongoing != null && !date.isBefore(ongoing) ->
+                            "经期进行中（第 ${ChronoUnit.DAYS.between(ongoing, today).toInt() + 1} 天），" +
+                                "点「大姨妈走了」结束这一段"
+                        ongoing != null ->
+                            "${cnDate(ongoing)} 那一段还在进行中，先点「大姨妈走了」再记新的"
+                        PeriodOngoing.canAutoContinue(date, today) -> {
+                            settingsRepository.setOngoingPeriodStart(segmentStart.toString())
+                            "经期已开始：之后每天自动标记，直到点「大姨妈走了」"
+                        }
+                        else ->
+                            "已标记 ${cnDate(date)} 为经期日（距今超过 ${PeriodOngoing.MAX_AUTO_DAYS} 天，不自动延续）"
                     }
                 }
             }
@@ -508,32 +563,68 @@ class MainViewModel(
     }
 
     /**
-     * 「大姨妈走了」：从最近一段经期首日到选中日补齐缺失日期（仅标记，不覆盖已有详情）。
+     * 「大姨妈走了」：有进行中的起点时，把 `[起点..结束日]` 全部落库（仅标记，不覆盖已有详情）并清状态；
+     * 没有进行中状态时，沿用原来的「从最近一段首日补齐」逻辑（兼容旧版本升级上来的数据）。
      * 间隔超过 [PeriodFill.MAX_GAP_DAYS] 天不自动补，返回提示要求逐日确认（设计 §5.2）。
      */
     fun markPeriodEnd(date: LocalDate) {
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val records = repository.observeRecordsInRange(
-                        date.minusYears(3).toString(), date.toString(), MenstruationFields.TYPE_CODE
-                    ).first()
                     val today = LocalDate.now(ZoneId.systemDefault())
-                    val dates = records.mapNotNullTo(mutableSetOf()) {
-                        runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
-                    }
-                    when (val plan = PeriodFill.plan(dates, date, today)) {
-                        is PeriodFill.Plan.TooFar ->
-                            "间隔超过 ${PeriodFill.MAX_GAP_DAYS} 天，请逐日确认后再补齐"
-                        is PeriodFill.Plan.Fill -> {
-                            plan.dates.forEach { repository.addRecord(periodMarkDraft(it)) }
-                            "已标记结束，并补齐 ${plan.dates.size} 天（已有记录不覆盖）"
+                    val ongoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    if (ongoing != null) {
+                        if (date.isBefore(ongoing)) {
+                            "结束日不能早于开始日（${cnDate(ongoing)}）"
+                        } else {
+                            val dates = PeriodOngoing.closingDates(ongoing, date)
+                            val recorded = repository.observeRecordsInRange(
+                                ongoing.toString(), date.toString(), MenstruationFields.TYPE_CODE
+                            ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+                            dates.filterNot { it in recorded }
+                                .forEach { repository.addRecord(periodMarkDraft(it)) }
+                            settingsRepository.setOngoingPeriodStart(null)
+                            "经期已结束：共 ${dates.size} 天（${cnDate(ongoing)} – ${cnDate(date)}）"
+                        }
+                    } else {
+                        val records = repository.observeRecordsInRange(
+                            date.minusYears(3).toString(), date.toString(), MenstruationFields.TYPE_CODE
+                        ).first()
+                        val dates = records.mapNotNullTo(mutableSetOf()) {
+                            parseDateOrNull(it.event.localDate)
+                        }
+                        when (val plan = PeriodFill.plan(dates, date, today)) {
+                            is PeriodFill.Plan.TooFar ->
+                                "间隔超过 ${PeriodFill.MAX_GAP_DAYS} 天，请逐日确认后再补齐"
+                            is PeriodFill.Plan.Fill -> {
+                                plan.dates.forEach { repository.addRecord(periodMarkDraft(it)) }
+                                "已标记结束，并补齐 ${plan.dates.size} 天（已有记录不覆盖）"
+                            }
                         }
                     }
                 }
             }
             refreshToday()
             periodFeedbackChannel.trySend(message)
+        }
+    }
+
+    /**
+     * 把进行中区间里缺的日子补进库（幂等，已有记录不覆盖）。
+     * 只补到「昨天」：今天由派生显示，避免在用户还没过完这天时就先落库。
+     * 写入走 [periodWriteMutex]，与起止动作、逐行保存串行，防止同一天重复插入。
+     */
+    private suspend fun syncOngoingPeriod(startIso: String?, today: LocalDate) {
+        val start = startIso?.let(::parseDateOrNull) ?: return
+        if (start.isAfter(today)) return
+        periodWriteMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val recorded = repository.observeRecordsInRange(
+                    start.toString(), today.toString(), MenstruationFields.TYPE_CODE
+                ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+                PeriodOngoing.pendingWrites(start, recorded, today)
+                    .forEach { repository.addRecord(periodMarkDraft(it)) }
+            }
         }
     }
 
@@ -556,6 +647,11 @@ class MainViewModel(
             detail = null
         )
     }
+
+    private fun parseDateOrNull(iso: String?): LocalDate? =
+        iso?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    private fun cnDate(date: LocalDate): String = "${date.monthValue}月${date.dayOfMonth}日"
 
     fun deleteRecord(eventId: String) {
         viewModelScope.launch {

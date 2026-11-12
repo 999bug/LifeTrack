@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-variant="v1">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>经期「来了自动延续」交互原型 · 生活记</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  :root {
+    --font: -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --canvas: #ECEEE8;
+    --surface: #FDFDFB;
+    --surface-2: #EFF2EB;
+    --border: #E3E8DE;
+    --border-strong: #D3DBCC;
+    --text: #171A16;
+    --text-2: #59625A;
+    --text-3: #7A837B;
+    --primary: #33604A;
+    --on-primary: #FFFFFF;
+    --primary-soft: #DDEBE0;
+    --period: #A35B52;
+    --period-soft: #F6EAE8;
+    --period-line: #C4807433;
+    --note-bg: #F1F4EF;
+    --shadow: 0 1px 2px rgba(23,26,22,.04), 0 12px 28px -22px rgba(23,26,22,.35);
+  }
+  html[data-theme="dark"] {
+    --canvas: #070A08;
+    --surface: #171E19;
+    --surface-2: #121814;
+    --border: #2A342C;
+    --border-strong: #37443A;
+    --text: #E9F0E9;
+    --text-2: #A8B4AA;
+    --text-3: #8B988E;
+    --primary: #A9D8B4;
+    --on-primary: #0E1510;
+    --primary-soft: #24382B;
+    --period: #E0A79B;
+    --period-soft: #33211F;
+    --period-line: #E0A79B33;
+    --note-bg: #1A231C;
+    --shadow: 0 1px 0 rgba(255,255,255,.02), 0 14px 30px -24px rgba(0,0,0,.9);
+  }
+
+  body { font-family: var(--font); background: var(--canvas); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+  .stage { max-width: 1080px; margin: 0 auto; padding: 30px 26px 52px; display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 44px; align-items: start; }
+  .eyebrow { font-size: 11px; letter-spacing: 1.3px; color: var(--text-3); margin: 0 0 12px; }
+  .notes h1 { font-size: 22px; line-height: 1.4; font-weight: 600; margin: 0 0 12px; letter-spacing: -.2px; }
+  .lede { font-size: 12.5px; line-height: 1.85; color: var(--text-2); margin: 0 0 24px; }
+  .decision { border-top: 1px solid var(--border); padding: 14px 0 0; margin: 0 0 15px; }
+  .decision h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; }
+  .decision h3 i { font-style: normal; font-size: 10px; color: var(--period); letter-spacing: .5px; }
+  .decision p { font-size: 12px; line-height: 1.75; color: var(--text-3); margin: 0; }
+  .decision code { font-size: 11px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+  .note-box { margin-top: 22px; padding: 13px 14px; background: var(--note-bg); border-left: 2px solid var(--primary); border-radius: 0 8px 8px 0; font-size: 11.5px; line-height: 1.8; color: var(--text-2); }
+
+  .demo { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); }
+  .tb-btn { font: inherit; font-size: 11.5px; color: var(--text-2); background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+  .tb-btn:hover { background: var(--surface-2); }
+  .tb-btn.strong { color: var(--period); background: var(--period-soft); }
+  .tb-sep { width: 1px; height: 18px; background: var(--border); }
+
+  .phone { width: 372px; max-width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; box-shadow: var(--shadow); padding: 16px 16px 20px; }
+  .app-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .app-head .back { width: 28px; height: 28px; display: grid; place-items: center; color: var(--text-2); font-size: 15px; }
+  .app-head h2 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
+  .app-head .set { font-size: 11.5px; color: var(--text-2); }
+
+  .status { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+  .status .badge { font-size: 11px; color: var(--period); letter-spacing: .2px; }
+  .status .line { font-size: 15px; font-weight: 600; }
+  .status .meta { font-size: 11.5px; color: var(--text-2); line-height: 1.6; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+  .cal-head { display: flex; align-items: center; margin-bottom: 8px; }
+  .cal-head .label { flex: 1; font-size: 12.5px; font-weight: 600; }
+  .cal-head button { font: inherit; font-size: 13px; color: var(--text-2); background: none; border: none; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
+  .cal-head button:disabled { opacity: .3; cursor: default; }
+  .cal-head button:not(:disabled):hover { background: var(--surface-2); }
+  .week { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 2px; }
+  .week span { font-size: 10.5px; color: var(--text-3); text-align: center; }
+  .grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cell { position: relative; min-height: 42px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-size: 12px; color: var(--text); border: 1px solid transparent; }
+  .cell.empty { cursor: default; }
+  .cell .dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
+  .cell.period { background: var(--period-soft); border-color: var(--period); }
+  .cell.period .dot { background: var(--period); }
+  .cell.predicted { border: 1px dashed var(--period); opacity: .9; }
+  .cell.predicted .dot { background: transparent; }
+  .cell.today { background: var(--primary); color: var(--on-primary); border-color: var(--primary); font-weight: 600; }
+  .cell.today .dot { background: var(--on-primary); }
+  /* 今天 + 经期中：v1 经期色实心；v2 主色实心 + 经期色环 */
+  html[data-variant="v1"] .cell.today.period { background: var(--period); color: #fff; border-color: var(--period); }
+  html[data-variant="v1"] .cell.today.period .dot { background: #fff; }
+  html[data-variant="v2"] .cell.today.period { background: var(--primary); color: var(--on-primary); border: 2px solid var(--period); }
+  .cell.selected { box-shadow: 0 0 0 2px var(--primary) inset; }
+  .cell.today.selected { box-shadow: 0 0 0 2px var(--on-primary) inset; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .legend div { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--text-3); }
+  .sw { width: 11px; height: 11px; border-radius: 3px; }
+  .sw.a { background: var(--period-soft); border: 1px solid var(--period); }
+  .sw.b { border: 1px dashed var(--period); }
+  .sw.c { background: var(--primary); }
+  .cal-tip { font-size: 10.5px; color: var(--text-3); margin-top: 8px; line-height: 1.6; }
+
+  .sel-head { display: flex; align-items: center; margin: 14px 0 10px; }
+  .sel-head .t { font-size: 12.5px; font-weight: 600; flex: 1; }
+  .sel-head .r { font-size: 11px; color: var(--text-3); }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { font: inherit; font-size: 12.5px; border-radius: 10px; padding: 10px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); background: transparent; color: var(--text); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.primary { background: var(--period); border-color: var(--period); color: #fff; }
+  .btn.accent { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .hint { font-size: 11px; color: var(--text-2); line-height: 1.7; margin-top: 8px; min-height: 34px; }
+  .hint b { color: var(--period); font-weight: 600; }
+
+  .sim { display: flex; gap: 6px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); flex-wrap: wrap; }
+  .sim button { font: inherit; font-size: 11px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; cursor: pointer; }
+  .sim button:hover { border-color: var(--border-strong); }
+  .sim .lbl { font-size: 10.5px; color: var(--text-3); align-self: center; margin-right: 2px; }
+
+  @media (max-width: 900px) {
+    .stage { grid-template-columns: 1fr; gap: 26px; }
+    .notes { order: 2; }
+    .demo { order: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="notes">
+    <p class="eyebrow">A9 经期 · 交互优化原型 v1</p>
+    <h1>点一次「来了」，之后每天自动标记，直到「走了」</h1>
+    <p class="lede">现在的问题：点「大姨妈来了」只写当天一条记录，第二天不点就断了；而且当天的格子被「今天」的主色实心盖住，点了看不出任何变化。</p>
+
+    <div class="decision">
+      <h3><i>01</i> 一次开始，自动延续</h3>
+      <p>点「来了」后记下一个进行中的起点，日历把起点到今天整段染成经期色，跨天自动接上，不需要每天点。</p>
+    </div>
+    <div class="decision">
+      <h3><i>02</i> 点「走了」才结束</h3>
+      <p>结束日以你点的那天为准，中间缺的日子一次性补齐入库；不点就一直延续，状态条一直显示「经期第 N 天」。</p>
+    </div>
+    <div class="decision">
+      <h3><i>03</i> 当天立刻有颜色反馈</h3>
+      <p>「今天 + 经期中」不再被主色吃掉：v1 用经期色实心，v2 保留今天主色 + 经期色描边。右侧可切换对比。</p>
+    </div>
+    <div class="decision">
+      <h3><i>04</i> 防止误触与忘点</h3>
+      <p>只对 14 天内的日期开启延续（更早的历史日只标记当天）；持续超过 14 天时状态条温和提示「如果已经结束，记得点走了」，不自动结束、不自动删除。</p>
+    </div>
+
+    <div class="note-box">
+      试一下：点「大姨妈来了」→ 连点三次「过一天」→ 点「大姨妈走了」。也可以先点「演示完整流程」一次看完。
+    </div>
+  </aside>
+
+  <div class="demo">
+    <div class="toolbar">
+      <button class="tb-btn strong" id="demoAll">演示完整流程</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="variantBtn">配色：v1 经期色实心</button>
+      <button class="tb-btn" id="themeBtn">切换深色</button>
+      <button class="tb-btn" id="resetBtn">重置</button>
+    </div>
+
+    <div class="phone">
+      <div class="app-head">
+        <div class="back">‹</div>
+        <h2>经期</h2>
+        <span class="set">周期设置</span>
+      </div>
+
+      <div class="status">
+        <span class="badge" id="stBadge">记录暂不足</span>
+        <span class="line" id="stLine">还没有经期记录</span>
+        <span class="meta" id="stMeta">点下面的「大姨妈来了」开始记录</span>
+      </div>
+
+      <div class="card">
+        <div class="cal-head">
+          <span class="label" id="calLabel"></span>
+          <button id="prevMonth">‹</button>
+          <button id="nextMonth">›</button>
+        </div>
+        <div class="week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="grid" id="grid"></div>
+        <div class="legend">
+          <div><span class="sw a"></span>经期中</div>
+          <div><span class="sw b"></span>预计经期</div>
+          <div><span class="sw c"></span>今天</div>
+        </div>
+        <div class="cal-tip">点任意一天，下方按钮作用于该日；未来日期不可标记。</div>
+      </div>
+
+      <div class="sel-head">
+        <span class="t" id="selTitle"></span>
+        <span class="r" id="selRight">可标记</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="btnStart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
+          大姨妈来了
+        </button>
+        <button class="btn" id="btnEnd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
+          大姨妈走了
+        </button>
+      </div>
+      <div class="hint" id="hint">起止动作会补齐中间日期，已有记录不覆盖。</div>
+
+      <div class="sim">
+        <span class="lbl">模拟（正式版由系统日期推进）</span>
+        <button id="nextDay">过一天 →</button>
+        <button id="next3">+3 天</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const MS = 86400000;
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const dayOnly = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const diffDays = (a, b) => Math.round((dayOnly(b) - dayOnly(a)) / MS); // b - a
+  const cn = d => `${d.getMonth() + 1}月${d.getDate()}日`;
+
+  const state = {
+    today: dayOnly(new Date()),
+    selected: dayOnly(new Date()),
+    ongoingStart: null,     // LocalDate | null，进行中的经期起点
+    records: new Set(),     // 已落库的经期日
+    monthOffset: 0
+  };
+
+  const el = id => document.getElementById(id);
+  const $grid = el('grid'), $hint = el('hint');
+
+  function hint(html) { $hint.innerHTML = html; }
+
+  /* ---------- 派生 ---------- */
+  // 显示用：已落库 + 进行中区间 [start, today]
+  function isPeriod(date) {
+    if (state.records.has(iso(date))) return true;
+    if (state.ongoingStart && diffDays(state.ongoingStart, date) >= 0 && diffDays(date, state.today) >= 0) return true;
+    return false;
+  }
+
+  function lastSegmentStart() {
+    const arr = [...state.records].sort();
+    if (!arr.length) return null;
+    let start = arr[arr.length - 1];
+    for (let i = arr.length - 1; i > 0; i--) {
+      if (diffDays(parseISO(arr[i - 1]), parseISO(arr[i])) === 1) start = arr[i - 1];
+      else break;
+    }
+    return parseISO(start);
+  }
+
+  function predictedDates() {
+    if (state.ongoingStart) return new Set();
+    const start = lastSegmentStart();
+    if (!start) return new Set();
+    const set = new Set();
+    const next = addDays(start, 28);
+    for (let i = 0; i < 5; i++) set.add(iso(addDays(next, i)));
+    return set;
+  }
+
+  const ongoingDayIndex = () =>
+    state.ongoingStart ? diffDays(state.ongoingStart, state.today) + 1 : 0;
+
+  /* ---------- 动作 ---------- */
+  function markStart() {
+    const sel = state.selected;
+    if (diffDays(state.today, sel) > 0) { hint('未来日期不能标记为经期。'); return; }
+    if (state.ongoingStart) { hint('经期进行中，先点「大姨妈走了」结束，再记下一次。'); return; }
+
+    const gap = diffDays(sel, state.today); // 选中日距今多少天
+    state.records.add(iso(sel));
+    if (gap > 14) {
+      state.ongoingStart = null;
+      hint(`选中日距今天 <b>${gap} 天</b>，超过 14 天，只标记这一天，不自动延续。如果这是一段历史经期，请再点结束日。`);
+    } else {
+      state.ongoingStart = sel;
+      hint('已开始记录：今天起<b>每天自动标记</b>，一直延续到你点「大姨妈走了」。中间的日子会自动补齐入库。');
+    }
+    render();
+  }
+
+  function markEnd() {
+    const end = state.selected;
+    if (diffDays(state.today, end) > 0) { hint('未来日期不能作为结束日。'); return; }
+
+    if (!state.ongoingStart) {
+      const last = lastSegmentStart();
+      if (!last) { hint('还没有进行中的经期。先点「大姨妈来了」开始，再点这里结束。'); return; }
+      const gap = diffDays(last, end);
+      if (gap > 14) { hint(`距最近一段首日已 <b>${gap} 天</b>，超过自动补齐上限，请逐日选择后补记。`); return; }
+      for (let i = 0; i <= gap; i++) state.records.add(iso(addDays(last, i)));
+      hint(`已补齐 ${gap + 1} 天（已有记录不覆盖）。`);
+      render();
+      return;
+    }
+
+    const days = diffDays(state.ongoingStart, end);
+    if (days < 0) { hint('结束日不能早于开始日。'); return; }
+    for (let i = 0; i <= days; i++) state.records.add(iso(addDays(state.ongoingStart, i)));
+    const total = days + 1;
+    state.ongoingStart = null;
+    hint(`经期已结束：共 <b>${total} 天</b>，${cn(end)} 为最后一天，中间缺的日子已补齐入库。`);
+    render();
+  }
+
+  function nextDay() {
+    if (state.ongoingStart) state.records.add(iso(state.today)); // 每天把昨天落库，今天由派生显示
+    state.today = addDays(state.today, 1);
+    state.selected = state.today;
+    if (state.ongoingStart) {
+      hint(`进入经期第 <b>${ongoingDayIndex()}</b> 天：不需要任何操作，日历已自动接上。`);
+    }
+    render();
+  }
+
+  /* ---------- 渲染 ---------- */
+  function renderStatus() {
+    const badge = el('stBadge'), line = el('stLine'), meta = el('stMeta');
+    if (state.ongoingStart) {
+      const idx = ongoingDayIndex();
+      badge.textContent = '经期中 · 自动延续';
+      line.textContent = `经期第 ${idx} 天`;
+      meta.innerHTML = `自 ${cn(state.ongoingStart)} 起 · 点「大姨妈走了」结束`
+        + (idx > 14 ? '<br>已持续超过 14 天，如果已经结束，记得点「走了」。' : '');
+      return;
+    }
+    const last = lastSegmentStart();
+    if (!last) {
+      badge.textContent = '记录暂不足';
+      line.textContent = '还没有经期记录';
+      meta.textContent = '点下面的「大姨妈来了」开始记录';
+      return;
+    }
+    const days = diffDays(state.today, addDays(last, 28)); // 距下次预计
+    badge.textContent = '按最近周期估算';
+    line.textContent = days >= 0 ? `距预计下次经期 ${days} 天` : `已推迟 ${-days} 天`;
+    meta.textContent = `本次 ${cn(last)} 起 · 下次预计 ${cn(addDays(last, 28))}`;
+  }
+
+  function renderCalendar() {
+    const base = new Date(state.today.getFullYear(), state.today.getMonth() + state.monthOffset, 1);
+    el('calLabel').textContent = `${base.getFullYear()}年${base.getMonth() + 1}月`;
+    el('nextMonth').disabled = state.monthOffset >= 6;
+    el('prevMonth').disabled = state.monthOffset <= -36;
+
+    const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const lead = (base.getDay() + 6) % 7;
+    const predicted = predictedDates();
+    let html = '';
+    for (let i = 0; i < lead; i++) html += '<div class="cell empty"></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(base.getFullYear(), base.getMonth(), day);
+      const cls = ['cell'];
+      const period = isPeriod(d);
+      if (period) cls.push('period');
+      else if (predicted.has(iso(d))) cls.push('predicted');
+      if (diffDays(d, state.today) === 0) cls.push('today');
+      if (diffDays(d, state.selected) === 0) cls.push('selected');
+      const label = `${d.getMonth() + 1}月${d.getDate()}日${period ? '，经期' : ''}`;
+      html += `<div class="${cls.join(' ')}" data-date="${iso(d)}" role="button" aria-label="${label}">${day}<span class="dot"></span></div>`;
+    }
+    $grid.innerHTML = html;
+
+    const sel = state.selected;
+    const weekday = ['周一','周二','周三','周四','周五','周六','周日'][(sel.getDay() + 6) % 7];
+    el('selTitle').textContent = `${cn(sel)} · ${weekday}${diffDays(sel, state.today) === 0 ? ' · 今天' : ''}`;
+    el('selRight').textContent = diffDays(state.today, sel) > 0 ? '只读' : '可标记';
+  }
+
+  function renderActions() {
+    const $s = el('btnStart'), $e = el('btnEnd');
+    const selInFuture = diffDays(state.today, state.selected) > 0;
+    $s.disabled = !!state.ongoingStart || selInFuture;
+    $s.classList.toggle('primary', !state.ongoingStart && !selInFuture);
+    $e.disabled = selInFuture;
+    $e.classList.toggle('accent', !!state.ongoingStart);
+  }
+
+  function render() { renderStatus(); renderCalendar(); renderActions(); }
+
+  /* ---------- 事件 ---------- */
+  $grid.addEventListener('click', e => {
+    const cell = e.target.closest('.cell[data-date]');
+    if (!cell) return;
+    state.selected = parseISO(cell.dataset.date);
+    render();
+  });
+
+  el('btnStart').addEventListener('click', markStart);
+  el('btnEnd').addEventListener('click', markEnd);
+  el('nextDay').addEventListener('click', nextDay);
+  el('next3').addEventListener('click', () => { nextDay(); nextDay(); nextDay(); });
+  el('prevMonth').addEventListener('click', () => { state.monthOffset--; renderCalendar(); });
+  el('nextMonth').addEventListener('click', () => { state.monthOffset++; renderCalendar(); });
+
+  el('resetBtn').addEventListener('click', () => {
+    state.today = dayOnly(new Date());
+    state.selected = state.today;
+    state.ongoingStart = null;
+    state.records.clear();
+    state.monthOffset = 0;
+    hint('起止动作会补齐中间日期，已有记录不覆盖。');
+    render();
+  });
+
+  el('demoAll').addEventListener('click', () => {
+    state.today = addDays(dayOnly(new Date()), -10);
+    state.selected = state.today;
+    state.ongoingStart = null;
+    state.records.clear();
+    state.monthOffset = 0;
+
+    const startDate = state.selected;
+    state.records.add(iso(startDate));
+    state.ongoingStart = startDate;
+    for (let i = 0; i < 4; i++) {
+      state.records.add(iso(state.today));              // 每天把当天补进库
+      state.today = addDays(state.today, 1);
+    }
+    const end = state.today;
+    const total = diffDays(startDate, end) + 1;
+    for (let i = 0; i < total; i++) state.records.add(iso(addDays(startDate, i)));
+    state.ongoingStart = null;
+    state.selected = end;
+    render();
+    hint(`已演示：${cn(startDate)} 点「来了」→ 自动延续 ${total} 天 → ${cn(end)} 点「走了」，共 ${total} 天全部入库。`);
+  });
+
+  el('variantBtn').addEventListener('click', () => {
+    const next = document.documentElement.dataset.variant === 'v1' ? 'v2' : 'v1';
+    document.documentElement.dataset.variant = next;
+    el('variantBtn').textContent = next === 'v1' ? '配色：v1 经期色实心' : '配色：v2 主色 + 经期环';
+  });
+
+  el('themeBtn').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    el('themeBtn').textContent = next === 'light' ? '切换深色' : '切换浅色';
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

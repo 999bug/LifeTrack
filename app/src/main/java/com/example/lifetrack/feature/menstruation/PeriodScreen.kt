@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -58,6 +60,7 @@ import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PeriodDayFormModel
 import com.example.lifetrack.core.model.PeriodField
 import com.example.lifetrack.core.model.PeriodMonth
+import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.model.Phase
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.ui.LifeTrackTokens
@@ -90,6 +93,7 @@ fun PeriodScreen(
     val enabled = types.any { it.code == MenstruationFields.TYPE_CODE && it.enabled }
     val periodRecords by viewModel.periodRecords.collectAsStateWithLifecycle()
     val snapshot by viewModel.cycleSnapshot.collectAsStateWithLifecycle()
+    val ongoingStart by viewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
     val cycleDays by viewModel.cycleLengthDays.collectAsStateWithLifecycle()
     val periodDays by viewModel.periodLengthDays.collectAsStateWithLifecycle()
 
@@ -104,9 +108,15 @@ fun PeriodScreen(
     val selectedDate = remember(selectedIso) { LocalDate.parse(selectedIso) }
     val month = remember(today, monthOffset) { PeriodMonth.of(today, monthOffset) }
 
-    val recordedDates = remember(periodRecords) {
-        periodRecords.mapNotNullTo(mutableSetOf()) {
-            runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
+    // 已落库的经期日 + 进行中区间 [起点..今天]：后者还没写进库，但日历与状态条要一起显示，
+    // 这样「点一次来了、之后每天自动接上」才成立（设计 §5.2）。
+    val recordedDates = remember(periodRecords, ongoingStart, today) {
+        val start = ongoingStart
+        buildSet {
+            periodRecords.mapNotNullTo(this) {
+                runCatching { LocalDate.parse(it.event.localDate) }.getOrNull()
+            }
+            if (start != null) addAll(PeriodOngoing.span(start, today))
         }
     }
     val predictedDates = remember(snapshot) {
@@ -180,7 +190,12 @@ fun PeriodScreen(
                 return@Column
             }
 
-            PeriodStatusBar(snapshot = snapshot, today = today, moduleColor = moduleColor)
+            PeriodStatusBar(
+                snapshot = snapshot,
+                today = today,
+                moduleColor = moduleColor,
+                ongoingStart = ongoingStart
+            )
 
             PeriodCalendarView(
                 month = month,
@@ -197,28 +212,63 @@ fun PeriodScreen(
             SelectedDayHeader(selectedDate = selectedDate, today = today, canEdit = canEdit)
 
             if (canEdit) {
+                // 未开始时「来了」是主按钮；进行中时换成「走了」收尾，避免同一天被重复开始。
+                val inPeriod = ongoingStart != null
+                val onModule = onModuleColor(moduleColor)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(onClick = { viewModel.markPeriodStart(selectedDate) }) {
-                        Icon(
-                            imageVector = LifeTrackTokens.ModuleIcons.of(MenstruationFields.TYPE_CODE),
-                            contentDescription = null,
-                            tint = moduleColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        Text("大姨妈来了")
-                    }
-                    OutlinedButton(onClick = { viewModel.markPeriodEnd(selectedDate) }) {
-                        PeriodCheck(color = moduleColor, size = 18.dp)
-                        Spacer(Modifier.size(6.dp))
-                        Text("大姨妈走了")
+                    if (inPeriod) {
+                        OutlinedButton(onClick = {}, enabled = false) {
+                            Icon(
+                                imageVector = LifeTrackTokens.ModuleIcons.of(MenstruationFields.TYPE_CODE),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.size(6.dp))
+                            Text("大姨妈来了")
+                        }
+                        Button(
+                            onClick = { viewModel.markPeriodEnd(selectedDate) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = moduleColor,
+                                contentColor = onModule
+                            )
+                        ) {
+                            PeriodCheck(color = onModule, size = 18.dp)
+                            Spacer(Modifier.size(6.dp))
+                            Text("大姨妈走了")
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.markPeriodStart(selectedDate) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = moduleColor,
+                                contentColor = onModule
+                            )
+                        ) {
+                            Icon(
+                                imageVector = LifeTrackTokens.ModuleIcons.of(MenstruationFields.TYPE_CODE),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.size(6.dp))
+                            Text("大姨妈来了")
+                        }
+                        OutlinedButton(onClick = { viewModel.markPeriodEnd(selectedDate) }) {
+                            PeriodCheck(color = moduleColor, size = 18.dp)
+                            Spacer(Modifier.size(6.dp))
+                            Text("大姨妈走了")
+                        }
                     }
                 }
                 Text(
-                    text = "起止动作补齐中间日期，已有记录不覆盖。",
+                    text = if (inPeriod) {
+                        "之后每天自动标记；结束时点「大姨妈走了」，中间缺的日子会补齐。"
+                    } else {
+                        "点一次「大姨妈来了」，之后每天自动标记，直到点「大姨妈走了」。"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -311,12 +361,16 @@ private fun SectionTitle(text: String) {
     )
 }
 
-/** 精简状态条：阶段主句 + 本期区间 / 下次预计；样本不足时降级、隐藏预测数字（设计 §5.4 ②）。 */
+/**
+ * 精简状态条：阶段主句 + 本期区间 / 下次预计；样本不足时降级、隐藏预测数字（设计 §5.4 ②）。
+ * 有进行中的起点时以它为准（「经期第 N 天」），并提示结束方式，避免用户忘了点「走了」。
+ */
 @Composable
 private fun PeriodStatusBar(
     snapshot: CycleSnapshot,
     today: LocalDate,
-    moduleColor: Color
+    moduleColor: Color,
+    ongoingStart: LocalDate?
 ) {
     val headline = when (val phase = snapshot.currentPhase) {
         is Phase.InPeriod -> "经期第 ${phase.dayIndex} 天"
@@ -324,21 +378,32 @@ private fun PeriodStatusBar(
         is Phase.Delayed -> "已推迟 ${phase.days} 天"
         Phase.Insufficient -> "记录暂不足，继续记录后可预测"
     }
-    val badge = if (snapshot.sampleReliable) {
-        "按最近 ${CycleCalculator.DEFAULT_SAMPLE_SIZE} 个周期估算"
-    } else {
-        "按设定值估算"
+    val badge = when {
+        ongoingStart != null -> "经期中 · 每天自动标记"
+        snapshot.sampleReliable -> "按最近 ${CycleCalculator.DEFAULT_SAMPLE_SIZE} 个周期估算"
+        else -> "按设定值估算"
     }
     val lastStart = snapshot.segments.lastOrNull()?.start
     val nextStart = snapshot.predictedPeriods.firstOrNull()?.start
-    val meta = if (snapshot.sampleReliable && lastStart != null) {
-        val dayIndex = ChronoUnit.DAYS.between(lastStart, today).toInt() + 1
-        buildString {
-            append("本期 ${cn(lastStart)} 起 · 第 $dayIndex 天")
-            if (nextStart != null) append(" · 下次预计 ${cn(nextStart)}")
+    val meta = when {
+        ongoingStart != null -> {
+            val dayIndex = ChronoUnit.DAYS.between(ongoingStart, today).toInt() + 1
+            buildString {
+                append("自 ${cn(ongoingStart)} 起 · 第 $dayIndex 天 · 点「大姨妈走了」结束")
+                if (dayIndex > PeriodOngoing.MAX_AUTO_DAYS) {
+                    append("\n已持续较久，如果已经结束，记得点「走了」。")
+                }
+            }
         }
-    } else {
-        "目前只有 ${snapshot.segments.size} 段记录，还不能推算周期。继续记录几个周期后会自动给出预计日期。"
+        snapshot.sampleReliable && lastStart != null -> {
+            val dayIndex = ChronoUnit.DAYS.between(lastStart, today).toInt() + 1
+            buildString {
+                append("本期 ${cn(lastStart)} 起 · 第 $dayIndex 天")
+                if (nextStart != null) append(" · 下次预计 ${cn(nextStart)}")
+            }
+        }
+        else ->
+            "目前只有 ${snapshot.segments.size} 段记录，还不能推算周期。继续记录几个周期后会自动给出预计日期。"
     }
 
     Column(
@@ -584,3 +649,10 @@ private fun symptomFrequency(records: List<BackupRecord>): List<Pair<String, Int
 }
 
 private fun cn(date: LocalDate): String = "${date.monthValue}月${date.dayOfMonth}日"
+
+/**
+ * 模块色实心控件（按钮 / 日历格）的前景色。
+ * 深色主题下模块色本身是浅色，用白字会糊成一片，所以按亮度切换到深色文字。
+ */
+internal fun onModuleColor(moduleColor: Color): Color =
+    if (moduleColor.luminance() > 0.5f) Color(0xFF171A16) else Color.White

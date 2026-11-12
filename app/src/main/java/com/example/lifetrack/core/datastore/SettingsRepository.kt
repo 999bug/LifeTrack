@@ -25,6 +25,7 @@ class SettingsRepository(private val context: Context) {
     private val lastKnownLatestVersionKey = stringPreferencesKey("last_known_latest_version")
     private val cycleLengthDaysKey = intPreferencesKey("cycle_length_days")
     private val periodLengthDaysKey = intPreferencesKey("period_length_days")
+    private val ongoingPeriodStartKey = stringPreferencesKey("ongoing_period_start")
 
     val darkTheme: Flow<Boolean> = context.settingsDataStore.data.map { preferences ->
         preferences[darkThemeKey] ?: false
@@ -96,6 +97,24 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPeriodLengthDays(days: Int) {
         context.settingsDataStore.edit { preferences ->
             preferences[periodLengthDaysKey] = days.coerceIn(PERIOD_LENGTH_RANGE)
+        }
+    }
+
+    /**
+     * 进行中的经期起点（ISO 日期）；null = 当前没有进行中的经期。
+     *
+     * 只存「起点」这一个临时状态：区间 [起点..今天] 由派生显示，落库时按天补，
+     * 所以不需要为每一天预先写记录，也不会出现「预测没更新、记录先涨」的漂移。
+     * 不进备份（备份只有记录本体，恢复后最多丢失「进行中」这一临时态）。
+     */
+    val ongoingPeriodStart: Flow<String?> = context.settingsDataStore.data.map { preferences ->
+        preferences[ongoingPeriodStartKey]
+    }
+
+    suspend fun setOngoingPeriodStart(isoDate: String?) {
+        context.settingsDataStore.edit { preferences ->
+            if (isoDate == null) preferences.remove(ongoingPeriodStartKey)
+            else preferences[ongoingPeriodStartKey] = isoDate
         }
     }
 

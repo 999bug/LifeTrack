@@ -218,13 +218,20 @@ private fun RowScope.PeriodDayCell(
         }
     }
 
-    // 今天主色实心；已记录浅底 + 实线；预测虚线；选中再叠一层主色描边。
+    // 经期中的今天用模块色实心：点「大姨妈来了」当天就能看到变化，
+    // 否则「今天」的主色实心会把经期底色完全盖掉。其余今天仍用主色实心。
+    val periodToday = isToday && isRecorded
     val container = when {
+        periodToday -> moduleColor
         isToday -> MaterialTheme.colorScheme.primary
         isRecorded -> moduleColor.copy(alpha = 0.16f)
         else -> Color.Transparent
     }
-    val contentColor = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val contentColor = when {
+        periodToday -> onModuleColor(moduleColor)
+        isToday -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     val dashed = isPredicted && !isRecorded && !isToday
 
     Box(
@@ -278,7 +285,7 @@ private fun RowScope.PeriodDayCell(
                 Box(modifier = Modifier.height(6.dp), contentAlignment = Alignment.Center) {
                     if (isRecorded) {
                         PeriodSymptomDot(
-                            color = if (isToday) MaterialTheme.colorScheme.onPrimary else moduleColor,
+                            color = if (isToday) contentColor else moduleColor,
                             size = 5.dp
                         )
                     }

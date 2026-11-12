@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A9 月经模块 · 交互原型 v2 · 生活记</title>
+<title>A9 经期子应用 · 交互原型 v3 · 生活记</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -211,6 +211,24 @@
   .toast { position: absolute; left: 50%; bottom: 88px; transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); font-size: .84em; padding: 9px 16px; border-radius: 999px; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
   .placeholder { padding: 60px 12px; text-align: center; color: var(--text-3); font-size: .92em; line-height: 1.9; }
 
+  /* 经期子应用首屏 */
+  .hero2 { background: var(--primary-soft); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+  .hero2 .big2 { font-size: 2em; font-weight: 600; line-height: 1.25; letter-spacing: -.3px; }
+  .hero2 .sub2 { font-size: .86em; color: var(--text-2); margin-top: 8px; line-height: 1.7; }
+  .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .metrics .mv { display: block; font-size: 1.18em; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metrics .ml { display: block; font-size: .74em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
+  .cta { display: block; width: 100%; background: var(--primary); color: var(--on-primary); border: none; border-radius: 12px; padding: 14px; font: inherit; font-size: 1.05em; cursor: pointer; margin-top: 14px; }
+  .cta-sub { display: flex; gap: 8px; margin-top: 8px; }
+  .cta-sub button { flex: 1; background: var(--period-soft); border: 1px solid var(--period); color: var(--text); border-radius: 10px; padding: 10px 6px; font: inherit; font-size: .88em; cursor: pointer; }
+  .topline { font-size: .78em; color: var(--text-3); margin-top: 8px; line-height: 1.6; }
+  .brief { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .brief .item { background: var(--surface-2); border-radius: 10px; padding: 10px; }
+  .brief .item b { display: block; font-size: 1.12em; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .brief .item span { display: block; font-size: .76em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
+  html[data-font="large"] .metrics, html[data-font="large"] .brief { grid-template-columns: 1fr; }
+  html[data-font="large"] .cta-sub { flex-wrap: wrap; }
+
   @media (max-width: 900px) {
     .stage { grid-template-columns: 1fr; gap: 22px; padding: 22px 16px 40px; }
     .notes { max-width: 640px; }
@@ -222,24 +240,24 @@
 <body>
 <div class="stage">
   <aside class="notes">
-    <p class="eyebrow">LIFETRACK · A9 设计原型 v2</p>
-    <h1>月经模块<br>交互原型</h1>
-    <p class="lede">按 2026-11-12 的布局诊断修正：不重设计全局布局，只加一条首页状态行和一个隐藏底导的「周期」二级页。数据为确定性 mock，跨页面自洽。</p>
+    <p class="eyebrow">LIFETRACK · A9 经期子应用 v3</p>
+    <h1>经期子应用<br>交互原型</h1>
+    <p class="lede">按 13:39 拍板：点首页「记录月经」卡直接进入一个完整的经期子应用，首屏信息架构接近参考 App，让使用者无缝使用。全局布局与历史页不动，数据仍走同一套事件表。</p>
 
     <div class="decision">
-      <h3><i>01</i> 今天页只加一行</h3>
-      <p>一句「经期第 N 天」加一个入口，不塞趋势图、不塞日历，6 个记录入口仍在首屏。模块停用时首页与 0.6.8 完全一致。</p>
+      <h3><i>01</i> 点卡直接进子应用</h3>
+      <p>首页「月经」模块卡与状态行都指向同一个「经期」页；卡片右下角由「记录」改为「打开」。快速记一条移到子应用首屏的「今天记一笔」主按钮。</p>
     </div>
     <div class="decision">
-      <h3><i>02</i> 预测归到二级页</h3>
-      <p>现有月历 <code>require(offset &lt;= 0)</code> 禁止翻到未来，历史页两态也被定义为同一份数据的两种密度。所以未来经期日历、周期趋势、设置都放进新的「周期」页。</p>
+      <h3><i>02</i> 首屏就是完整闭环</h3>
+      <p>状态大卡、今天记一笔、大姨妈来了 / 走了、可翻未来月的经期日历、本周期简报、趋势与设置依次排布。抄的是信息架构与交互，视觉沿用 LifeTrack token。</p>
     </div>
     <div class="decision">
-      <h3><i>03</i> 历史页保持不动</h3>
-      <p>原型里可切到「历史」核对：仍是列表 / 月历两态，下一月按钮在本月禁用，页面带「本页不改」角标。</p>
+      <h3><i>03</i> 边界与历史页不变</h3>
+      <p>不做账号 / 云同步 / 社区 / 电商 / 资讯 / 孕产模式 / 推送。现有月历 <code>require(offset &lt;= 0)</code> 禁止翻未来，历史页仍是列表 / 月历两态并带「本页不改」角标。</p>
     </div>
     <div class="note-box">
-      点工具栏切浅 / 深色、200% 字体、三种数据场景；点日历格子看当天状态，点「记录」打开按天记录编辑器，改周期 / 经期长度会立即重算预测日期。所有文案均为界面内文案，无营销措辞、无渐变、无外链。
+      点工具栏切浅 / 深色、200% 字体、三种数据场景；点「今天记一笔」打开按天记录编辑器，点日历中过去的日期可直接补记该天，未来日期只给只读提示；改周期 / 经期长度会立即重算预测日期。数据为确定性 mock，跨页面自洽，无外链、无渐变。
     </div>
   </aside>
 
@@ -247,7 +265,7 @@
     <div class="toolbar">
       <div class="tb-group" data-group="page">
         <button data-set="page" data-value="today" class="on">今天</button>
-        <button data-set="page" data-value="cycle">周期</button>
+        <button data-set="page" data-value="cycle">经期</button>
         <button data-set="page" data-value="history">历史</button>
       </div>
       <span class="tb-sep"></span>
@@ -272,7 +290,7 @@
     </div>
 
     <div class="device"><div class="phone" id="phone"></div></div>
-    <p class="caption">412 × 866 · 单文件原型 · 数据固定为 2026-11-12，周期长度序列 [28, 29, 28, 28, 29, 28]，中位数 28 天</p>
+    <p class="caption">412 × 866 · 单文件原型 v3 · 数据固定为 2026-11-12，周期序列 [28, 29, 28, 28, 29, 28]，中位数 28 天 · 底部导航仍为 4 项</p>
   </main>
 </div>
 
@@ -292,7 +310,8 @@
     monthOffset: 0, cycleDays: 28, periodDays: 5, overridden: false,
     settingsOpen: false, editorOpen: false, dayPop: null,
     historyMode: 'list', toast: '',
-    quick: '', form: { flow:'medium', pain:'mild', symptoms:['腹痛','腰酸'], mood:'calm', discharge:'', note:'' },
+    quick: '', editorDate: TODAY,
+    form: { flow:'medium', pain:'mild', symptoms:['腹痛','腰酸'], mood:'calm', discharge:'', note:'' },
     savedDetails: {}
   };
 
@@ -396,15 +415,15 @@
     const periodCount = recs.filter(r => r.name === '月经').length;
     const cards = mods.map(x => {
       const n = x.code === 'period' ? periodCount : x.count;
-      return '<button class="mod" style="--c:' + x.c + '" data-act="mod" data-code="' + x.code + '">' +
+      return '<button class="mod" style="--c:' + x.c + '" data-act="' + (x.code === 'period' ? 'openperiod' : 'mod') + '" data-code="' + x.code + '">' +
         '<div class="nm"><span class="dot"></span>' + x.name + '</div>' +
         '<div class="ct">今日 ' + n + ' 次</div>' +
         '<div class="sm">' + (x.sum || '&nbsp;') + '</div>' +
-        '<span class="go">记录</span></button>';
+        '<span class="go">' + (x.code === 'period' ? '打开' : '记录') + '</span></button>';
     }).join('');
 
     const status = m.enabled
-      ? '<div class="status-line" data-act="opencycle"><div class="main"><span>' + m.headline + '</span><span class="link">查看周期 →</span></div>' +
+      ? '<div class="status-line" data-act="opencycle"><div class="main"><span>' + m.headline + '</span><span class="link">打开经期 →</span></div>' +
         '<div class="src">' + m.source + '</div></div>'
       : '';
 
@@ -422,8 +441,8 @@
 
   function cyclePage(m) {
     if (!m.enabled) {
-      return '<div class="screen"><div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>周期</h2></div>' +
-        '<div class="placeholder">「月经」记录项目尚未启用。<br>到「设置 → 记录项目」开启后，这里会显示周期日历与趋势。</div></div>';
+      return '<div class="screen"><div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>经期</h2></div>' +
+        '<div class="placeholder">「月经」记录项目尚未启用。<br>到「设置 → 记录项目」开启后，点首页的「月经」卡即可进入这里。</div></div>';
     }
     const g = monthGrid(S.monthOffset);
     const daySet = new Set(m.actual);
@@ -439,12 +458,17 @@
       return '<button class="' + cls.join(' ') + '" data-act="cell" data-date="' + c.iso + '"><span class="dn tnum">' + c.day + '</span>' + mark + '</button>';
     }).join('');
 
-    const heroMeta = m.reliable
-      ? '本期 ' + cn(m.lastStart) + ' 起 · 今天是第 ' + (diff(m.lastStart, TODAY) + 1) + ' 天 · 下次预计 ' + cn(m.nextStart) + '<br>中位数周期 ' + m.cycle + ' 天 · 经期长度 ' + m.plen + ' 天'
+    const badge = m.reliable ? (S.overridden ? '按设定值估算' : '按最近 6 个周期估算') : '记录暂不足';
+    const sub2 = m.reliable
+      ? '本期 ' + cn(m.lastStart) + ' 起 · 今天是第 ' + (diff(m.lastStart, TODAY) + 1) + ' 天 · 累计 ' + m.actual.length + ' 个经期日'
       : '目前只有 1 段记录，还不能推算周期。继续记录几个周期后会自动给出预计日期。';
+    const metrics = [
+      [m.cycle + ' 天', '中位数周期'],
+      [m.reliable ? cn(m.nextStart) : '—', '下次预计'],
+      [m.plen + ' 天', '经期长度']
+    ].map(x => '<div><span class="mv tnum">' + x[0] + '</span><span class="ml">' + x[1] + '</span></div>').join('');
 
     const bars = TREND.map(v => '<div class="bar"><span class="v tnum">' + v + '</span><span class="stem" style="height:' + (18 + (v - 26) * 8) + 'px"></span></div>').join('');
-
     const cfg = S.settingsOpen
       ? '<div class="divider"></div>' +
         cfgRow('周期长度', S.cycleDays, 'cycleDays', '15', '60') +
@@ -452,11 +476,29 @@
         '<div class="tiny muted" style="margin-top:10px">手动调整后按设定值估算，页面会立即重算预测日期。</div>'
       : '';
 
+    const briefItems = m.reliable ? [
+      [median(TREND) + ' 天', '最近 6 个周期中位数'],
+      [Math.max.apply(null, TREND) + ' / ' + Math.min.apply(null, TREND) + ' 天', '最长 / 最短周期'],
+      [m.actual.length + ' 天', '累计已记录经期日'],
+      ['腹痛 4 次', '最常见症状（填写天数）']
+    ] : [
+      ['1 段', '已记录周期段'],
+      [m.actual.length + ' 天', '累计已记录经期日'],
+      ['—', '中位数周期'],
+      ['—', '常见症状']
+    ];
+    const brief = '<div class="brief">' + briefItems.map(x => '<div class="item"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>').join('') + '</div>';
+
     return '<div class="screen">' +
-      '<div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>周期</h2>' +
+      '<div class="topbar"><button class="icon-btn" data-act="back">←</button><h2>经期</h2>' +
         '<button class="link" data-act="settings">' + (S.settingsOpen ? '收起设置' : '周期设置') + '</button></div>' +
-      '<div class="hero"><span class="badge">' + (m.reliable ? (S.overridden ? '按设定值估算' : '按最近 6 个周期估算') : '记录暂不足') + '</span>' +
-        '<div class="big">' + m.headline + '</div><div class="meta">' + heroMeta + '</div></div>' +
+      '<div class="hero2"><span class="badge">' + badge + '</span>' +
+        '<div class="big2">' + m.headline + '</div><div class="sub2">' + sub2 + '</div>' +
+        '<div class="metrics">' + metrics + '</div></div>' +
+      '<button class="cta" data-act="openEditor">今天记一笔</button>' +
+      '<div class="cta-sub"><button data-act="quick" data-kind="start">大姨妈来了</button>' +
+        '<button data-act="quick" data-kind="end">大姨妈走了</button></div>' +
+      '<div class="topline">起止动作会自动补齐中间日期，已有记录不覆盖；点日历中过去的任意一天可直接补记。</div>' +
       '<div class="sec-title">经期日历</div>' +
       '<div class="card"><div class="cal-head"><span class="ttl">' + g.label + '</span><div class="cal-nav">' +
         '<button data-act="month" data-delta="-1"' + (S.monthOffset <= -2 ? ' disabled' : '') + '>←</button>' +
@@ -465,13 +507,14 @@
       '<div class="week">' + WEEK.map(w => '<span>' + w + '</span>').join('') + '</div>' +
       '<div class="cells">' + cells + '</div>' +
       '<div class="legend"><span><i class="a"></i>已记录经期</span><span><i class="p"></i>预计经期</span><span><i class="t"></i>今天</span></div>' +
-      (m.reliable ? '<div class="tiny muted" style="margin-top:10px">可向右翻到未来月份查看预计经期；点日期看当天状态。</div>' : '<div class="tiny muted" style="margin-top:10px">样本不足时不绘制预测经期，避免给出没有依据的日期。</div>') +
+      (m.reliable ? '<div class="tiny muted" style="margin-top:10px">可向右翻到未来月份看预计经期；点过去日期直接打开当天的记录编辑器。</div>' : '<div class="tiny muted" style="margin-top:10px">样本不足时不绘制预测经期，避免给出没有依据的日期。</div>') +
       '</div>' +
+      '<div class="sec-title">本周期简报</div>' +
+      '<div class="card">' + brief + '<div class="tiny muted" style="margin-top:10px">只统计已填写的内容，不推算健康结论，也不给调理建议。</div></div>' +
       '<div class="sec-title">周期长度趋势</div>' +
       '<div class="card"><div class="small muted">最近 6 个周期 · 中位数 <b class="tnum">' + median(TREND) + '</b> 天</div>' +
         '<div class="trend">' + bars + '</div><div class="trend-labels">' + ['6月','7月','8月','9月','10月','11月'].map(x => '<span>' + x + '</span>').join('') + '</div>' +
         cfg + '</div>' +
-      '<button class="btn-primary" data-act="openEditor">记录今天</button>' +
       '<p class="disclaimer">仅供记录参考，不用于避孕或医疗判断。预测基于已记录的日期推算，未记录的日子不会计入。</p>' +
       '</div>';
   }
@@ -514,7 +557,7 @@
     };
     const group = (label, key, vals) => '<div class="field-label">' + label + '</div><div class="chips">' + vals.map(v => chip(key, v[0], v[1])).join('') + '</div>';
     return '<div class="scrim" data-act="closeEditor"><div class="sheet" data-stop="1">' +
-      '<h3>记录月经</h3><div class="tiny muted">11月12日 · 周四 08:20 · 按记录所在地时区保存：Asia/Shanghai</div>' +
+      '<h3>记录月经</h3><div class="tiny muted">' + cn(S.editorDate) + ' · 周' + weekday(S.editorDate) + ' 08:20 · 按记录所在地时区保存：Asia/Shanghai</div>' +
       '<div class="quick"><button class="chip' + (S.quick === 'start' ? ' on' : '') + '" data-act="quick" data-kind="start">大姨妈来了</button>' +
         '<button class="chip' + (S.quick === 'end' ? ' on' : '') + '" data-act="quick" data-kind="end">大姨妈走了</button></div>' +
       '<div class="tiny muted" style="margin-top:7px">点「走了」会补齐上次起始日以来的中间日期，已有记录不覆盖。</div>' +
@@ -530,16 +573,12 @@
 
   function dayPop(m) {
     const date = S.dayPop;
-    const isActual = m.actual.indexOf(date) >= 0;
     const isPred = m.predicted.indexOf(date) >= 0;
-    const state = isActual ? '已记录经期' : (isPred ? '预计经期' : '无经期记录');
-    const seg = m.starts.filter(s => s <= date).pop();
-    const idx = (isActual && seg) ? diff(seg, date) + 1 : 0;
-    const canRecord = date <= TODAY;
     return '<div class="daypop"><div class="row between"><b>' + cn(date) + ' · 周' + weekday(date) + '</b><span class="link" data-act="closeDay">关闭</span></div>' +
-      '<div class="small muted" style="margin-top:8px">' + state + (isActual && idx > 0 ? ' · 第 ' + idx + ' 天' : '') + '</div>' +
-      (isPred ? '<div class="tiny muted" style="margin-top:6px">这是推算日期，不是已记录的数据。</div>' : '') +
-      (canRecord ? '<button class="btn-ghost" data-act="openEditor">记录这一天</button>' : '<div class="tiny muted" style="margin-top:10px">未来日期暂不能记录。</div>') +
+      '<div class="small muted" style="margin-top:8px">' + (isPred ? '预计经期' : '未来日期') + '</div>' +
+      '<div class="tiny muted" style="margin-top:6px">' +
+        (isPred ? '这是按已记录周期推算的日期，不是记录数据。' : '这一天还没有到来。') +
+        '未来日期暂不能记录；过去的日期点开即可直接补记。</div>' +
       '</div>';
   }
 
@@ -590,13 +629,16 @@
     switch (act) {
       case 'nav': S.page = el.getAttribute('data-page'); S.dayPop = null; render(); break;
       case 'back': S.page = 'today'; S.dayPop = null; render(); break;
-      case 'opencycle': S.page = 'cycle'; S.monthOffset = 0; render(); break;
-      case 'mod':
-        if (el.getAttribute('data-code') === 'period') S.editorOpen = true;
-        else toast('本原型聚焦月经模块，其它编辑器沿用 0.6.8');
-        render(); break;
+      case 'opencycle': case 'openperiod': S.page = 'cycle'; S.monthOffset = 0; S.dayPop = null; render(); break;
+      case 'mod': toast('本原型聚焦月经模块，其它编辑器沿用 0.6.8'); break;
       case 'month': S.monthOffset = Math.max(-2, Math.min(3, S.monthOffset + Number(el.getAttribute('data-delta')))); S.dayPop = null; render(); break;
-      case 'cell': S.dayPop = el.getAttribute('data-date'); render(); break;
+      case 'cell': {
+        const picked = el.getAttribute('data-date');
+        S.dayPop = null;
+        if (picked > TODAY) S.dayPop = picked;
+        else { S.editorDate = picked; S.editorOpen = true; }
+        render(); break;
+      }
       case 'closeDay': S.dayPop = null; render(); break;
       case 'settings': S.settingsOpen = !S.settingsOpen; render(); break;
       case 'cfg': {
@@ -608,7 +650,7 @@
       }
       case 'hview': S.historyMode = el.getAttribute('data-mode'); render(); break;
       case 'histprev': toast('历史月历可继续往前翻页，本原型只展示当月'); break;
-      case 'openEditor': S.editorOpen = true; S.dayPop = null; render(); break;
+      case 'openEditor': S.editorDate = TODAY; S.editorOpen = true; S.dayPop = null; render(); break;
       case 'closeEditor': S.editorOpen = false; render(); break;
       case 'quick': S.quick = el.getAttribute('data-kind'); toast(el.getAttribute('data-kind') === 'start' ? '已标记今天为经期起始日' : '已标记结束，并补齐中间缺失日期'); break;
       case 'chip': {
@@ -622,9 +664,9 @@
         render(); break;
       }
       case 'save': {
-        S.savedDetails[TODAY] = true;
-        S.editorOpen = false; S.page = 'today';
-        toast('已更新今天的月经记录（同一天只记一条，不重复计数）');
+        S.savedDetails[S.editorDate] = true;
+        S.editorOpen = false; S.page = 'cycle';
+        toast('已保存 ' + cn(S.editorDate) + ' 的月经记录（同一天只记一条）');
         break;
       }
     }

@@ -23,7 +23,7 @@
 
 <!-- BEGIN AUTO-SNAPSHOT -->
 > 由 `scripts/export_release_pipeline.py --write` 从 `.github/workflows/release.yml` 与 `app/build.gradle.kts` 生成，**不要手改**。
-> 输入指纹：`release.yml` = `1824dcbdacd2` · `build.gradle.kts` = `7f928c026006`。
+> 输入指纹：`release.yml` = `1824dcbdacd2` · `build.gradle.kts` = `1fd35959162f`。
 
 ### 机器可读事实
 
@@ -35,8 +35,8 @@ package_manager=gradle
 build_file=app/build.gradle.kts
 application_id=com.example.lifetrack
 min_sdk=26
-version_name=0.6.10
-version_code=16
+version_name=0.6.11
+version_code=17
 version_scheme=semver_auto_patch
 version_source=highest_vX.Y.Z_tag
 version_code_source=gradle_plus_one
@@ -62,7 +62,7 @@ mirror_tag_source=needs.release.outputs.tag
 contents_permission=write
 secrets=GITEE_TOKEN,GITHUB_TOKEN,SIGNING_KEYSTORE_BASE64,SIGNING_KEYSTORE_PASSWORD,SIGNING_KEY_ALIAS,SIGNING_KEY_PASSWORD
 workflow_sha256_12=1824dcbdacd2
-build_file_sha256_12=7f928c026006
+build_file_sha256_12=1fd35959162f
 step_count=17
 ```
 

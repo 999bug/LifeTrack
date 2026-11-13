@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.13",
+        date = "2026-11-13",
+        summary = "运动页卡片改同色系渐变；快记卡显示本周次数与上次时长，节奏格可点选；编辑器新增图标与时长快选"
+    ),
+    VersionNote(
         version = "0.6.12",
         date = "2026-11-13",
         summary = "新增运动子应用：本周节奏、三类占比与类型筛选；运动类型收敛为瑜伽、骑行、跑步"

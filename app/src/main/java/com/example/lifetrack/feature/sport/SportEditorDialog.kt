@@ -1,7 +1,14 @@
 package com.example.lifetrack.feature.sport
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -12,12 +19,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.feature.record.ChoiceChipRow
 import com.example.lifetrack.feature.record.RecordEditorDialog
+
+/** 时长快捷预设：覆盖最常见的单次时长，点一下填入，仍可手改。 */
+private val DURATION_PRESETS = listOf(15, 30, 45, 60, 90)
 
 /**
  * 运动编辑器：复用通用事件壳，只提供类型 / 时长 / 强度三个详情字段。
@@ -28,6 +39,7 @@ import com.example.lifetrack.feature.record.RecordEditorDialog
  * - 打开旧类型记录时**不预选任何 chip**，先提示再让用户显式重选，
  *   否则 `ChoiceChipRow` 会出现三个都不选中、保存后静默把类型改掉的情况。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SportEditorDialog(
     record: BackupRecord?,
@@ -92,7 +104,21 @@ fun SportEditorDialog(
         }
 
         Text("运动类型", style = MaterialTheme.typography.titleSmall)
-        ChoiceChipRow(SportFields.SPORTS, sport, SportFields::sportLabel) { sport = it }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SportFields.SPORTS.forEach { value ->
+                FilterChip(
+                    selected = sport == value,
+                    onClick = { sport = value },
+                    label = { Text(SportFields.sportLabel(value)) },
+                    leadingIcon = {
+                        Icon(sportIcon(value), contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                )
+            }
+        }
         if (sport.isEmpty()) {
             Text(
                 text = "先选一个类型，记录里才知道这是瑜伽、骑行还是跑步。",
@@ -120,6 +146,17 @@ fun SportEditorDialog(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            DURATION_PRESETS.forEach { preset ->
+                AssistChip(
+                    onClick = { duration = preset.toString() },
+                    label = { Text("$preset") }
+                )
+            }
         }
 
         Text("强度", style = MaterialTheme.typography.titleSmall)

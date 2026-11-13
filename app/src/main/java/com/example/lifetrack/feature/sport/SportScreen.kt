@@ -69,6 +69,13 @@ fun SportScreen(
     val brief = remember(sessions, today) { SportStats.brief(sessions, today) }
     val gap = remember(sessions, today) { SportStats.gapLabel(sessions.firstOrNull()?.date, today) }
     val recordById = remember(records) { records.associateBy { it.event.id } }
+    val weekBySport = remember(sessions, week) {
+        val inWeek = sessions.filter { !it.date.isBefore(week.start) && !it.date.isAfter(week.end) }
+        SportFields.SPORTS.associateWith { sport ->
+            val ofType = inWeek.filter { it.sport == sport }
+            ofType.size to ofType.sumOf { it.minutes }
+        }
+    }
 
     val moduleColor = LifeTrackTokens.ModuleColors.of(SportFields.TYPE_CODE)
     val colors = rememberStatsColors()
@@ -120,7 +127,7 @@ fun SportScreen(
             gap = gap,
             moduleColor = moduleColor,
             surface = colors.surface,
-            border = colors.border
+            stacked = stacked
         )
 
         SectionHeader(title = "记一次", hint = "选类型后填时长")
@@ -130,6 +137,8 @@ fun SportScreen(
                     SportQuickCard(
                         sport = sport,
                         last = SportStats.lastOf(sessions, sport),
+                        weekCount = weekBySport.getValue(sport).first,
+                        weekMinutes = weekBySport.getValue(sport).second,
                         accent = moduleColor,
                         stacked = true,
                         onClick = { onRecord(sport) }
@@ -142,6 +151,8 @@ fun SportScreen(
                     SportQuickCard(
                         sport = sport,
                         last = SportStats.lastOf(sessions, sport),
+                        weekCount = weekBySport.getValue(sport).first,
+                        weekMinutes = weekBySport.getValue(sport).second,
                         accent = moduleColor,
                         stacked = false,
                         onClick = { onRecord(sport) },
@@ -170,17 +181,18 @@ fun SportScreen(
                     FilterChip(
                         selected = filter == sport,
                         onClick = { filter = if (filter == sport) "" else sport },
-                        label = { Text(SportFields.sportLabel(sport)) }
+                        label = { Text(SportFields.sportLabel(sport)) },
+                        leadingIcon = {
+                            Icon(sportIcon(sport), contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
                     )
                 }
             }
         }
 
         if (sessions.isEmpty()) {
-            Text(
-                text = "这段时间还没有运动记录。点上面任意一张类型卡就能记一次，记几天后这里会出现节奏与占比。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            SportEmptyHint(
+                text = "这段时间还没有运动记录。点上面任意一张类型卡就能记一次，记几天后这里会出现节奏与占比。"
             )
         } else if (visible.isEmpty()) {
             Text(
@@ -213,7 +225,7 @@ fun SportScreen(
             }
         }
 
-        SportInsightSection(expanded = briefOpen, onToggle = { briefOpen = !briefOpen }) {
+        SportInsightSection(expanded = briefOpen, accent = moduleColor, onToggle = { briefOpen = !briefOpen }) {
             SportBriefGrid(brief = brief, stacked = stacked)
             Text(
                 text = "只统计你已记录的内容：时长按分钟累加，旧类型（步行 / 游泳 / 力量 / 其他）" +

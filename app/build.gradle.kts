@@ -16,8 +16,8 @@ android {
         applicationId = "com.example.lifetrack"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.6.11"
+        versionCode = 18
+        versionName = "0.6.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

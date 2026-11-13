@@ -1,22 +1,25 @@
 package com.example.lifetrack.feature.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,15 +42,15 @@ import java.util.Locale
 private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA)
 
 /**
- * 首页：页头 + 模块网格 + 今日时间轴。
+ * 首页（界面定稿 v2 · 批 1）：页头 + 通栏周期概览卡 + 等高模块网格 + 今日时间轴。
  *
- * 与旧版的两处关键差别：
- * 1. 顶部那张「今日记录 N 次」的大卡被去掉——它的信息已经写在每个模块卡的状态行里，
- *    以及页头副标题的「已记录 N 次 · 最近一次 HH:mm」，留着就是三处重复。
- * 2. 一排等宽的「记录饮水」按钮改成双列模块卡：状态与入口合并，整卡可点。
+ * 与旧版的三处结构差别，正是「每个框大小不一致」的根因：
+ * 1. 网格不再每行各自决定高度：所有卡片统一 [cardHeight]，行间不再出现 28dp 落差；
+ * 2. [ModuleCard] 的动作槽对所有模块常驻，同行卡片不再差 16dp；
+ * 3. 月经卡移出网格升级成通栏概览卡（它是子应用入口，不是「记一条」），
+ *    奇数模块时最后一张自动升为通栏宽卡，不再用 Spacer 留半行空白。
  *
- * 停用的模块不进入首页（2026-11-11 确认），也不做灰显占位；
- * 启用入口只在「设置 → 记录项目」。
+ * 停用的模块不进入首页，启用入口只在「设置 → 记录项目」；未启用月经时不显示概览卡。
  */
 @Composable
 fun TodayScreen(
@@ -67,18 +70,28 @@ fun TodayScreen(
 ) {
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val snapshot by viewModel.cycleSnapshot.collectAsStateWithLifecycle()
+    val ongoingStart by viewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
+    val cycleDays by viewModel.cycleLengthDays.collectAsStateWithLifecycle()
+    val periodDays by viewModel.periodLengthDays.collectAsStateWithLifecycle()
+
     val enabledTypes = trackTypes.filter { it.enabled }
+    val gridTypes = enabledTypes.filter { it.code != MenstruationFields.TYPE_CODE }
+    val periodEnabled = enabledTypes.any { it.code == MenstruationFields.TYPE_CODE }
     // 首页、历史、月历与统计默认都按「全部类型」同一口径计数，这里不再只数排便。
     val countsByType = records.groupingBy { it.event.typeCode }.eachCount()
     val typeNames = remember(enabledTypes) { enabledTypes.associate { it.code to it.name } }
-    val columns = moduleColumns(LocalDensity.current.fontScale)
+    val fontScale = LocalDensity.current.fontScale
+    val columns = moduleColumns(fontScale)
+    val cardHeight = if (fontScale > 1.3f) 176.dp else 128.dp
 
-    val today = LocalDate.now().format(todayFormatter)
+    val today = LocalDate.now()
     val lastTime = records.firstOrNull()?.let { RecordSummary.time(it) }
     val subtitle = buildString {
         append("已记录 ${records.size} 次")
         if (lastTime != null) append(" · 最近一次 $lastTime")
     }
+    val doneCount = gridTypes.count { (countsByType[it.code] ?: 0) > 0 }
 
     LazyColumn(
         contentPadding = PaddingValues(
@@ -90,24 +103,43 @@ fun TodayScreen(
         verticalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
     ) {
         item {
-            Column(modifier = Modifier.padding(bottom = 4.dp)) {
-                Text(
-                    text = today,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 0.4.sp
-                )
-                Text(
-                    text = "今天",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = today.format(todayFormatter),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.4.sp
+                    )
+                    Text(
+                        text = "今天",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                if (gridTypes.isNotEmpty()) {
+                    Text(
+                        text = "已完成 $doneCount / ${gridTypes.size}",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(bottom = 4.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
             }
         }
 
@@ -127,52 +159,100 @@ fun TodayScreen(
                 }
             }
         } else {
-            item {
-                Column {
-                    enabledTypes.chunked(columns).forEach { rowTypes ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
-                        ) {
-                            rowTypes.forEach { type ->
-                                // 月经卡是导航入口（进入经期子应用），不是「记一条」；其余模块沿用原动作。
-                                val isPeriod = type.code == MenstruationFields.TYPE_CODE
-                                ModuleCard(
-                                    type = type,
-                                    count = countsByType[type.code] ?: 0,
-                                    summary = moduleSummary(records, type),
-                                    quickAction = type.isQuickAction,
-                                    detailLabel = if (isPeriod) "打开" else null,
-                                    onRecord = {
-                                        if (isPeriod) onOpenPeriod()
-                                        else moduleAction(type, onQuickRecord, onWaterQuick, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)()
-                                    },
-                                    onDetail = {
-                                        if (isPeriod) onOpenPeriod()
-                                        else moduleDetail(type, onDetailedRecord, onWaterRecord, onCoffeeRecord, onSportRecord, onIntimacyRecord)()
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            // 最后一排只有一张卡时补一个空位，避免它被拉伸成整行宽
-                            if (rowTypes.size < columns) {
-                                repeat(columns - rowTypes.size) {
-                                    Spacer(Modifier.weight(1f))
+            if (periodEnabled) {
+                item {
+                    CycleOverviewCard(
+                        snapshot = snapshot,
+                        ongoingStart = ongoingStart,
+                        cycleDays = cycleDays,
+                        periodDays = periodDays,
+                        today = today,
+                        onClick = onOpenPeriod
+                    )
+                }
+            }
+
+            if (gridTypes.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "快速记录",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "${gridTypes.size} 个项目 · 常驻动作槽",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)) {
+                        val rows = gridTypes.chunked(columns)
+                        rows.forEach { rowTypes ->
+                            // 奇数模块时最后一张独占一行并升为通栏宽卡，不再用 Spacer 留半行空白。
+                            val wide = columns == 2 && rowTypes.size == 1 && gridTypes.size % 2 == 1
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(LifeTrackTokens.Spacing.gap)
+                            ) {
+                                rowTypes.forEach { type ->
+                                    val quick = type.isQuickAction
+                                    val record = moduleAction(
+                                        type, onQuickRecord, onWaterQuick, onWaterRecord,
+                                        onCoffeeRecord, onSportRecord, onIntimacyRecord
+                                    )
+                                    val detail = moduleDetail(
+                                        type, onDetailedRecord, onWaterRecord,
+                                        onCoffeeRecord, onSportRecord, onIntimacyRecord
+                                    )
+                                    ModuleCard(
+                                        type = type,
+                                        count = countsByType[type.code] ?: 0,
+                                        summary = moduleSummary(records, type),
+                                        actionLabel = moduleActionLabel(type, quick),
+                                        onRecord = record,
+                                        onAction = if (quick) detail else record,
+                                        cardHeight = cardHeight,
+                                        wide = wide,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (!wide && rowTypes.size < columns) {
+                                    repeat(columns - rowTypes.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
-                        Spacer(Modifier.height(LifeTrackTokens.Spacing.gap))
                     }
                 }
             }
         }
 
         item {
-            Text(
-                text = "今日记录",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = "今日记录",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${records.size} 条",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         if (records.isEmpty()) {
@@ -201,6 +281,15 @@ fun TodayScreen(
 /** 有合理默认值、可以直接落一条记录的模块。 */
 private val TrackTypeEntity.isQuickAction: Boolean
     get() = code == DEFAULT_POOP_TYPE.code || code == WaterFields.TYPE_CODE
+
+/** 动作槽文案：快捷记录型保留「详细」入口，其余直接写清楚这一下会记什么。 */
+private fun moduleActionLabel(type: TrackTypeEntity, quickAction: Boolean): String = when {
+    quickAction -> "详细"
+    type.code == CoffeeFields.TYPE_CODE -> "记一杯"
+    type.code == SportFields.TYPE_CODE -> "记一次"
+    type.code == IntimacyFields.TYPE_CODE -> "记一次"
+    else -> "记一条"
+}
 
 private fun moduleAction(
     type: TrackTypeEntity,

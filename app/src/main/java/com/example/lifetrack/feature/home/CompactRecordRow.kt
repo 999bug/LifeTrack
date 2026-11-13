@@ -1,16 +1,18 @@
 package com.example.lifetrack.feature.home
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -27,7 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,10 +39,11 @@ import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.record.RecordSummary
 
 /**
- * 首页时间轴上的一行。
+ * 首页时间轴上的一行（界面定稿 v2 · 批 1）。
  *
- * 比历史页的卡片更紧凑：时间、色点、类型、一行摘要，编辑与删除收进行尾菜单，
- * 让一屏能多看两三条。点击整行仍然打开只读详情，与历史页行为一致。
+ * 之前只是「时间 + 色点 + 文字」的紧凑列表，看不出先后顺序；现在左侧 18dp 轨道画
+ * 竖线与节点，行与行首尾相接形成连续时间轴。点击整行仍打开只读详情，编辑与删除收在
+ * 行尾菜单里；菜单按钮从 36dp 提到 44dp（批 3 · 触摸目标）。
  */
 @Composable
 internal fun CompactRecordRow(
@@ -55,71 +58,91 @@ internal fun CompactRecordRow(
     val typeName = RecordSummary.typeName(record.event.typeCode, typeNames)
     val detail = RecordSummary.detail(record)
     val dotColor = LifeTrackTokens.ModuleColors.of(record.event.typeCode)
+    val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+    val backgroundColor = MaterialTheme.colorScheme.background
     var menuOpen by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onShowDetail)
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "$time，$typeName，$detail"
-                }
-                .padding(vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .height(IntrinsicSize.Min)
         ) {
-            Text(
-                text = time,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(42.dp)
-            )
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(dotColor)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
+                    .width(18.dp)
+                    .fillMaxHeight()
+            ) {
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    val x = 6.dp.toPx()
+                    val nodeY = 20.dp.toPx()
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(x, 0f),
+                        end = Offset(x, this.size.height),
+                        strokeWidth = 1.5.dp.toPx()
+                    )
+                    drawCircle(backgroundColor, radius = 6.5.dp.toPx(), center = Offset(x, nodeY))
+                    drawCircle(dotColor, radius = 4.5.dp.toPx(), center = Offset(x, nodeY))
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 56.dp)
+                    .clickable(onClick = onShowDetail)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "$time，$typeName，$detail"
+                    }
+                    .padding(vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = typeName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = detail,
+                    text = time,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.width(42.dp)
                 )
-            }
-            Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "更多操作",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = typeName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("编辑") },
-                        onClick = {
-                            menuOpen = false
-                            onEdit()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("删除") },
-                        onClick = {
-                            menuOpen = false
-                            onDelete()
-                        }
-                    )
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "更多操作",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = {
+                                menuOpen = false
+                                onEdit()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除") },
+                            onClick = {
+                                menuOpen = false
+                                onDelete()
+                            }
+                        )
+                    }
                 }
             }
         }

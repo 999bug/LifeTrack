@@ -96,8 +96,8 @@ private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
  * - 无标题主卡：记录项目、外观——进设置最常做的两件事。
  * - 安全：中频且状态需随时可查，保持独立。
  * - 数据与备份：低频且高破坏，默认折叠；进行中 / 完成 / 失败时自动展开。
- * - 更多：只读或一次性入口（更新日志、开源许可、数据与隐私）。
- * - 页脚：版本号、免责文案与应用更新，沉到页面最后一段。
+ * - 关于：更新日志、开源许可、数据与隐私，以及应用更新（P2：不再是独立卡）。
+ * - 页脚：版本号与免责文案，沉到页面最后一段。
  *
  * 记录项目管理在独立页（[ModuleManagementScreen]）；更新状态机仍由
  * [UpdateSection] 自己维护，这里只决定它挂在哪一段。
@@ -446,6 +446,7 @@ fun SettingsScreen(
         }
 
         MoreSection(
+            viewModel = viewModel,
             availableVersion = availableVersion,
             privacyExpanded = privacyExpanded,
             onOpenChangelog = { changelogVisible = true },
@@ -453,11 +454,7 @@ fun SettingsScreen(
             onTogglePrivacy = { privacyExpanded = !privacyExpanded }
         )
 
-        // 应用更新是功能入口，紧跟「更多」分区（其最后一行是「数据与隐私」），
-        // 不能夹在页脚小字里；版本号与免责文案才是整页最底部。
-        SettingsCard {
-            UpdateSection(viewModel = viewModel)
-        }
+        // 应用更新已并入「关于」分组，页脚只剩版本号与免责文案。
         SettingsFooter(versionName = BuildConfig.VERSION_NAME)
     }
 
@@ -1201,20 +1198,21 @@ private fun ThemeModeRow(
 }
 
 /**
- * 「更多」分区的展示部分：更新日志、开源许可、数据与隐私。
+ * 「关于」分区（界面定稿 v2 · 批 3 · P2）：更新日志、开源许可、数据与隐私、应用更新。
  *
- * 只负责渲染与回调；展开态与弹窗可见性仍由 [SettingsScreen] 持有——它们和备份流程
- * 共用同一个重组作用域，先不下沉，避免把状态提升方向改掉。
+ * 「应用更新」原为一张独立卡，夹在分组与页脚之间归属不清；现在并入同一张卡的最后一行，
+ * 页面层级不增加。展开态与弹窗可见性仍由 [SettingsScreen] 持有。
  */
 @Composable
 private fun MoreSection(
+    viewModel: MainViewModel,
     availableVersion: String?,
     privacyExpanded: Boolean,
     onOpenChangelog: () -> Unit,
     onOpenLicenses: () -> Unit,
     onTogglePrivacy: () -> Unit
 ) {
-    SettingsSection(title = "更多") {
+    SettingsSection(title = "关于") {
         SettingsRow(
             title = "更新日志",
             icon = Icons.Filled.History,
@@ -1285,6 +1283,8 @@ private fun MoreSection(
                 )
             }
         }
+        SettingsDivider()
+        UpdateSection(viewModel = viewModel)
     }
 }
 

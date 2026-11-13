@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -23,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -51,9 +54,16 @@ import java.time.LocalDate
 private val WEEK_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 
 /**
- * 经期子应用的置顶日历（设计 §5.4 ②）。与历史页 [com.example.lifetrack.feature.history.CalendarMonthView]
- * 各自独立：这里用可翻未来的 [PeriodMonth]，格子按「实际经期 / 预测经期 / 今天 / 已记录 / 选中」染色，
- * 点日期只切换下方选中日、不打开弹层。格子用 `heightIn` 而非 1:1 正方形，保证 200% 字体下仍留出填写区。
+ * 经期置顶日历（界面定稿 v2 · 批 2）。
+ *
+ * 与旧版的三处差别：
+ * 1. **连续经期色带**：相邻经期日画成一条不断开的圆角带（在周 Row 的 drawBehind 上），
+ *    格子本身透明；今天不再是实心色块切断色带，改成 2dp 主色环 + 粗体数字。
+ * 2. 「回到今天」补齐翻月后的回程；三个导航按钮全部 ≥44dp。
+ * 3. 尾部无日期的空周不再渲染（模型仍返回 42 格，模型与既有测试零改动），
+ *    日历变矮后首屏能同时露出主行动按钮。
+ *
+ * 只切换下方选中日、不打开弹层；未来日期的只读状态由 [PeriodDayForm] 决定。
  */
 @Composable
 fun PeriodCalendarView(
@@ -65,14 +75,16 @@ fun PeriodCalendarView(
     canGoNext: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onToday: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = rememberStatsColors()
     val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
     val fontScale = LocalDensity.current.fontScale
-    // 比历史月历更矮的最小高度：首屏要同时露出日历与逐行填写区开头（设计 §5.8 第 6 条）。
     val minCellHeight = if (fontScale > 1.3f) 56.dp else 40.dp
+    // 模型固定 6 行，视图只裁掉尾部整周空白：11 月这类 5 行月份首屏能省下 40dp。
+    val weeks = month.cells.chunked(7).dropLastWhile { week -> week.all { it == null } }
 
     Column(
         modifier = modifier
@@ -89,7 +101,19 @@ fun PeriodCalendarView(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onPrevious, modifier = Modifier.size(32.dp)) {
+            TextButton(
+                onClick = onToday,
+                modifier = Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
+            ) {
+                Text(
+                    text = "回到今天",
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
+                )
+            }
+            IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
                 Icon(
                     Icons.Filled.ChevronLeft,
                     contentDescription = "上个月",
@@ -97,7 +121,7 @@ fun PeriodCalendarView(
                     modifier = Modifier.size(18.dp)
                 )
             }
-            IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(44.dp)) {
                 Icon(
                     Icons.Filled.ChevronRight,
                     contentDescription = "下个月",
@@ -119,8 +143,36 @@ fun PeriodCalendarView(
             }
         }
         Spacer(Modifier.height(4.dp))
-        month.cells.chunked(7).forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+        weeks.forEach { week ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val cellWidth = this.size.width / 7f
+                        val pad = 2.dp.toPx()
+                        var i = 0
+                        while (i < 7) {
+                            val date = week[i]
+                            if (date != null && date in recordedDates) {
+                                var j = i
+                                while (j + 1 < 7) {
+                                    val next = week[j + 1]
+                                    if (next == null || next !in recordedDates) break
+                                    j++
+                                }
+                                drawRoundRect(
+                                    color = moduleColor.copy(alpha = 0.16f),
+                                    topLeft = Offset(i * cellWidth + pad, pad),
+                                    size = Size((j - i + 1) * cellWidth - pad * 2, this.size.height - pad * 2),
+                                    cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
+                                )
+                                i = j + 1
+                            } else {
+                                i++
+                            }
+                        }
+                    }
+            ) {
                 week.forEach { date ->
                     PeriodDayCell(
                         date = date,
@@ -137,24 +189,23 @@ fun PeriodCalendarView(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LegendSwatch(label = "已记录经期") {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LegendSwatch(label = "经期连续色带") {
                 Box(
                     Modifier
                         .size(12.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(moduleColor.copy(alpha = 0.16f))
-                        .border(1.dp, moduleColor.copy(alpha = 0.7f), RoundedCornerShape(3.dp))
+                        .background(moduleColor.copy(alpha = 0.35f))
                 )
             }
-            LegendSwatch(label = "预计经期") {
+            LegendSwatch(label = "预计日虚线圈") {
                 Box(
                     Modifier
                         .size(12.dp)
                         .drawBehind {
                             drawRoundRect(
                                 color = moduleColor.copy(alpha = 0.85f),
-                                cornerRadius = CornerRadius(3.dp.toPx()),
+                                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()),
                                 style = Stroke(
                                     width = 1.dp.toPx(),
                                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 3f), 0f)
@@ -163,18 +214,20 @@ fun PeriodCalendarView(
                         }
                 )
             }
-            LegendSwatch(label = "今天") {
+            LegendSwatch(label = "今天 2dp 环") {
                 Box(
                     Modifier
                         .size(12.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.primary)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp))
                 )
             }
         }
         Spacer(Modifier.height(8.dp))
+        val recordedInMonth = month.cells.count { it != null && it in recordedDates }
+        val predictedInMonth = month.cells.count { it != null && it in predictedDates && it !in recordedDates }
         Text(
-            text = "可向右翻到未来月份；点任意一天，下方内容跟着切换。",
+            text = "本月已记录 $recordedInMonth 天 · 预计 $predictedInMonth 天",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -218,21 +271,19 @@ private fun RowScope.PeriodDayCell(
         }
     }
 
-    // 经期中的今天用模块色实心：点「大姨妈来了」当天就能看到变化，
-    // 否则「今天」的主色实心会把经期底色完全盖掉。其余今天仍用主色实心。
-    val periodToday = isToday && isRecorded
-    val container = when {
-        periodToday -> moduleColor
-        isToday -> MaterialTheme.colorScheme.primary
-        isRecorded -> moduleColor.copy(alpha = 0.16f)
-        else -> Color.Transparent
+    // 经期底色由周 Row 画成连续带，这里只保留选中日的淡底，不切断色带。
+    val container = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    } else {
+        Color.Transparent
     }
     val contentColor = when {
-        periodToday -> onModuleColor(moduleColor)
-        isToday -> MaterialTheme.colorScheme.onPrimary
+        isToday -> MaterialTheme.colorScheme.primary
+        isRecorded -> moduleColor
         else -> MaterialTheme.colorScheme.onSurface
     }
     val dashed = isPredicted && !isRecorded && !isToday
+    val ring = isToday || isSelected
 
     Box(
         modifier = Modifier
@@ -242,11 +293,8 @@ private fun RowScope.PeriodDayCell(
             .clip(shape)
             .background(container)
             .then(
-                when {
-                    isSelected -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
-                    isRecorded && !isToday -> Modifier.border(1.dp, moduleColor.copy(alpha = 0.7f), shape)
-                    else -> Modifier
-                }
+                // 经期不画逐格边框：连续带由周 Row 一次画完，逐格描边会把它切回三段方框。
+                if (ring) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier
             )
             .drawBehind {
                 if (dashed) {
@@ -254,7 +302,7 @@ private fun RowScope.PeriodDayCell(
                         color = moduleColor.copy(alpha = 0.85f),
                         topLeft = Offset.Zero,
                         size = this.size,
-                        cornerRadius = CornerRadius(8.dp.toPx()),
+                        cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx()),
                         style = Stroke(
                             width = 1.dp.toPx(),
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 5f), 0f)
@@ -278,6 +326,7 @@ private fun RowScope.PeriodDayCell(
                 Text(
                     text = date.dayOfMonth.toString(),
                     fontSize = if (fontScale > 1.3f) 11.sp else 12.sp,
+                    fontWeight = if (isToday) androidx.compose.ui.text.font.FontWeight.Bold else null,
                     maxLines = 1,
                     color = contentColor
                 )
@@ -285,7 +334,7 @@ private fun RowScope.PeriodDayCell(
                 Box(modifier = Modifier.height(6.dp), contentAlignment = Alignment.Center) {
                     if (isRecorded) {
                         PeriodSymptomDot(
-                            color = if (isToday) contentColor else moduleColor,
+                            color = moduleColor,
                             size = 5.dp
                         )
                     }

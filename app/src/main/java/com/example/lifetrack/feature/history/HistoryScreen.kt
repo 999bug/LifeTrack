@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -94,7 +95,10 @@ fun HistoryScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = { showRangePicker = true }) {
+                TextButton(
+                    onClick = { showRangePicker = true },
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
                     Icon(Icons.Filled.FilterList, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
                     Text("筛选")
                 }
@@ -130,7 +134,10 @@ fun HistoryScreen(
                     modifier = Modifier.weight(1f)
                 )
                 if (query.filtered) {
-                    TextButton(onClick = viewModel::clearHistoryFilter) { Text("清除筛选") }
+                    TextButton(
+                        onClick = viewModel::clearHistoryFilter,
+                        modifier = Modifier.heightIn(min = 44.dp)
+                    ) { Text("清除筛选") }
                 }
             }
         }

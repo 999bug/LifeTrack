@@ -230,6 +230,24 @@ class MainViewModel(
     /** 串行化经期写入：逐行即点即存与起止补齐可能并发，避免同一天重复落库。 */
     private val periodWriteMutex = Mutex()
 
+    /**
+     * 经期起止动作的「撤销上一步」（界面定稿 v2 · 批 2）。
+     *
+     * 只记住**本次动作自己新增的事件 id** 与动作前的进行中起点：撤销时精确删除这些
+     * 仅标记记录、恢复起点，绝不按日期范围扫库，避免误删用户填过详情 / 备注的记录。
+     * 状态只存在内存里，重进应用后可撤销状态自然消失（不落库、不跨会话承诺）。
+     */
+    private data class PeriodActionUndo(
+        val addedEventIds: List<String>,
+        val previousOngoingStart: LocalDate?,
+        val label: String
+    )
+
+    private val lastPeriodAction = MutableStateFlow<PeriodActionUndo?>(null)
+    val canUndoPeriodAction: StateFlow<Boolean> = lastPeriodAction
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     /** 统计口径：null = 全部类型。统计页顶部的类型筛选直接写这里。 */
     private val statsTypeFilter = MutableStateFlow<String?>(null)
     val statsScope: StateFlow<String?> = statsTypeFilter.asStateFlow()
@@ -526,10 +544,11 @@ class MainViewModel(
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = LocalDate.now(ZoneId.systemDefault())
+                    val addedEventIds = mutableListOf<String>()
                     val existing = repository.observeRecordsInRange(
                         date.toString(), date.toString(), MenstruationFields.TYPE_CODE
                     ).first().firstOrNull()
-                    if (existing == null) repository.addRecord(periodMarkDraft(date))
+                    if (existing == null) addedEventIds += repository.addRecord(periodMarkDraft(date))
 
                     // 前一天已经记过（用户先逐日补了几天才点「来了」）时，进行中起点取当天所在
                     // 连续段的段首，保证状态条「第 N 天」、日历染色与点「走了」时补齐的起点一致；
@@ -541,19 +560,26 @@ class MainViewModel(
                         .firstOrNull { date in DateRange(it.start, it.end) }?.start
                         ?: date
 
-                    val ongoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    val previousOngoingStart = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
                     when {
-                        ongoing != null && !date.isBefore(ongoing) ->
-                            "经期进行中（第 ${ChronoUnit.DAYS.between(ongoing, today).toInt() + 1} 天），" +
+                        previousOngoingStart != null && !date.isBefore(previousOngoingStart) ->
+                            "经期进行中（第 ${ChronoUnit.DAYS.between(previousOngoingStart, today).toInt() + 1} 天），" +
                                 "点「大姨妈走了」结束这一段"
-                        ongoing != null ->
-                            "${cnDate(ongoing)} 那一段还在进行中，先点「大姨妈走了」再记新的"
+                        previousOngoingStart != null ->
+                            "${cnDate(previousOngoingStart)} 那一段还在进行中，先点「大姨妈走了」再记新的"
                         PeriodOngoing.canAutoContinue(date, today) -> {
                             settingsRepository.setOngoingPeriodStart(segmentStart.toString())
+                            lastPeriodAction.value = PeriodActionUndo(
+                                addedEventIds, previousOngoingStart, "开始经期 ${cnDate(date)}"
+                            )
                             "经期已开始：之后每天自动标记，直到点「大姨妈走了」"
                         }
-                        else ->
+                        else -> {
+                            lastPeriodAction.value = PeriodActionUndo(
+                                addedEventIds, previousOngoingStart, "标记 ${cnDate(date)} 为经期日"
+                            )
                             "已标记 ${cnDate(date)} 为经期日（距今超过 ${PeriodOngoing.MAX_AUTO_DAYS} 天，不自动延续）"
+                        }
                     }
                 }
             }
@@ -572,19 +598,23 @@ class MainViewModel(
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = LocalDate.now(ZoneId.systemDefault())
-                    val ongoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
-                    if (ongoing != null) {
-                        if (date.isBefore(ongoing)) {
-                            "结束日不能早于开始日（${cnDate(ongoing)}）"
+                    val addedEventIds = mutableListOf<String>()
+                    val previousOngoingStart = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    if (previousOngoingStart != null) {
+                        if (date.isBefore(previousOngoingStart)) {
+                            "结束日不能早于开始日（${cnDate(previousOngoingStart)}）"
                         } else {
-                            val dates = PeriodOngoing.closingDates(ongoing, date)
+                            val dates = PeriodOngoing.closingDates(previousOngoingStart, date)
                             val recorded = repository.observeRecordsInRange(
-                                ongoing.toString(), date.toString(), MenstruationFields.TYPE_CODE
+                                previousOngoingStart.toString(), date.toString(), MenstruationFields.TYPE_CODE
                             ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
                             dates.filterNot { it in recorded }
-                                .forEach { repository.addRecord(periodMarkDraft(it)) }
+                                .forEach { addedEventIds += repository.addRecord(periodMarkDraft(it)) }
                             settingsRepository.setOngoingPeriodStart(null)
-                            "经期已结束：共 ${dates.size} 天（${cnDate(ongoing)} – ${cnDate(date)}）"
+                            lastPeriodAction.value = PeriodActionUndo(
+                                addedEventIds, previousOngoingStart, "结束这一段经期（${cnDate(date)}）"
+                            )
+                            "经期已结束：共 ${dates.size} 天（${cnDate(previousOngoingStart)} – ${cnDate(date)}）"
                         }
                     } else {
                         val records = repository.observeRecordsInRange(
@@ -597,7 +627,10 @@ class MainViewModel(
                             is PeriodFill.Plan.TooFar ->
                                 "间隔超过 ${PeriodFill.MAX_GAP_DAYS} 天，请逐日确认后再补齐"
                             is PeriodFill.Plan.Fill -> {
-                                plan.dates.forEach { repository.addRecord(periodMarkDraft(it)) }
+                                plan.dates.forEach { addedEventIds += repository.addRecord(periodMarkDraft(it)) }
+                                lastPeriodAction.value = PeriodActionUndo(
+                                    addedEventIds, null, "补齐 ${plan.dates.size} 天经期记录"
+                                )
                                 "已标记结束，并补齐 ${plan.dates.size} 天（已有记录不覆盖）"
                             }
                         }
@@ -634,6 +667,67 @@ class MainViewModel(
 
     fun setPeriodLengthDays(days: Int) {
         viewModelScope.launch { settingsRepository.setPeriodLengthDays(days) }
+    }
+
+    /**
+     * 撤销最近一次起止动作（界面定稿 v2 · 批 2 的「撤销上一步」）。
+     *
+     * 只删除该动作自己新增的仅标记事件、恢复动作前的进行中起点；
+     * 用户填过详情 / 备注的记录从不在 [PeriodActionUndo.addedEventIds] 里，因此不会被碰。
+     */
+    fun undoLastPeriodAction() {
+        viewModelScope.launch {
+            val action = lastPeriodAction.value ?: return@launch
+            lastPeriodAction.value = null
+            periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    action.addedEventIds.forEach { id ->
+                        runCatching { repository.deletePoopRecord(id) }
+                    }
+                    settingsRepository.setOngoingPeriodStart(action.previousOngoingStart?.toString())
+                }
+            }
+            refreshToday()
+            periodFeedbackChannel.trySend("已撤销：${action.label}")
+        }
+    }
+
+    /**
+     * 「改开始日期」：把进行中的经期起点改到用户选的那天。
+     *
+     * 新起点晚于旧起点时，清掉被移出区间的**仅标记**日子（自动补齐出来的那些），
+     * 用户手写过详情或备注的记录一律保留；新起点早于旧起点时不删任何记录，
+     * 之后由 [syncOngoingPeriod] 自动补齐。改完仍可「撤销上一步」回到旧起点。
+     */
+    fun changePeriodStart(date: LocalDate) {
+        viewModelScope.launch {
+            val message = periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val today = LocalDate.now(ZoneId.systemDefault())
+                    if (date.isAfter(today)) return@withContext "开始日期不能晚于今天"
+                    val previous = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    val addedEventIds = mutableListOf<String>()
+
+                    if (previous != null && date.isAfter(previous)) {
+                        val stale = repository.observeRecordsInRange(
+                            previous.toString(), date.minusDays(1).toString(), MenstruationFields.TYPE_CODE
+                        ).first().filter { it.detail == null && it.event.note.isBlank() }
+                        stale.forEach { repository.deletePoopRecord(it.event.id) }
+                    }
+                    val existing = repository.observeRecordsInRange(
+                        date.toString(), date.toString(), MenstruationFields.TYPE_CODE
+                    ).first().firstOrNull()
+                    if (existing == null) addedEventIds += repository.addRecord(periodMarkDraft(date))
+                    settingsRepository.setOngoingPeriodStart(date.toString())
+                    lastPeriodAction.value = PeriodActionUndo(
+                        addedEventIds, previous, "开始日期改为 ${cnDate(date)}"
+                    )
+                    "开始日期已改为 ${cnDate(date)}"
+                }
+            }
+            refreshToday()
+            periodFeedbackChannel.trySend(message)
+        }
     }
 
     /** 仅标记事件：detail = null、note 空，时刻取当天正午避开夏令时边界。 */

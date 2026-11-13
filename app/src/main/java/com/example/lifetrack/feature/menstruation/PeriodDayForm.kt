@@ -14,12 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,10 +31,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PeriodDayFormModel
 import com.example.lifetrack.core.model.PeriodField
@@ -41,13 +47,15 @@ import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.statistics.CardShape
 
 /**
- * 经期子应用的逐行填写区（设计 §5.4 ④ / §5.8）。一行一字段，顺序固定为
- * 流量 / 痛经 / 症状 / 心情 / 分泌物 / 日记；点行展开、同一时刻只展开一行，
- * 选项与已填值共用 [PeriodDayIcons] 的同一套自绘图示。选中即保存、再点可取消，
- * 由调用方把每次变更落库；未来日期整块只读，不给可填控件、不编造记录。
+ * 经期逐行填写区（界面定稿 v2 · 批 2）。
  *
- * 本 composable 不持有可变状态：全部读写都经 [PeriodDayFormModel] 与回调，
- * 滚动位置由外层 `verticalScroll` 的 `rememberScrollState` 保持，点选项不会跳回顶部。
+ * 一行一字段，顺序固定为 流量 / 痛经 / 症状 / 心情 / 分泌物 / 日记；点行展开、
+ * 同一时刻只展开一行，选中即保存、再点可取消。与旧版的两处关键差别：
+ * 1. 5 类字段各用一套**形状不同**的图示（液滴 / 脉冲波纹 / 点阵 / 表情 / 横条），
+ *    不再共用同一组递增竖条；选项与已填值走同一个 [PeriodFieldGlyph]。
+ * 2. 顶部常驻「图形化值预览 + 已填 N / 6」：不展开也能看出今天记了什么、还差几项。
+ *
+ * 本 composable 不持有可变状态：全部读写都经 [PeriodDayFormModel] 与回调。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -96,6 +104,8 @@ fun PeriodDayForm(
     }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        FormProgress(model = model, moduleColor = moduleColor)
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,7 +114,9 @@ fun PeriodDayForm(
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CardShape)
         ) {
             PeriodField.entries.forEachIndexed { index, field ->
-                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
                 PeriodFieldRow(
                     field = field,
                     model = model,
@@ -132,6 +144,48 @@ fun PeriodDayForm(
     }
 }
 
+/** 收起态也能看到今天记了什么：6 个字段各一枚图形化值预览，进度由选中日标题统一播报。 */
+@Composable
+private fun FormProgress(model: PeriodDayFormModel, moduleColor: Color) {
+    val stacked = LocalDensity.current.fontScale > 1.3f
+    val glyphSize = if (stacked) 22.dp else 26.dp
+    val cell = glyphSize + 8.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        PeriodField.entries.forEach { field ->
+            val isFilled = model.isFilled(field)
+            val color = if (isFilled) moduleColor else MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .size(cell)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        if (isFilled) {
+                            moduleColor.copy(alpha = 0.12f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        }
+                    )
+                    .semantics { contentDescription = "${fieldLabel(field)}：${if (isFilled) "已填" else "未填"}" },
+                contentAlignment = Alignment.Center
+            ) {
+                PeriodFieldGlyph(
+                    field = field,
+                    level = fieldLevel(model, field),
+                    symptomLevel = model.symptoms.size.coerceAtMost(4),
+                    color = color.copy(alpha = if (isFilled) 1f else 0.45f),
+                    size = glyphSize
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PeriodFieldRow(
@@ -145,6 +199,14 @@ private fun PeriodFieldRow(
 ) {
     val open = model.openRow == field
     val filled = model.isFilled(field)
+    val level = fieldLevel(model, field)
+    val rowDescription = buildString {
+        append(fieldLabel(field))
+        append("，")
+        append(if (filled) fieldValueText(model, field) else "未填写")
+        append("，")
+        append(if (open) "已展开" else "已收起")
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -152,11 +214,28 @@ private fun PeriodFieldRow(
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
                 .clickable { onToggleRow(field) }
-                .semantics { stateDescription = if (open) "已展开" else "已收起" }
+                .semantics {
+                    stateDescription = if (open) "已展开" else "已收起"
+                    contentDescription = rowDescription
+                }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RowHeadIcon(field = field, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
+                PeriodFieldGlyph(
+                    field = field,
+                    level = level,
+                    symptomLevel = model.symptoms.size.coerceAtMost(4),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    size = 20.dp
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(text = fieldLabel(field), style = MaterialTheme.typography.bodyLarge)
@@ -184,19 +263,7 @@ private fun PeriodFieldRow(
     }
 }
 
-/** 行首功能图示：固定尺寸、不随字号拉伸，颜色用中性的 onSurfaceVariant。 */
-@Composable
-private fun RowHeadIcon(field: PeriodField, color: Color) {
-    when (field) {
-        PeriodField.FLOW -> PeriodLevelBars(MenstruationFields.FLOW_VALUES.size, MenstruationFields.FLOW_VALUES.size, color)
-        PeriodField.PAIN -> PeriodLevelBars(MenstruationFields.PAIN_VALUES.size, MenstruationFields.PAIN_VALUES.size, color)
-        PeriodField.DISCHARGE -> PeriodLevelBars(MenstruationFields.DISCHARGE_VALUES.size, MenstruationFields.DISCHARGE_VALUES.size, color)
-        PeriodField.MOOD -> PeriodMoodFace(index = 1, color = color)
-        PeriodField.SYMPTOMS -> PeriodSymptomDot(color = color)
-        PeriodField.DIARY -> PeriodDiary(color = color)
-    }
-}
-
+/** 已填值的图形化预览：与选项共用同一套图示，不靠颜色单独表达。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FieldValue(field: PeriodField, model: PeriodDayFormModel, filled: Boolean, moduleColor: Color) {
@@ -210,9 +277,14 @@ private fun FieldValue(field: PeriodField, model: PeriodDayFormModel, filled: Bo
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            model.symptoms.forEach { code ->
+            model.symptoms.take(3).forEach { code ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PeriodSymptomDot(color = moduleColor, size = 8.dp)
+                    PeriodSymptomGrid(
+                        level = model.symptoms.size.coerceAtMost(4),
+                        total = 4,
+                        color = moduleColor,
+                        size = 14.dp
+                    )
                     Text(
                         text = MenstruationFields.symptomLabel(code),
                         style = MaterialTheme.typography.bodySmall,
@@ -221,6 +293,7 @@ private fun FieldValue(field: PeriodField, model: PeriodDayFormModel, filled: Bo
                 }
             }
         }
+
         PeriodField.DIARY -> Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -232,13 +305,19 @@ private fun FieldValue(field: PeriodField, model: PeriodDayFormModel, filled: Bo
                 color = moduleColor
             )
         }
+
         else -> Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ValueGlyph(field = field, value = currentValue(model, field), color = moduleColor, size = 16.dp)
+            PeriodFieldGlyph(
+                field = field,
+                level = fieldLevel(model, field),
+                color = moduleColor,
+                size = 22.dp
+            )
             Text(
-                text = optionLabel(field, currentValue(model, field)),
+                text = fieldValueText(model, field),
                 style = MaterialTheme.typography.bodySmall,
                 color = moduleColor
             )
@@ -246,6 +325,7 @@ private fun FieldValue(field: PeriodField, model: PeriodDayFormModel, filled: Bo
     }
 }
 
+/** 选项改成 56dp 图形方块：图示 26dp + 文字，触摸目标 ≥44dp，选中态同时用边框和底色。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FieldOptions(
@@ -267,6 +347,7 @@ private fun FieldOptions(
                 )
             }
         }
+
         PeriodField.DIARY -> OutlinedTextField(
             value = model.diary,
             onValueChange = onDiaryChange,
@@ -277,47 +358,78 @@ private fun FieldOptions(
                 Text("${model.diary.length} 字 · 仅存为本条记录的备注，请勿记录他人身份信息")
             }
         )
+
         else -> FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val selectedValue = currentValue(model, field)
-            fieldValues(field).forEach { value ->
+            fieldValues(field).forEachIndexed { index, value ->
                 val selected = value == selectedValue
-                FilterChip(
-                    selected = selected,
-                    onClick = { onSelectOption(field, value) },
-                    label = { Text(optionLabel(field, value)) },
-                    leadingIcon = {
-                        ValueGlyph(
+                val label = optionLabel(field, value)
+                val shape = RoundedCornerShape(12.dp)
+                Box(
+                    modifier = Modifier
+                        .sizeIn(minWidth = 56.dp, minHeight = 56.dp)
+                        .clip(shape)
+                        .background(
+                            if (selected) {
+                                moduleColor.copy(alpha = 0.12f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerLow
+                            }
+                        )
+                        .border(
+                            width = if (selected) 2.dp else 1.dp,
+                            color = if (selected) moduleColor else MaterialTheme.colorScheme.outlineVariant,
+                            shape = shape
+                        )
+                        .clickable { onSelectOption(field, value) }
+                        .semantics {
+                            role = Role.Button
+                            stateDescription = if (selected) "已选中" else "未选中"
+                            contentDescription = "${fieldLabel(field)}：$label"
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        PeriodFieldGlyph(
                             field = field,
-                            value = value,
+                            level = index + 1,
                             color = if (selected) moduleColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                            size = 16.dp
+                            size = 26.dp
+                        )
+                        Text(
+                            text = label,
+                            fontSize = 9.5.sp,
+                            maxLines = 1,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                )
+                }
             }
         }
     }
 }
 
-/** 已填值与选项共用的图示：等级格 / 简笔表情，保证「选的和显示的一样」。 */
-@Composable
-private fun ValueGlyph(field: PeriodField, value: String, color: Color, size: Dp) {
-    when (field) {
-        PeriodField.FLOW -> PeriodLevelBars(levelFilled(MenstruationFields.FLOW_VALUES, value), MenstruationFields.FLOW_VALUES.size, color, size = size)
-        PeriodField.PAIN -> PeriodLevelBars(levelFilled(MenstruationFields.PAIN_VALUES, value), MenstruationFields.PAIN_VALUES.size, color, size = size)
-        PeriodField.DISCHARGE -> PeriodLevelBars(levelFilled(MenstruationFields.DISCHARGE_VALUES, value), MenstruationFields.DISCHARGE_VALUES.size, color, size = size)
-        PeriodField.MOOD -> PeriodMoodFace(MenstruationFields.MOOD_VALUES.indexOf(value).coerceAtLeast(0), color, size = size)
-        PeriodField.SYMPTOMS -> PeriodSymptomDot(color, size = size)
-        PeriodField.DIARY -> PeriodDiary(color, size = size)
-    }
+/** 1-based 档位：0 = 未填 / 无。症状按已选数量映射到 4 档点阵。 */
+private fun fieldLevel(model: PeriodDayFormModel, field: PeriodField): Int = when (field) {
+    PeriodField.SYMPTOMS -> model.symptoms.size.coerceIn(0, 4)
+    PeriodField.DIARY -> if (model.diary.isEmpty()) 0 else 1
+    else -> fieldValues(field).indexOf(currentValue(model, field)).let { if (it < 0) 0 else it + 1 }
 }
 
-private fun levelFilled(values: List<String>, value: String): Int {
-    val index = values.indexOf(value)
-    return if (index < 0) 0 else index + 1
+private fun fieldValueText(model: PeriodDayFormModel, field: PeriodField): String = when (field) {
+    PeriodField.FLOW -> MenstruationFields.flowLabel(model.flow)
+    PeriodField.PAIN -> MenstruationFields.painLabel(model.pain)
+    PeriodField.MOOD -> MenstruationFields.moodLabel(model.mood)
+    PeriodField.DISCHARGE -> MenstruationFields.dischargeLabel(model.discharge)
+    PeriodField.SYMPTOMS -> "${model.symptoms.size} 项"
+    PeriodField.DIARY -> truncateDiary(model.diary)
 }
 
 private fun currentValue(model: PeriodDayFormModel, field: PeriodField): String = when (field) {

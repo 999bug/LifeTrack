@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.lifetrack.core.model.MenstruationFields
 import kotlin.math.min
 
 /**
@@ -217,5 +218,175 @@ fun PeriodCheck(
             color = color,
             style = Stroke(width = min(w, h) * 0.1f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
+    }
+}
+
+/* ============================================================================
+ * 界面定稿 v2 · 批 2：5 类语义化图示
+ *
+ * 旧版流量 / 痛经 / 分泌物共用同一组「递增竖条」，形状一样，只能靠文字区分。
+ * 现在每类字段有自己的形状语言：液滴数量 / 脉冲波纹 / 横条密度 / 表情嘴形 / 3×3 点阵。
+ * 选项与已填值都走 [PeriodFieldGlyph]，保证「选的和显示的一样」。
+ * ========================================================================== */
+
+/** 流量：level 个逐渐变大的液滴；level=0 画一个淡显小滴表示「无 / 点滴」。 */
+@Composable
+fun PeriodFlowDrops(
+    level: Int,
+    total: Int,
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp
+) {
+    val n = total.coerceAtLeast(1)
+    val filled = level.coerceIn(0, n)
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val count = if (filled == 0) 1 else filled
+        val cell = w / (n + 1f)
+        for (i in 0 until count) {
+            val scale = 0.26f + 0.1f * i
+            val dropH = h * scale * 2.1f
+            val dropW = dropH * 0.72f
+            val cx = cell * (i + 1f) + cell * (n - count) / 2f
+            val top = h - dropH
+            val path = Path().apply {
+                moveTo(cx, top)
+                cubicTo(cx + dropW * 0.8f, top + dropH * 0.45f, cx + dropW * 0.55f, h, cx, h)
+                cubicTo(cx - dropW * 0.55f, h, cx - dropW * 0.8f, top + dropH * 0.45f, cx, top)
+                close()
+            }
+            drawPath(path = path, color = if (filled == 0) color.copy(alpha = 0.22f) else color)
+        }
+    }
+}
+
+/** 痛经：中心圆 + level 圈向外扩散的脉冲波纹，圈数越多表示越强。 */
+@Composable
+fun PeriodPainPulse(
+    level: Int,
+    total: Int,
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp
+) {
+    val n = total.coerceAtLeast(1)
+    val filled = level.coerceIn(0, n)
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val cx = w / 2f
+        val cy = h * 0.42f
+        drawCircle(color, radius = min(w, h) * 0.11f, center = Offset(cx, cy))
+        val step = min(w, h) * 0.17f
+        // level=0（未填）也留一圈淡显波纹，形状上仍能与「单个圆点」区分开。
+        val rings = if (filled == 0) 1 else filled
+        for (i in 1..rings) {
+            val r = step * i
+            drawArc(
+                color = color.copy(
+                    alpha = if (filled == 0) 0.22f else (0.9f - 0.13f * i).coerceAtLeast(0.3f)
+                ),
+                startAngle = 25f,
+                sweepAngle = 130f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = Size(r * 2f, r * 2f),
+                style = Stroke(width = min(w, h) * 0.065f, cap = StrokeCap.Round)
+            )
+        }
+    }
+}
+
+/** 分泌物：level 根长短递增的横条，未达到的档位淡显，形状上与竖条 / 液滴明显不同。 */
+@Composable
+fun PeriodDischargeBars(
+    level: Int,
+    total: Int,
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp
+) {
+    val n = total.coerceAtLeast(1)
+    val filled = level.coerceIn(0, n)
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val rowH = h / (n + 0.6f)
+        for (i in 0 until n) {
+            val barW = w * (0.34f + 0.15f * i)
+            drawRoundRect(
+                color = if (i < filled) color else color.copy(alpha = 0.2f),
+                topLeft = Offset((w - barW) / 2f, rowH * (i + 0.5f)),
+                size = Size(barW, rowH * 0.42f),
+                cornerRadius = CornerRadius(rowH * 0.21f, rowH * 0.21f)
+            )
+        }
+    }
+}
+
+/** 症状：3 × 3 点阵，实心点数随 level 增加，与单个圆点的「已记录」标记区分开。 */
+@Composable
+fun PeriodSymptomGrid(
+    level: Int,
+    total: Int,
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp
+) {
+    val n = total.coerceAtLeast(1)
+    val filled = level.coerceIn(0, n)
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val step = min(w, h) / 4f
+        val solid = (filled.toFloat() / n * 9f).toInt()
+        for (i in 0 until 9) {
+            val x = step * (i % 3 + 1)
+            val y = step * (i / 3 + 1)
+            val on = i < solid
+            drawCircle(
+                color = if (on) color else color.copy(alpha = 0.22f),
+                radius = step * (if (on) 0.28f else 0.14f),
+                center = Offset(x, y)
+            )
+        }
+    }
+}
+
+/**
+ * 字段 → 图示的唯一分发点。
+ *
+ * [level] 是 1-based 的档位（0 = 未填 / 无）；心情按 [MenstruationFields.MOOD_VALUES]
+ * 的顺序映射到 [PeriodMoodFace] 的表情索引，症状按已选数量映射到点阵密度。
+ */
+@Composable
+fun PeriodFieldGlyph(
+    field: com.example.lifetrack.core.model.PeriodField,
+    level: Int,
+    color: Color,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    symptomLevel: Int = level
+) {
+    when (field) {
+        com.example.lifetrack.core.model.PeriodField.FLOW ->
+            PeriodFlowDrops(level, MenstruationFields.FLOW_VALUES.size, color, modifier, size)
+
+        com.example.lifetrack.core.model.PeriodField.PAIN ->
+            PeriodPainPulse(level, MenstruationFields.PAIN_VALUES.size, color, modifier, size)
+
+        com.example.lifetrack.core.model.PeriodField.DISCHARGE ->
+            PeriodDischargeBars(level, MenstruationFields.DISCHARGE_VALUES.size, color, modifier, size)
+
+        com.example.lifetrack.core.model.PeriodField.MOOD ->
+            PeriodMoodFace((level - 1).coerceIn(0, MenstruationFields.MOOD_VALUES.lastIndex), color, modifier, size)
+
+        com.example.lifetrack.core.model.PeriodField.SYMPTOMS ->
+            PeriodSymptomGrid(symptomLevel, 4, color, modifier, size)
+
+        com.example.lifetrack.core.model.PeriodField.DIARY ->
+            PeriodDiary(color, modifier, size)
     }
 }

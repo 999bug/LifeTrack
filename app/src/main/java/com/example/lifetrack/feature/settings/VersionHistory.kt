@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.11",
+        date = "2026-11-13",
+        summary = "首页卡片统一等高并新增周期概览；经期页重做周期环、连续色带与逐日图示"
+    ),
+    VersionNote(
         version = "0.6.10",
         date = "2026-11-12",
         summary = "经期点一次「来了」后每天自动接上、点「走了」才结束；取消截屏限制，可正常截屏录屏"

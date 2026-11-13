@@ -80,7 +80,7 @@ fun CalendarMonthView(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onPrevious, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
                 Icon(
                     Icons.Filled.ChevronLeft,
                     contentDescription = "上个月",
@@ -88,7 +88,7 @@ fun CalendarMonthView(
                     modifier = Modifier.size(18.dp)
                 )
             }
-            IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(44.dp)) {
                 Icon(
                     Icons.Filled.ChevronRight,
                     contentDescription = "下个月",

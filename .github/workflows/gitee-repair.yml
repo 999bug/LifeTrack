@@ -1,13 +1,18 @@
 name: Repair Gitee mirror
 
-# 为什么单独开一个 workflow：
-# release.yml 的 `mirror-gitee` job 是「一次性」语义——它先创建 Gitee Release，
-# 再上传附件；一旦创建成功、附件上传被网络重置打断，整条流水线就会卡在
-# 「Gitee release $TAG already exists; refusing to overwrite」，重跑也没用，
-# 而重跑整个 release.yml 又会撞 GitHub 侧已打好的 tag。
-# 这里补一条可重复执行的补传通道：复用已存在的 Release，只补缺失的附件。
+# 为什么还保留这条 workflow：
+# 2026-11-13 起 release.yml 的 `mirror-gitee` job 已改成幂等 + 带重试，跨境链路
+# 抖动时会在 job 内自愈；即使整个镜像 job 失败，也可以直接在那次 Actions run
+# 点「Re-run failed jobs」补传，不必再走这里。
 #
-# 用法：Actions → Repair Gitee mirror → Run workflow，填已发布的 tag（如 v0.6.10）。
+# 本 workflow 覆盖的是「那次 run 的 artifact 已过期 / 需要跨 run 补传」场景：
+# 从已发布的 GitHub Release 重新下载 APK 与 .sha256（不重新构建），复用同名
+# Gitee Release、按文件名跳过已有附件、逐个退避重试上传，附件齐了才把
+# latest.json 校准回本次版本。可反复执行。
+#
+# 仍然不允许重跑整个 release.yml：GitHub 侧的 tag / Release 一经发布不可复用。
+#
+# 用法：Actions → Repair Gitee mirror → Run workflow，填已发布的 tag（如 v0.6.11）。
 # 幂等：附件已齐时直接跳过上传，只把 latest.json 校准回本次版本。
 
 on:

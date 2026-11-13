@@ -182,9 +182,9 @@ Android 的 `versionCode` 必须严格递增，否则系统拒绝覆盖安装；
 | 版本推算 / SDK / 签名配置 / 构建 / 验签 | 未推送任何东西，`main` 与 tag 都不变 | 修好问题后直接重跑，版本号不变 |
 | 更新日志校验（在 `Resolve version` 内） | 未推送任何东西，版本号还没算进去 | 按报错提示在 `VersionHistory.kt` 最前面补一条对应版本，推 `main` 后重跑；版本号与上次相同 |
 | `Commit version bump to main` | 版本提交可能已推送，但 tag / Release 还没建 | 先看 `main` 与 Actions 日志再决定；重跑会算出更高的 `versionCode`，不要盲点 |
-| `Create GitHub Release` 之后、`mirror-gitee` 失败 | GitHub 侧已发布成功，Gitee 缺附件 | 按 §6 人工补传，**不要重跑整个 workflow**（会撞 tag） |
+| `Create GitHub Release` 之后、`mirror-gitee` 失败 | GitHub 侧已发布成功，Gitee 缺附件 | 在该次 run 点「Re-run failed jobs」（镜像 job 幂等，会复用已有 Release 只补缺失附件）；artifact 过期时按 §6 跑 `gitee-repair.yml`。**不要重跑整个 workflow**（会撞 tag） |
 
-`mirror-gitee` 失败会让 workflow 标红，但**不会回滚已发布的 GitHub Release**。
+`mirror-gitee` 标了 `continue-on-error`，是 best-effort 镜像：它失败不会让整个 workflow 标红，也**不会回滚已发布的 GitHub Release**；job 内会留下 `::error::` / `::warning::` 与补传命令，按上表处理即可。
 
 ---
 
@@ -217,7 +217,7 @@ Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256
 - **发版失败后先看 `main` 有没有多出 `chore: release …` 提交**，再决定能否直接重跑，详见 §2.3。
 - 覆盖安装前确认 Room `version` 与 `Migration` 已就位，否则启动即崩。
 - 密钥轮换意味着用户必须卸载重装 → 数据全丢，非必要不做。
-- **Gitee 同步失败不回滚 GitHub Release**：`mirror-gitee` 失败时 GitHub 侧已发布成功，流水线标红只是提示国内镜像缺失；按 §6 人工补传，不要重跑整个 workflow（会撞同名 tag）。
+- **Gitee 同步失败不回滚 GitHub Release**：`mirror-gitee` 失败时 GitHub 侧已发布成功，镜像 job 以 `continue-on-error` 标为警告；按 §6 补传（优先「Re-run failed jobs」），不要重跑整个 workflow（会撞同名 tag）。
 
 ---
 
@@ -240,9 +240,10 @@ Get-FileHash .\LifeTrack-0.6.0-release.apk -Algorithm SHA256
 ## 6. 国内分发（Gitee）的设计与限制
 
 - **为什么不用 Gitee 仓库镜像**：官方「仓库镜像管理」只同步分支、标签和提交记录，不同步 Release 附件。APK 必须由 `release.yml` 的 `mirror-gitee` job 调 OpenAPI 上传。
+- **镜像 job 是幂等 + 重试 + best-effort（2026-11-13 起）**：境外 runner 到 `gitee.com/api/v5` 的跨境链路会被重置（`curl: (35)`），旧版「无重试、同名 Release 即拒绝」的一次性语义让任意一次抖动都会把 job 标红且无法补跑。现在所有 API 调用带超时并按 10s / 20s… 退避重试；附件上传最多 `GITEE_MAX_ATTEMPTS` 次（默认 6，可用仓库 variable 覆盖），每次先按文件名复查服务端附件，避免「响应丢失但已上传成功」造成重复；同名 Gitee Release 直接复用。job 标 `continue-on-error`，镜像失败不影响 GitHub 侧的发布结论，失败时日志会给出「Re-run failed jobs」与 `gitee-repair.yml` 两条补救路径。
 - **代码不落地 Gitee**：Gitee 仓库只作为 Release 附件的载体，`target_commitish` 指向其 `main` 分支即可；本地与 CI 都不向 Gitee 推代码。
 - **App 查询链路**：HTTPS GET `gitee.com/api/v5/repos/saul999/LifeTrack/releases/latest`（公开仓库免令牌）。主源只要返回了版本事实就以其为准；**Release 已发布但附件还没同步过来不算故障**，客户端进入「安装包同步中」并按 30s → 1m → 2m → 5m 退避重查，不回退 GitHub 下载。仅当主源请求失败或暂无 Release 时才查 `api.github.com`，且只取版本信息、剥掉下载地址——国内版不跨境下载。
-- **制品就绪判据**：`assets` 里必须同时有 `.apk` 与 `.apk.sha256`。`mirror-gitee` 在同一个 shell 步骤里先创建 Release 再逐个上传附件，sha256 是最后上传的一份，它出现等价于「本次同步已完成」。只比较 `tag_name` 会把同步中间态误报成可更新。
+- **制品就绪判据**：`assets` 里必须同时有 `.apk` 与 `.apk.sha256`。镜像 job 以服务端 `releases/tags/<tag>` 详情为准（不依赖本地上传返回值，因此全部附件被跳过时也拿得到直链），两者齐了才写 `latest.json`；只比较 `tag_name` 会把同步中间态误报成可更新。客户端同样按「附件齐全」判定，未齐时进入「安装包同步中」退避重查。
 - **Gitee 的 `latest` 指向「最后创建」的 Release，不是语义版本最高的**：按版本递增正常发版不会出问题；客户端 `isNewer()` 还会再比一次版本号，最坏是提示「已是最新」，不会误装旧包。不要补发旧版本。
 - **附件配额**：社区版单附件 ≤100MB、单仓库附件总量 ≤1GB（GVP 分别 200MB / 5GB）。APK 只走 Release 附件，不要提交进 git（git 单文件上限 50MB、单仓 500MB）。长期发版需定期清理旧 Release 的附件。
 - **下载前置校验**：`HttpArtifactProbe` 对 APK 直链发 HEAD（跟随两次 302 到 CDN），要求 2xx、非 `text/html`、`Content-Length` 存在且 ≥1MB，否则判为「未就绪」并重试。`ApkDownloader` 在**切到下载中状态之前**再校验状态码、Content-Type、长度一致性与 ZIP 魔数，所以进度条只会在确认源端真有完整 APK 后出现；下载过程带 socket 无进展超时与「20 秒窗口内不足 32KB」的停滞看门狗。写盘后按 `.sha256` 校验全文摘要、ZIP 魔数与体积。这些校验不替代系统对 APK 签名的校验。

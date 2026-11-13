@@ -306,10 +306,18 @@ jobs:
   # Gitee 官方仓库镜像只同步分支/标签/提交，不同步 Release 附件，
   # 因此 APK 必须由本流水线调用 OpenAPI 单独上传。这里复用同一份 release-apk
   # artifact，保证 Gitee 与 GitHub 的签名包字节完全一致。
+  #
+  # 2026-11-13 改为幂等 + 重试：境外 runner 调 gitee.com/api/v5 的跨境链路会被
+  # 重置（curl exit 35），旧版「先建 Release 再逐个传、无重试、同名即拒绝」的
+  # 一次性语义让任何一次抖动都会把 job 标红，且既不能重跑也不能补跑。现在同名
+  # Release 直接复用、按附件名跳过、每个附件最多 N 次退避重试，附件齐了才写
+  # latest.json，所以 Actions 的「Re-run failed jobs」能直接接着补传。
+  # Gitee 只是国内 best-effort 镜像，它的失败不该把已发布的 GitHub Release 判成失败。
   mirror-gitee:
     name: Mirror release to Gitee
     needs: release
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
       actions: read
@@ -321,6 +329,7 @@ jobs:
       GITEE_OWNER: ${{ vars.GITEE_OWNER || 'saul999' }}
       GITEE_REPO: ${{ vars.GITEE_REPO || 'LifeTrack' }}
       GITEE_BRANCH: ${{ vars.GITEE_BRANCH || 'main' }}
+      GITEE_MAX_ATTEMPTS: ${{ vars.GITEE_MAX_ATTEMPTS || '6' }}
     steps:
       - name: Download release APK
         uses: actions/download-artifact@v4
@@ -343,64 +352,136 @@ jobs:
             exit 1
           fi
 
-      - name: Create Gitee release and upload attachments
+      - name: Sync Gitee release and attachments (idempotent)
         run: |
           set -euo pipefail
           API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases"
+          MAX_ATTEMPTS="${GITEE_MAX_ATTEMPTS:-6}"
+          case "$MAX_ATTEMPTS" in ''|*[!0-9]*) MAX_ATTEMPTS=6 ;; esac
+          [ "$MAX_ATTEMPTS" -ge 1 ] || MAX_ATTEMPTS=6
 
-          existing=$(curl -sS "${API}?access_token=${GITEE_TOKEN}&page=1&per_page=100")
-          if ! printf '%s' "$existing" | jq -e 'type == "array"' > /dev/null; then
-            echo "::error::Cannot list Gitee releases: $existing"
+          # 失败时给出可执行的补救路径：GitHub Release 此时已经发布成功，
+          # 绝不重跑整条 release.yml（第一步就会撞同名 tag）。
+          die() {
+            echo "::error::$1" >&2
+            echo "::warning::Gitee 镜像未完成，但 GitHub Release ${TAG} 已发布成功，无需重跑整条发布流水线。"
+            echo "::warning::优先在本次 Actions run 点「Re-run failed jobs」；镜像 job 幂等，会复用已有 Release 只补缺失附件。"
+            echo "::warning::若 artifact 已过期：gh workflow run gitee-repair.yml --ref main --repo ${GITHUB_REPOSITORY} -f tag=${TAG}"
             exit 1
+          }
+
+          # 跨境链路抖动时 curl 会以 exit 35 / TLS reset 失败，Gitee 也可能回一段非 JSON
+          # 错误页。统一在这里重试：每次重新发请求并校验响应是合法 JSON，退避 10s/20s/…。
+          # 刻意不用 curl --retry：附件上传由外层循环控制次数，避免 N×N 次放大。
+          # desc 只写操作名，绝不把带 access_token 的参数打进日志。
+          api_json() {
+            local timeout=$1 desc=$2; shift 2
+            local out=""
+            for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+              if out=$(curl -sS --connect-timeout 30 --max-time "$timeout" "$@" 2>/dev/null) \
+                 && printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
+                printf '%s' "$out"
+                return 0
+              fi
+              if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+                echo "::warning::${desc} 第 ${attempt}/${MAX_ATTEMPTS} 次失败，$(($attempt * 10))s 后重试" >&2
+                sleep $(( attempt * 10 ))
+              else
+                echo "::warning::${desc} 已连续失败 ${MAX_ATTEMPTS} 次" >&2
+              fi
+            done
+            return 1
+          }
+
+          release_detail() {
+            api_json 60 "读取 Gitee Release 详情" "${API}/tags/${TAG}?access_token=${GITEE_TOKEN}"
+          }
+
+          # 1. 同名 Release 直接复用（幂等的关键），不再 refusing to overwrite。
+          existing=$(api_json 60 "列出 Gitee Releases" \
+            "${API}?access_token=${GITEE_TOKEN}&page=1&per_page=100") \
+            || die "无法列出 Gitee Releases"
+          if ! printf '%s' "$existing" | jq -e 'type == "array"' >/dev/null; then
+            die "Gitee Releases 响应格式异常"
           fi
-          if printf '%s' "$existing" | jq -e --arg tag "$TAG" 'any(.[]; .tag_name == $tag)' > /dev/null; then
-            echo "::error::Gitee release $TAG already exists; refusing to overwrite"
-            exit 1
+          release_id=$(printf '%s' "$existing" \
+            | jq -r --arg tag "$TAG" 'map(select(.tag_name == $tag)) | (.[0].id // empty)')
+
+          if [ -n "$release_id" ]; then
+            echo "Reusing existing Gitee release id=$release_id for $TAG"
+          else
+            # 应用内更新卡只取 Release body 的第一行非空行当「本版改了什么」，
+            # 所以首行必须是 summary，镜像说明退到第二段。
+            GITEE_BODY=$(printf '%s\n\n国内分发镜像，权威发布见 https://github.com/%s/releases/tag/%s' \
+              "${CHANGELOG_SUMMARY:-本次变更见 GitHub Release}" "$GITHUB_REPOSITORY" "$TAG")
+            created=$(api_json 120 "创建 Gitee Release" -X POST "$API" \
+              --data-urlencode "access_token=${GITEE_TOKEN}" \
+              --data-urlencode "tag_name=${TAG}" \
+              --data-urlencode "name=${TAG}" \
+              --data-urlencode "body=${GITEE_BODY}" \
+              --data-urlencode "target_commitish=${GITEE_BRANCH}" \
+              --data-urlencode "prerelease=false") || created=''
+            release_id=$(printf '%s' "$created" | jq -r '.id // empty' 2>/dev/null || true)
+            if [ -z "$release_id" ]; then
+              # 请求可能已在服务端生效、只是响应在回程丢失：复查列表，避免重复创建。
+              echo "::warning::创建未返回 id，复查 Release 列表"
+              existing=$(api_json 60 "复查 Gitee Releases" \
+                "${API}?access_token=${GITEE_TOKEN}&page=1&per_page=100") || existing=''
+              release_id=$(printf '%s' "$existing" \
+                | jq -r --arg tag "$TAG" \
+                  'if type == "array" then (map(select(.tag_name == $tag)) | (.[0].id // empty)) else empty end' \
+                  2>/dev/null || true)
+            fi
+            [ -n "$release_id" ] || die "Gitee Release 创建失败（响应: ${created:-<empty>}）"
+            echo "Created Gitee release id=$release_id for $TAG"
           fi
 
-          # 应用内更新卡只取 Release body 的第一行非空行当「本版改了什么」，
-          # 所以首行必须是 summary，镜像说明退到第二段。
-          GITEE_BODY=$(printf '%s\n\n国内分发镜像，权威发布见 https://github.com/%s/releases/tag/%s' \
-            "${CHANGELOG_SUMMARY:-本次变更见 GitHub Release}" "$GITHUB_REPOSITORY" "$TAG")
-
-          created=$(curl -sS -X POST "$API" \
-            --data-urlencode "access_token=${GITEE_TOKEN}" \
-            --data-urlencode "tag_name=${TAG}" \
-            --data-urlencode "name=${TAG}" \
-            --data-urlencode "body=${GITEE_BODY}" \
-            --data-urlencode "target_commitish=${GITEE_BRANCH}" \
-            --data-urlencode "prerelease=false")
-          release_id=$(printf '%s' "$created" | jq -r '.id // empty')
-          if [ -z "$release_id" ]; then
-            echo "::error::Gitee release creation failed: $created"
-            exit 1
-          fi
-          echo "Created Gitee release id=$release_id for $TAG"
-
+          # 2. 逐个附件：每次尝试前按文件名复查，避免「响应丢失但服务端已成功」
+          #    时重复上传。APK 在前、sha256 在后，sha256 到位才代表同步完成。
           for file in dist/*.apk dist/*.apk.sha256; do
             [ -f "$file" ] || continue
-            response=$(curl -sS -X POST "${API}/${release_id}/attach_files" \
-              -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${file}")
-            url=$(printf '%s' "$response" | jq -r '.browser_download_url // empty')
-            if [ -z "$url" ]; then
-              echo "::error::Attachment upload failed for $(basename "$file"): $response"
-              exit 1
-            fi
-            echo "Uploaded $(basename "$file"): $url"
-            case "$(basename "$file")" in
-              *.apk.sha256) SHA_URL="$url" ;;
-              *.apk) APK_URL="$url" ;;
-            esac
+            name=$(basename "$file")
+            uploaded=0
+            for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+              detail=$(release_detail) || detail=''
+              if printf '%s' "$detail" | jq -e --arg n "$name" \
+                'if type == "object" then ((.assets // []) | any(.name == $n)) else false end' \
+                >/dev/null 2>&1; then
+                echo "Skip $name (already present)"
+                uploaded=1
+                break
+              fi
+              echo "Uploading $name (attempt $attempt/$MAX_ATTEMPTS)"
+              up_resp=$(curl -sS --connect-timeout 30 --max-time 900 -X POST \
+                "${API}/${release_id}/attach_files" \
+                -F "access_token=${GITEE_TOKEN}" \
+                -F "file=@${file}" 2>/dev/null) || up_resp=''
+              if printf '%s' "$up_resp" | jq -e '.browser_download_url' >/dev/null 2>&1; then
+                echo "Uploaded $name"
+                uploaded=1
+                break
+              fi
+              if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+                echo "::warning::${name} 第 ${attempt}/${MAX_ATTEMPTS} 次上传失败，$(($attempt * 15))s 后重试" >&2
+                sleep $(( attempt * 15 ))
+              else
+                echo "::warning::${name} 已连续失败 ${MAX_ATTEMPTS} 次" >&2
+              fi
+            done
+            [ "$uploaded" -eq 1 ] || die "${name} 在 ${MAX_ATTEMPTS} 次尝试后仍未上传成功"
           done
 
-          if [ -z "${APK_URL:-}" ] || [ -z "${SHA_URL:-}" ]; then
-            echo "::error::Missing APK or sha256 URL after upload (apk=${APK_URL:-} sha=${SHA_URL:-})"
-            exit 1
+          # 3. latest.json 只认服务端详情里的直链：即使本次全部跳过上传也拿得到 URL，
+          #    且 .apk 与 .sha256 必须同时在，避免把同步中间态发布给客户端。
+          detail=$(release_detail) || die "无法读取 Gitee Release 详情，未写 latest.json"
+          APK_URL=$(printf '%s' "$detail" \
+            | jq -r '[(.assets // [])[] | select(.name | endswith(".apk"))][0].browser_download_url // empty')
+          SHA_URL=$(printf '%s' "$detail" \
+            | jq -r '[(.assets // [])[] | select(.name | endswith(".apk.sha256"))][0].browser_download_url // empty')
+          if [ -z "$APK_URL" ] || [ -z "$SHA_URL" ]; then
+            die "附件不齐，未写 latest.json (apk=${APK_URL:-} sha=${SHA_URL:-})"
           fi
 
-          # 把版本事实 + Gitee 直链写进 latest.json，供客户端绕过被限流的 Gitee REST API。
-          # 通过 contents API 创建/更新文件（仓库默认分支须已初始化），认证写不受匿名限流影响。
           MANIFEST=$(jq -n \
             --arg version "$VERSION_NAME" \
             --arg tag "$TAG" \
@@ -408,32 +489,32 @@ jobs:
             --arg apk "$APK_URL" \
             --arg sha "$SHA_URL" \
             '{version:$version, tag:$tag, notes:$notes, apkUrl:$apk, sha256Url:$sha}')
-          echo "Manifest payload: $MANIFEST"
           CONTENT=$(printf '%s' "$MANIFEST" | base64 | tr -d '\n')
 
           CONTENTS_API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/contents/latest.json"
-          # Gitee 对「文件不存在」返回的是数组（目录列表语义）而不是 404，
-          # 直接 jq '.sha' 会报 "Cannot index array with string"，必须先判类型。
-          EXISTING_RESP=$(curl -sS "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" || echo '')
+          # Gitee 对「文件不存在」返回数组（目录列表语义）而不是 404，必须先判类型。
+          EXISTING_RESP=$(api_json 60 "读取 latest.json" \
+            "${CONTENTS_API}?access_token=${GITEE_TOKEN}&ref=${GITEE_BRANCH}" || echo '')
           EXISTING_SHA=$(printf '%s' "$EXISTING_RESP" \
             | jq -r 'if type == "object" then (.sha // empty) else empty end' 2>/dev/null || true)
           if [ -n "$EXISTING_SHA" ]; then
-            put_resp=$(curl -sS -X PUT "$CONTENTS_API" \
+            put_resp=$(api_json 120 "更新 latest.json" -X PUT "$CONTENTS_API" \
               --data-urlencode "access_token=${GITEE_TOKEN}" \
               --data-urlencode "content=${CONTENT}" \
               --data-urlencode "message=chore: update latest.json for ${TAG}" \
               --data-urlencode "sha=${EXISTING_SHA}" \
-              --data-urlencode "branch=${GITEE_BRANCH}")
+              --data-urlencode "branch=${GITEE_BRANCH}") || die "写入 latest.json 失败"
           else
-            put_resp=$(curl -sS -X POST "$CONTENTS_API" \
+            put_resp=$(api_json 120 "创建 latest.json" -X POST "$CONTENTS_API" \
               --data-urlencode "access_token=${GITEE_TOKEN}" \
               --data-urlencode "content=${CONTENT}" \
               --data-urlencode "message=chore: update latest.json for ${TAG}" \
-              --data-urlencode "branch=${GITEE_BRANCH}")
+              --data-urlencode "branch=${GITEE_BRANCH}") || die "写入 latest.json 失败"
           fi
-          if ! printf '%s' "$put_resp" | jq -e 'type == "object" and (has("content") or has("sha"))' > /dev/null 2>&1; then
-            echo "::error::Failed to write latest.json to Gitee: $put_resp"
-            exit 1
+          if ! printf '%s' "$put_resp" \
+            | jq -e 'type == "object" and (has("content") or has("sha"))' >/dev/null 2>&1; then
+            die "写入 latest.json 的响应异常"
           fi
-          echo "Wrote latest.json: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/raw/${GITEE_BRANCH}/latest.json"
+
+          echo "Manifest: $MANIFEST"
           echo "Mirror complete: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/tag/${TAG}"

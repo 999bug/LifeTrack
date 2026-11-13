@@ -163,7 +163,9 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 | 不设 `continue-on-error`，失败即 workflow 标红 | GitHub 侧已发布成功，但国内镜像缺失这件事**看得见** | **推荐**：分发完整性优先，且日志能直接定位 |
 | 设 `continue-on-error: true` 并打明确日志 | 主链路不红，但镜像缺失容易被忽略 | 仅在 Gitee 只是「可有可无的备份」时用 |
 
-无论哪种，**GitHub Release 都不会被回滚**，同步失败一律按第 8 节补传，绝不重跑整个 workflow（会撞同名 tag）。
+无论哪种，**GitHub Release 都不会被回滚**，同步失败绝不重跑整个 workflow（会撞同名 tag）。
+
+> **2026-11-13 本项目修订**：本仓库已改用第二种策略。连续两次发版（v0.6.10、v0.6.11）都因境外 runner 调 `gitee.com/api/v5` 被 TLS 重置而把镜像 job 标红，GitHub 侧其实每次都已发布成功；为避免「发布成功却显示红灯」误导判断，`mirror-gitee` 现在标 `continue-on-error`，并在失败步骤里打 `::error::` + `::warning::` 与补传命令。同时主流程已改成幂等 + 重试，所以**同步失败的第一选择是在该次 run 点「Re-run failed jobs」**，第 8 节的人工补传退为 artifact 过期 / 跨 run 时的兜底。上表是给新项目选型的通用建议，不代表本仓库当前配置。
 
 ---
 
@@ -171,7 +173,9 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 
 ### 6.1 镜像 job（挂在你现有的发布 workflow 后面）
 
-这是给新项目套用的参数化骨架，`<...>` 按 6.2 节替换。本仓库 `release.yml` 已是这份形状；注意 2026-11-10 起本项目的 `TAG` 不再读 `inputs.version`，而是读 `${{ needs.release.outputs.tag }}`（版本号由发布 job 自动推算后输出），模板里保留的是通用写法。
+> 以下为**通用骨架**（一次性语义），供新项目套用；本仓库 `release.yml` 的现行实现已在 2026-11-13 改为幂等 + 重试 + 按文件名跳过，不再是这份形状，请以 workflow 文件为准。
+
+这是给新项目套用的参数化骨架，`<...>` 按 6.2 节替换。注意 2026-11-10 起本项目的 `TAG` 不再读 `inputs.version`，而是读 `${{ needs.release.outputs.tag }}`（版本号由发布 job 自动推算后输出），模板里保留的是通用写法。
 
 ```yaml
   mirror-gitee:
@@ -253,6 +257,7 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 
 - `needs` + artifact 传递：保证两端同一份字节。
 - 列出再创建：同名拒绝，避免重跑覆盖；**Release 超过 100 个时 `per_page=100` 会漏判**，要么翻页、要么定期清理旧 Release。
+  > 本仓库现行实现已改为**同名复用**而不是拒绝：先按文件名跳过已传附件，再补缺失的，这样才能直接「Re-run failed jobs」。模板保留一次性语义，是因为它面向新项目的首次接入。
 - 每次上传校验 `browser_download_url`：只有返回了下载地址才算成功。
 - `target_commitish` 显式指定：不要依赖默认值。
 - 不在 workflow 里写任何令牌明文，全部走 Secrets。
@@ -300,15 +305,21 @@ gh secret list --repo <gh-owner>/<gh-repo>   # 确认已写入；值不可再读
 
 ## 8. 失败兜底：人工补传
 
-**触发条件**：GitHub Release 已创建成功，`mirror-gitee` 失败（令牌过期、限流、上传超时、附件超限等）。
+**触发条件**：GitHub Release 已创建成功，`mirror-gitee` 失败（令牌过期、限流、上传超时、附件超限等），且该次 run 的 artifact 已过期或需要跨 run 补传。
 
 **前置纪律**：
 
+- **优先在该次 Actions run 点「Re-run failed jobs」**：`mirror-gitee` 自 2026-11-13 起幂等且带重试，会复用同名 Gitee Release、按文件名跳过已有附件，通常一次就能补齐，无需本节脚本。
 - 不要重跑整个 workflow，会撞同名 tag 并失败在第一步。
 - 不要删掉 GitHub Release 重发；版本号一经发布就不可复用。
 - 从**已发布的 GitHub Release** 下载产物，或从该次 Actions run 的 artifact 下载，不要本地重新构建。
 
 ### 8.1 Git Bash / Linux / macOS（curl + jq，与 CI 一致，优先用这套）
+
+> **适用边界**：下面两段手工脚本假设 **Gitee 上还没有该 tag 的 Release**（第 2 步同名即退出）。
+> 实际失败场景几乎都是「Release 已建好、附件传了一半」，这时脚本会直接报错，请优先用
+> `gitee-repair.yml`（或该次 run 的「Re-run failed jobs」）——它复用已有 Release、按文件名
+> 跳过、带退避重试。只有 Gitee 侧连 Release 都没建成、又不方便跑 workflow 时，才用下面的手工脚本。
 
 ```bash
 read -rsp 'Gitee token: ' GITEE_TOKEN; echo   # 交互输入，不进 shell 历史

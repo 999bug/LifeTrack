@@ -22,20 +22,38 @@ import com.example.lifetrack.feature.record.RecordEditorDialog
 /**
  * 运动编辑器：复用通用事件壳，只提供类型 / 时长 / 强度三个详情字段。
  * 时长是唯一必填项，类型与强度都有默认值，避免大字号下多一步操作才能保存。
+ *
+ * v0.7 起界面只提供瑜伽 / 骑行 / 跑步三类（[SportFields.SPORTS]），并且：
+ * - [initialSport] 让子应用的类型卡直接预选，点「瑜伽」后只需填时长；
+ * - 打开旧类型记录时**不预选任何 chip**，先提示再让用户显式重选，
+ *   否则 `ChoiceChipRow` 会出现三个都不选中、保存后静默把类型改掉的情况。
  */
 @Composable
 fun SportEditorDialog(
     record: BackupRecord?,
     onDismiss: () -> Unit,
-    onSave: (RecordDraft) -> Unit
+    onSave: (RecordDraft) -> Unit,
+    initialSport: String? = null
 ) {
     val initial = (record?.detail as? RecordDetail.Generic)?.fields.orEmpty()
-    var sport by remember(record) { mutableStateOf(initial[SportFields.SPORT] ?: SportFields.SPORTS.first()) }
+    val storedSport = initial[SportFields.SPORT]?.takeIf { it.isNotEmpty() }
+    var sport by remember(record, initialSport) {
+        mutableStateOf(
+            when {
+                storedSport != null && SportFields.isSelectable(storedSport) -> storedSport
+                storedSport != null -> "" // 旧类型：不预选，逼一次显式选择
+                initialSport != null && SportFields.isSelectable(initialSport) -> initialSport
+                else -> ""
+            }
+        )
+    }
     var duration by remember(record) { mutableStateOf(initial[SportFields.DURATION].orEmpty()) }
     var intensity by remember(record) {
         mutableStateOf(initial[SportFields.INTENSITY] ?: SportFields.INTENSITIES[1])
     }
-    val valid = SportFields.isValidDuration(duration)
+    val legacySport = storedSport?.takeIf { SportFields.isLegacy(it) }
+    val durationValid = SportFields.isValidDuration(duration)
+    val valid = durationValid && sport.isNotEmpty()
 
     RecordEditorDialog(
         title = if (record == null) "记录运动" else "编辑运动记录",
@@ -64,8 +82,24 @@ fun SportEditorDialog(
             )
         }
     ) {
+        if (legacySport != null) {
+            Text(
+                text = "这条记录的类型是「${SportFields.sportLabel(legacySport)}」，该类型已从界面下线。" +
+                    "请重新选一个类型再保存；直接关掉不会改动它。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
         Text("运动类型", style = MaterialTheme.typography.titleSmall)
         ChoiceChipRow(SportFields.SPORTS, sport, SportFields::sportLabel) { sport = it }
+        if (sport.isEmpty()) {
+            Text(
+                text = "先选一个类型，记录里才知道这是瑜伽、骑行还是跑步。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Text(
             "时长（必填，${SportFields.DURATION_RANGE.first}–${SportFields.DURATION_RANGE.last} 分钟）",
@@ -78,9 +112,9 @@ fun SportEditorDialog(
             label = { Text("分钟") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
-            isError = duration.isNotEmpty() && !valid
+            isError = duration.isNotEmpty() && !durationValid
         )
-        if (duration.isNotEmpty() && !valid) {
+        if (duration.isNotEmpty() && !durationValid) {
             Text(
                 "请输入 ${SportFields.DURATION_RANGE.first}–${SportFields.DURATION_RANGE.last} 之间的整数",
                 style = MaterialTheme.typography.bodySmall,

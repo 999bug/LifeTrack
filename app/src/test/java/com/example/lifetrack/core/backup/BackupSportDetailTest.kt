@@ -64,6 +64,22 @@ class BackupSportDetailTest {
         }
     }
 
+    /**
+     * 界面只留瑜伽 / 骑行 / 跑步，但旧值必须继续通过备份校验：
+     * 校验器改成只认三类，会让任何含旧类型记录的旧备份**整份**恢复失败，
+     * 而不只是丢那几条。
+     */
+    @Test
+    fun `legacy sport values still decode from old backups`() {
+        SportFields.LEGACY_SPORTS.forEach { legacy ->
+            val fields = validFields + (SportFields.SPORT to legacy)
+            val result = BackupCodec.decode(encode(fields), fixedNow)
+            assertTrue(legacy, result is BackupDecodeResult.Success)
+            val record = (result as BackupDecodeResult.Success).payload.events.single()
+            assertEquals(RecordDetail.Generic(SportFields.TYPE_CODE, fields), record.detail)
+        }
+    }
+
     @Test
     fun `a sport record without detail is still valid`() {
         val record = BackupRecord(event = event(), detail = null)

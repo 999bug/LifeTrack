@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-font="normal">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运动子应用 · 交互原型 v1 · 生活记</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  :root {
+    --font: -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --canvas: #ECEEE8;
+    --bg: #F7F8F5;
+    --surface: #FFFFFF;
+    --surface-2: #EFF2EB;
+    --surface-3: #E7EBE2;
+    --border: #E3E8DE;
+    --border-strong: #D3DBCC;
+    --text: #171A16;
+    --text-2: #59625A;
+    --text-3: #69716A;
+    --primary: #33604A;
+    --on-primary: #FFFFFF;
+    --primary-soft: #DDEBE0;
+    --sport: #4C7A57;
+    --sport-1: #2F5A40;
+    --sport-2: #5F9369;
+    --sport-3: #93BC9D;
+    --poop: #8A6A4B;
+    --water: #3D7391;
+    --note-bg: #F1F4EF;
+    --shadow: 0 1px 2px rgba(23,26,22,.04), 0 12px 28px -22px rgba(23,26,22,.35);
+  }
+  html[data-theme="dark"] {
+    --canvas: #070A08;
+    --bg: #111713;
+    --surface: #19211B;
+    --surface-2: #202A23;
+    --surface-3: #28332B;
+    --border: #3B463D;
+    --border-strong: #47534A;
+    --text: #E8F2E9;
+    --text-2: #B9C6BA;
+    --text-3: #8FA093;
+    --primary: #A5D6AE;
+    --on-primary: #0E1510;
+    --primary-soft: #24382B;
+    --sport: #9CC7A6;
+    --sport-1: #DBEFDD;
+    --sport-2: #9CC7A6;
+    --sport-3: #5E8C69;
+    --poop: #C9A382;
+    --water: #8FC0D8;
+    --note-bg: #1A231C;
+    --shadow: 0 1px 0 rgba(255,255,255,.02), 0 14px 30px -24px rgba(0,0,0,.9);
+  }
+
+  body { font-family: var(--font); background: var(--canvas); color: var(--text); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  .stage { max-width: 1160px; margin: 0 auto; padding: 30px 28px 52px; display: grid; grid-template-columns: 292px minmax(0,1fr); gap: 48px; align-items: start; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 1.3px; color: var(--text-3); margin: 0 0 12px; }
+  .notes h1 { font-size: 23px; line-height: 1.35; font-weight: 600; margin: 0 0 12px; letter-spacing: -.2px; }
+  .lede { font-size: 12.5px; line-height: 1.85; color: var(--text-2); margin: 0 0 26px; }
+  .decision { border-top: 1px solid var(--border); padding: 15px 0 0; margin: 0 0 16px; }
+  .decision h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; }
+  .decision h3 i { font-style: normal; font-size: 10px; color: var(--primary); letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+  .decision p { font-size: 12px; line-height: 1.75; color: var(--text-3); margin: 0; }
+  .note-box { margin-top: 24px; padding: 13px 14px; background: var(--note-bg); border-left: 2px solid var(--primary); border-radius: 0 8px 8px 0; font-size: 11.5px; line-height: 1.8; color: var(--text-2); }
+  .note-box code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 10.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; }
+
+  .demo { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); }
+  .tb-group { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 999px; }
+  .tb-group button { font: inherit; font-size: 11.5px; color: var(--text-2); background: none; border: none; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .tb-group button.on { background: var(--primary); color: var(--on-primary); }
+  .tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
+  .tb-label { font-size: 10.5px; color: var(--text-3); padding: 0 3px 0 7px; }
+  .tb-btn { font: inherit; font-size: 11.5px; color: var(--primary); background: var(--primary-soft); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+
+  .device { width: 412px; height: 866px; padding: 10px; border-radius: 50px; background: #1B1F1C; box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 40px 90px -40px rgba(0,0,0,.6); flex: 0 0 auto; }
+  .phone { --f: 1; position: relative; width: 100%; height: 100%; border-radius: 41px; overflow: hidden; background: var(--bg); color: var(--text); font-size: calc(13px * var(--f)); display: flex; flex-direction: column; }
+  html[data-font="large"] .phone { --f: 1.42; }
+  .caption { font-size: 11.5px; color: var(--text-3); margin: 0; text-align: center; line-height: 1.7; }
+
+  .screen { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 26px 20px 26px; scrollbar-width: none; }
+  .screen::-webkit-scrollbar { display: none; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; }
+  .topbar h2 { font-size: 1.3em; font-weight: 600; margin: 0; flex: 1; letter-spacing: -.2px; }
+  .icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; padding: 0; }
+  .icon-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .ghost { font: inherit; font-size: .84em; color: var(--text-3); background: none; border: none; padding: 0; cursor: pointer; }
+
+  .ov { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); }
+  .ov-cap { font-size: .8em; color: var(--text-3); }
+  .ov-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .ov-big { font-size: 2em; font-weight: 600; letter-spacing: -.8px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .ov-total { font-size: .88em; color: var(--text-2); }
+  .segbar { display: flex; gap: 2px; height: 8px; margin-top: 14px; }
+  .segbar i { display: block; height: 100%; }
+  .segbar i.first { border-radius: 4px 0 0 4px; }
+  .segbar i.last { border-radius: 0 4px 4px 0; }
+  .segbar i.only { border-radius: 4px; }
+  .seg-a { background: var(--sport-1); }
+  .seg-b { background: var(--sport-2); }
+  .seg-c { background: var(--sport-3); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 9px; font-size: .78em; color: var(--text-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
+  .ov-div { height: 1px; background: var(--border); margin: 13px 0 11px; }
+  .wk-cap { font-size: .78em; color: var(--text-3); margin-bottom: 8px; }
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .wk { text-align: center; }
+  .wk span { display: block; font-size: .76em; color: var(--text-3); margin-bottom: 5px; }
+  .wk span.today { color: var(--sport); font-weight: 500; }
+  .wk i { display: block; height: 18px; border-radius: 5px; background: var(--surface-2); }
+  .wk i.on { background: var(--sport); opacity: .55; }
+  .wk i.today { background: var(--sport); opacity: 1; }
+  .wk i.future { background: transparent; border: 1px dashed var(--border-strong); }
+
+  .sec { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 20px 0 10px; }
+  .sec h3 { font-size: 1.08em; font-weight: 600; margin: 0; }
+  .sec .hint { font-size: .78em; color: var(--text-3); }
+
+  .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .quick { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 11px 6px 10px; text-align: center; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow); }
+  .quick .qi { width: 34px; height: 34px; margin: 0 auto; border-radius: 10px; display: grid; place-items: center; background: var(--primary-soft); color: var(--sport); }
+  .quick .qi svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+  .quick b { display: block; font-size: .92em; font-weight: 500; margin-top: 7px; }
+  .quick em { display: block; font-style: normal; font-size: .76em; color: var(--text-3); margin-top: 2px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: .8em; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-2); cursor: pointer; min-height: 30px; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+  .rec-list { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2px 13px; box-shadow: var(--shadow); }
+  .rec-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 0; border: none; border-bottom: 1px solid var(--border); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .rec-row:last-child { border-bottom: none; }
+  .rec-ico { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; display: grid; place-items: center; background: var(--primary-soft); color: var(--sport); }
+  .rec-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+  .rec-main { flex: 1; min-width: 0; }
+  .rec-main b { display: block; font-size: .89em; font-weight: 500; }
+  .rec-main em { display: block; font-style: normal; font-size: .76em; color: var(--text-3); margin-top: 2px; }
+  .rec-dur { font-size: .86em; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .empty { padding: 22px 8px; text-align: center; font-size: .86em; line-height: 1.8; color: var(--text-3); }
+
+  .fold { margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .fold-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px 13px; background: none; border: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .fold-head b { font-size: .92em; font-weight: 500; flex: 1; }
+  .fold-head span { font-size: .78em; color: var(--text-3); }
+  .fold-body { padding: 0 13px 13px; border-top: 1px solid var(--border); }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
+  .metric { background: var(--surface-2); border-radius: 10px; padding: 10px; }
+  .metric b { display: block; font-size: 1.08em; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric span { display: block; font-size: .74em; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
+  .fold-note { font-size: .76em; line-height: 1.7; color: var(--text-3); margin: 11px 0 0; }
+
+  .disclaimer { font-size: .76em; line-height: 1.7; color: var(--text-3); margin: 14px 2px 4px; }
+
+  .mod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .mod { position: relative; min-height: 128px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px; text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+  .mod.hl { border-color: var(--sport); }
+  .mod-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .mod-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+  .mod-ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .mod-cnt { font-size: .72em; color: var(--text-3); background: var(--surface-3); border-radius: 12px; padding: 3px 7px; }
+  .mod-name { font-size: .92em; font-weight: 500; margin-top: auto; }
+  .mod-foot { display: flex; align-items: center; gap: 6px; min-height: 26px; margin-top: 4px; }
+  .mod-status { flex: 1; min-width: 0; font-size: .74em; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; min-height: 26px; padding: 0 8px; border-radius: 13px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--sport); font-size: .7em; cursor: pointer; font-family: inherit; }
+  .slot svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+
+  .day-list { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2px 13px; margin-top: 10px; box-shadow: var(--shadow); }
+  .day-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .86em; }
+  .day-row:last-child { border-bottom: none; }
+  .day-row .t { width: 40px; flex: 0 0 40px; color: var(--text-3); font-size: .92em; padding-top: 1px; font-variant-numeric: tabular-nums; }
+  .day-row .b { flex: 1; min-width: 0; }
+  .day-row .b em { display: block; font-style: normal; color: var(--text-3); font-size: .88em; margin-top: 2px; }
+
+  .nav { display: flex; border-top: 1px solid var(--border); background: var(--surface); padding: 7px 4px 14px; flex: 0 0 auto; }
+  .nav button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; color: var(--text-3); font: inherit; font-size: .76em; padding: 5px 0; }
+  .nav button.on { color: var(--primary); }
+  .nav svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  .sheet-mask { position: absolute; inset: 0; background: rgba(10,14,11,.42); display: flex; align-items: flex-end; z-index: 20; }
+  .sheet { width: 100%; max-height: 88%; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 18px 22px; scrollbar-width: none; }
+  .sheet::-webkit-scrollbar { display: none; }
+  .grab { width: 34px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 12px; }
+  .sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .sheet-head b { font-size: 1.08em; font-weight: 600; flex: 1; }
+  .field { margin-top: 16px; }
+  .field > label { display: block; font-size: .82em; color: var(--text-2); margin-bottom: 7px; }
+  .time-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; font-size: .88em; }
+  .time-row span { flex: 1; }
+  .time-row em { font-style: normal; font-size: .86em; color: var(--text-3); }
+  .dur-input { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; background: var(--surface); }
+  .dur-input input { flex: 1; min-width: 0; border: none; outline: none; background: none; font: inherit; font-size: .95em; color: var(--text); padding: 11px 0; }
+  .dur-input span { font-size: .84em; color: var(--text-3); }
+  .sheet-note { font-size: .76em; line-height: 1.7; color: var(--text-3); margin: 12px 0 0; }
+  .sheet-foot { display: flex; gap: 9px; margin-top: 18px; }
+  .sheet-foot button { flex: 1; font: inherit; font-size: .9em; padding: 11px 0; border-radius: 11px; cursor: pointer; }
+  .btn-ghost { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); }
+  .btn-main { background: var(--primary); border: 1px solid var(--primary); color: var(--on-primary); }
+  .btn-main:disabled { opacity: .45; cursor: default; }
+
+  .toast { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); font-size: .82em; padding: 9px 16px; border-radius: 999px; white-space: nowrap; max-width: 88%; overflow: hidden; text-overflow: ellipsis; }
+
+  html[data-font="large"] .quick-grid { grid-template-columns: 1fr; }
+  html[data-font="large"] .quick { display: flex; align-items: center; gap: 10px; text-align: left; padding: 12px; }
+  html[data-font="large"] .quick .qi { margin: 0; flex: 0 0 34px; }
+  html[data-font="large"] .quick b { margin-top: 0; }
+  html[data-font="large"] .quick em { margin-top: 0; margin-left: auto; }
+  html[data-font="large"] .wk i { height: 26px; }
+  html[data-font="large"] .metrics { grid-template-columns: 1fr; }
+  html[data-font="large"] .rec-row { flex-wrap: wrap; }
+  html[data-font="large"] .rec-dur { width: 100%; padding-left: 40px; }
+  html[data-font="large"] .mod-grid { grid-template-columns: 1fr; }
+  html[data-font="large"] .mod { min-height: 104px; }
+
+  @media (max-width: 900px) {
+    .stage { grid-template-columns: 1fr; gap: 22px; padding: 22px 16px 40px; }
+    .notes { max-width: 640px; }
+    .decision, .note-box { max-width: 640px; }
+    .toolbar { border-radius: 16px; }
+    .device { width: 100%; max-width: 412px; height: 780px; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="notes">
+    <p class="eyebrow">LIFETRACK · 运动子应用 v1</p>
+    <h1>运动子应用<br>交互原型</h1>
+    <p class="lede">按已确认的四个方向做：A 节奏型、共用「时长 + 强度」、首页整卡进子应用、界面只留瑜伽 / 骑行 / 跑步。这一版只做视觉与交互，不写 Compose。</p>
+
+    <div class="decision">
+      <h3><i>01</i> 先看节奏，再记录</h3>
+      <p>首屏第一块是本周概览：次数、总时长、三类占比条、7 天节奏格。首页与统计页都看不到「这周断没断」，这是子应用存在的理由。</p>
+    </div>
+    <div class="decision">
+      <h3><i>02</i> 三类只差图标，不差字段</h3>
+      <p>瑜伽 / 骑行 / 跑步共用类型、时长、强度、备注，差异只在图标、占比条与筛选。不引入距离字段，不推翻「不做热量或配速推算」的既有约定。</p>
+    </div>
+    <div class="decision">
+      <h3><i>03</i> 快记是主行动</h3>
+      <p>三张类型卡点一下直接开弹层并预选类型，填完时长就保存。复用现有编辑器，不重造表单；保存后概览数字立即更新。</p>
+    </div>
+    <div class="decision">
+      <h3><i>04</i> 首页入口不动网格</h3>
+      <p>运动卡留在快速记录网格里，整卡点击进子应用，右下角动作槽保留「记一次」直接记录。高频路径不多一次点击。</p>
+    </div>
+
+    <div class="note-box">
+      工具栏可切<strong>浅色 / 深色</strong>、<strong>常规 / 200% 字体</strong>、<strong>本周有记录 / 空态</strong>；点三张类型卡打开记录弹层，选时长与强度后点保存，概览与列表会真的变化；点「本期简报」展开指标；点类型 chip 过滤列表。<br>
+      数据固定为 2026-11-13（周五），本周 4 次 / 200 分钟，跨面板自洽。图示全部内联 SVG，无外链、无渐变、无装饰 emoji。
+    </div>
+  </aside>
+
+  <main class="demo">
+    <div class="toolbar">
+      <div class="tb-group" data-group="page">
+        <button data-set="page" data-value="sport" class="on">运动</button>
+        <button data-set="page" data-value="today">今天</button>
+      </div>
+      <span class="tb-sep"></span>
+      <span class="tb-label">主题</span>
+      <div class="tb-group" data-group="theme">
+        <button data-set="theme" data-value="light" class="on">浅色</button>
+        <button data-set="theme" data-value="dark">深色</button>
+      </div>
+      <span class="tb-label">字号</span>
+      <div class="tb-group" data-group="font">
+        <button data-set="font" data-value="normal" class="on">常规</button>
+        <button data-set="font" data-value="large">200%</button>
+      </div>
+      <span class="tb-label">场景</span>
+      <div class="tb-group" data-group="scenario">
+        <button data-set="scenario" data-value="full" class="on">本周有记录</button>
+        <button data-set="scenario" data-value="empty">空态</button>
+      </div>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" data-act="openEditor">记一次</button>
+    </div>
+
+    <div class="device"><div class="phone" id="phone"></div></div>
+    <p class="caption">412 × 866 · 单文件原型 v1 · 数据固定为 2026-11-13（周五） · 运动子应用为隐藏底导的二级页，从首页运动卡整卡进入</p>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TODAY = '2026-11-13';
+  var WEEK_START = '2026-11-09';
+  var WEEK_END = '2026-11-15';
+  var DAY = 86400000;
+  var WEEK = ['一','二','三','四','五','六','日'];
+
+  var TYPE = {
+    yoga: { name: '瑜伽', icon: 'yoga' },
+    ride: { name: '骑行', icon: 'ride' },
+    run:  { name: '跑步', icon: 'run' }
+  };
+  var TYPE_ORDER = ['yoga','ride','run'];
+  var INTENSITY = { low: '低强度', medium: '中等强度', high: '高强度' };
+  var INTENSITY_ORDER = ['low','medium','high'];
+
+  var BASE_RECORDS = [
+    { id: 'r1', date: '2026-11-09', time: '07:20', type: 'run',  min: 60, intensity: 'medium' },
+    { id: 'r2', date: '2026-11-09', time: '18:30', type: 'ride', min: 45, intensity: 'low' },
+    { id: 'r3', date: '2026-11-11', time: '21:10', type: 'yoga', min: 60, intensity: 'low' },
+    { id: 'r4', date: '2026-11-13', time: '07:20', type: 'ride', min: 35, intensity: 'low' }
+  ];
+
+  var S = {
+    page: 'sport',
+    theme: 'light',
+    font: 'normal',
+    scenario: 'full',
+    filter: 'all',
+    briefOpen: false,
+    editorOpen: false,
+    draftType: 'ride',
+    draftMin: '35',
+    draftIntensity: 'medium',
+    records: BASE_RECORDS.slice(),
+    toast: ''
+  };
+
+  // 便于分享与自动化截图：?page=sport&theme=dark&font=large&scenario=empty&brief=1&editor=1
+  (function applyQuery() {
+    var q = new URLSearchParams(window.location.search);
+    ['page', 'theme', 'font', 'scenario'].forEach(function (k) {
+      var v = q.get(k);
+      if (v) S[k] = v;
+    });
+    if (q.get('brief') === '1') S.briefOpen = true;
+    if (q.get('editor') === '1') S.editorOpen = true;
+  })();
+
+  function dt(s) { return new Date(s + 'T00:00:00Z'); }
+  function iso(d) { return d.toISOString().slice(0, 10); }
+  function addDays(s, n) { return iso(new Date(dt(s).getTime() + n * DAY)); }
+  function cn(s) { var d = dt(s); return (d.getUTCMonth() + 1) + '月' + d.getUTCDate() + '日'; }
+  function weekday(s) { return WEEK[(dt(s).getUTCDay() + 6) % 7]; }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function durationLabel(min) {
+    if (min < 60) return min + ' 分钟';
+    var h = Math.floor(min / 60);
+    var rest = min % 60;
+    return rest === 0 ? h + ' 小时' : h + ' 小时 ' + rest + ' 分';
+  }
+
+  function relativeDay(d) {
+    if (d === TODAY) return '今天';
+    if (d === addDays(TODAY, -1)) return '昨天';
+    return cn(d) + ' 周' + weekday(d);
+  }
+
+  function activeRecords() {
+    return S.scenario === 'empty' ? [] : S.records.slice();
+  }
+
+  function weekRecords() {
+    return activeRecords().filter(function (r) { return r.date >= WEEK_START && r.date <= WEEK_END; });
+  }
+
+  function stats() {
+    var rs = weekRecords();
+    var total = 0, byType = { yoga: 0, ride: 0, run: 0 }, days = {}, inten = {};
+    rs.forEach(function (r) {
+      total += r.min;
+      byType[r.type] = (byType[r.type] || 0) + r.min;
+      days[r.date] = true;
+      inten[r.intensity] = (inten[r.intensity] || 0) + 1;
+    });
+    var topInten = '';
+    var best = 0;
+    Object.keys(inten).forEach(function (k) {
+      if (inten[k] > best) { best = inten[k]; topInten = k; }
+    });
+    return {
+      count: rs.length,
+      total: total,
+      byType: byType,
+      activeDays: Object.keys(days).length,
+      topInten: topInten,
+      records: rs
+    };
+  }
+
+  function icon(kind) {
+    var paths = {
+      yoga: '<circle cx="12" cy="5" r="2.1"/><path d="M12 8.5v4.5M5.5 17c2-3 4.5-4 6.5-4s4.5 1 6.5 4M4 17h16"/>',
+      ride: '<circle cx="5.5" cy="17" r="3.1"/><circle cx="18.5" cy="17" r="3.1"/><path d="M5.5 17l4-8h4l3.5 8M9.5 9h4M13.5 9l2-2h2"/>',
+      run: '<circle cx="14" cy="4.5" r="2"/><path d="M13 8l-3 4 3 2 1 5M10 12l-4 1M13 14l4-3M17 11l2 1"/>',
+      back: '<path d="M15 5l-7 7 7 7"/>',
+      plus: '<path d="M12 6v12M6 12h12"/>',
+      chart: '<path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/>',
+      close: '<path d="M6 6l12 12M18 6L6 18"/>',
+      home: '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',
+      calendar: '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 11h16"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+      water: '<path d="M12 3c3.5 4.2 5.5 7 5.5 9.5A5.5 5.5 0 0 1 12 18a5.5 5.5 0 0 1-5.5-5.5C6.5 10 8.5 7.2 12 3z"/>',
+      coffee: '<path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5z"/><path d="M16 10.5h2a2.3 2.3 0 0 1 0 4.6h-2M8 3.5v2M12 3.5v2"/>',
+      loop: '<path d="M7 8a5 5 0 1 0 0 8M17 16a5 5 0 1 0 0-8"/>'
+    };
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + (paths[kind] || '') + '</svg>';
+  }
+
+  function topbar(title, action) {
+    return '<div class="topbar">' +
+      '<button class="icon-btn" data-act="' + (S.page === 'sport' ? 'goToday' : 'noop') + '" aria-label="返回">' + icon('back') + '</button>' +
+      '<h2>' + esc(title) + '</h2>' +
+      (action || '') +
+      '</div>';
+  }
+
+  function overviewCard(st) {
+    var totalMin = st.total || 1;
+    var segs = TYPE_ORDER.map(function (t, i) {
+      return { t: t, min: st.byType[t] || 0, cls: ['seg-a','seg-b','seg-c'][i] };
+    }).filter(function (x) { return x.min > 0; });
+
+    var bar = segs.length === 0
+      ? '<div class="segbar"><i class="seg-a only" style="flex:1;opacity:.18"></i></div>'
+      : '<div class="segbar">' + segs.map(function (x, i) {
+          var round = segs.length === 1 ? 'only' : (i === 0 ? 'first' : (i === segs.length - 1 ? 'last' : ''));
+          return '<i class="' + x.cls + ' ' + round + '" style="flex:' + x.min + '"></i>';
+        }).join('') + '</div>';
+
+    var legend = segs.length === 0
+      ? '<div class="legend"><span>本周还没有记录</span></div>'
+      : '<div class="legend">' + segs.map(function (x) {
+          return '<span><i class="' + x.cls + '"></i>' + TYPE[x.t].name + ' ' + durationLabel(x.min) + '</span>';
+        }).join('') + '</div>';
+
+    var cells = '';
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(WEEK_START, i);
+      var has = st.records.some(function (r) { return r.date === d; });
+      var isToday = d === TODAY;
+      var future = d > TODAY;
+      var cls = has ? (isToday ? 'today' : 'on') : (future ? 'future' : '');
+      cells += '<div class="wk"><span class="' + (isToday ? 'today' : '') + '">' + WEEK[i] + '</span><i class="' + cls + '"></i></div>';
+    }
+
+    return '<div class="ov">' +
+      '<div class="ov-cap">本周 · ' + cn(WEEK_START) + '–' + cn(WEEK_END) + '</div>' +
+      '<div class="ov-main"><span class="ov-big">' + st.count + ' 次</span>' +
+      '<span class="ov-total">' + (st.total > 0 ? '累计 ' + durationLabel(st.total) : '还没开始') + '</span></div>' +
+      bar + legend +
+      '<div class="ov-div"></div>' +
+      '<div class="wk-cap">本周节奏 · 今天周' + weekday(TODAY) + '</div>' +
+      '<div class="week-grid">' + cells + '</div>' +
+      '</div>';
+  }
+
+  function quickCards() {
+    return '<div class="quick-grid">' + TYPE_ORDER.map(function (t) {
+      var last = activeRecords().filter(function (r) { return r.type === t; })
+        .sort(function (a, b) { return b.date < a.date ? -1 : 1; })[0];
+      return '<button class="quick" data-act="openEditor" data-type="' + t + '">' +
+        '<div class="qi">' + icon(TYPE[t].icon) + '</div>' +
+        '<b>' + TYPE[t].name + '</b>' +
+        '<em>' + (last ? '上次 ' + durationLabel(last.min) : '还没记录') + '</em>' +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  function recordList(st) {
+    var list = activeRecords().slice().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return a.time < b.time ? 1 : -1;
+    });
+    if (S.filter !== 'all') {
+      list = list.filter(function (r) { return r.type === S.filter; });
+    }
+    if (list.length === 0) {
+      return '<div class="rec-list"><div class="empty">' +
+        (S.scenario === 'empty' ? '本周还没有运动记录。<br>点上面任一张卡记一次。' : '这一类还没有记录。') +
+        '</div></div>';
+    }
+    return '<div class="rec-list">' + list.map(function (r) {
+      return '<button class="rec-row" data-act="noop">' +
+        '<span class="rec-ico">' + icon(TYPE[r.type].icon) + '</span>' +
+        '<span class="rec-main"><b>' + TYPE[r.type].name + ' · ' + INTENSITY[r.intensity] + '</b>' +
+        '<em>' + relativeDay(r.date) + ' ' + r.time + '</em></span>' +
+        '<span class="rec-dur">' + durationLabel(r.min) + '</span>' +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  function briefBlock(st) {
+    var body = S.briefOpen
+      ? '<div class="fold-body">' +
+          '<div class="metrics">' +
+            metric(st.count + ' 次', '累计次数') +
+            metric(durationLabel(st.total || 0), '累计时长') +
+            metric(st.activeDays + ' 天', '本周活跃天数') +
+            metric(st.topInten ? INTENSITY[st.topInten] : '—', '常见强度') +
+          '</div>' +
+          '<p class="fold-note">只统计已记录的内容，不推算热量或配速；未填写的字段不计入。</p>' +
+        '</div>'
+      : '';
+    return '<div class="fold">' +
+      '<button class="fold-head" data-act="toggleBrief"><b>本期简报</b><span>' + (S.briefOpen ? '收起' : '展开') + '</span></button>' +
+      body +
+      '</div>';
+  }
+
+  function metric(value, label) {
+    return '<div class="metric"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function sportPage() {
+    var st = stats();
+    var chips = '<div class="chips">' +
+      chip('all', '全部') + chip('yoga', '瑜伽') + chip('ride', '骑行') + chip('run', '跑步') +
+      '</div>';
+    return '<div class="screen">' +
+      topbar('运动', '<button class="ghost" data-act="noop">本周</button>') +
+      overviewCard(st) +
+      '<div class="sec"><h3>记一次</h3><span class="hint">点类型直接开记录</span></div>' +
+      quickCards() +
+      '<div class="sec"><h3>最近记录</h3><span class="hint">共 ' + activeRecords().length + ' 条</span></div>' +
+      chips +
+      '<div style="height:8px"></div>' +
+      recordList(st) +
+      briefBlock(st) +
+      '<p class="disclaimer">运动子应用只做记录与回顾：不接入设备数据，不推算热量、配速或训练负荷。历史与统计页仍按全部类型统一口径。</p>' +
+      '</div>' +
+      (S.editorOpen ? editorSheet() : '') +
+      (S.toast ? '<div class="toast">' + esc(S.toast) + '</div>' : '');
+  }
+
+  function chip(value, label) {
+    var on = S.filter === value ? ' on' : '';
+    return '<button class="chip' + on + '" data-act="filter" data-value="' + value + '">' + label + '</button>';
+  }
+
+  function editorSheet() {
+    var types = TYPE_ORDER.map(function (t) {
+      var on = S.draftType === t ? ' on' : '';
+      return '<button class="chip' + on + '" data-act="draftType" data-value="' + t + '">' + TYPE[t].name + '</button>';
+    }).join('');
+    var inten = INTENSITY_ORDER.map(function (k) {
+      var on = S.draftIntensity === k ? ' on' : '';
+      return '<button class="chip' + on + '" data-act="draftIntensity" data-value="' + k + '">' + INTENSITY[k] + '</button>';
+    }).join('');
+    var min = parseInt(S.draftMin, 10);
+    var valid = !isNaN(min) && min >= 1 && min <= 1440;
+
+    return '<div class="sheet-mask" data-act="closeEditorMask">' +
+      '<div class="sheet" data-act="stop">' +
+        '<div class="grab"></div>' +
+        '<div class="sheet-head"><b>记录运动</b>' +
+          '<button class="icon-btn" data-act="closeEditor" aria-label="关闭">' + icon('close') + '</button></div>' +
+        '<div class="field"><label>时间</label>' +
+          '<div class="time-row"><span>今天 15:05</span><em>修改</em></div></div>' +
+        '<div class="field"><label>运动类型</label><div class="chips">' + types + '</div></div>' +
+        '<div class="field"><label>时长（必填，1–1440 分钟）</label>' +
+          '<div class="dur-input"><input id="draftMin" inputmode="numeric" value="' + esc(S.draftMin) + '" aria-label="运动时长，分钟"><span>分钟</span></div></div>' +
+        '<div class="field"><label>强度</label><div class="chips">' + inten + '</div></div>' +
+        '<p class="sheet-note">时长按分钟记录，超过 60 分钟会换算成小时；不做热量或配速推算。</p>' +
+        '<div class="sheet-foot">' +
+          '<button class="btn-ghost" data-act="closeEditor">取消</button>' +
+          '<button class="btn-main" data-act="saveDraft"' + (valid ? '' : ' disabled') + '>保存</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function todayPage() {
+    var sportToday = activeRecords().filter(function (r) { return r.date === TODAY; });
+    var otherRows = [
+      { t: '09:10', n: '饮水', d: '250 ml' },
+      { t: '10:05', n: '咖啡 / 茶', d: '200 ml' },
+      { t: '12:30', n: '排便', d: '布里斯托 4 型' }
+    ];
+    var dayRows = sportToday.map(function (r) {
+      return { t: r.time, n: TYPE[r.type].name, d: INTENSITY[r.intensity] + ' · ' + durationLabel(r.min) };
+    }).concat(otherRows).sort(function (a, b) { return a.t < b.t ? 1 : -1; });
+    return '<div class="screen" style="padding-bottom:16px">' +
+      '<div style="padding-bottom:6px">' +
+        '<div style="font-size:.8em;color:var(--text-3);letter-spacing:.3px">' + cn(TODAY) + ' 周五</div>' +
+        '<div style="font-size:1.7em;font-weight:600;margin-top:2px;letter-spacing:-.3px">今天</div>' +
+      '</div>' +
+      '<div class="sec"><h3>快速记录</h3><span class="hint">运动卡整卡进入</span></div>' +
+      '<div class="mod-grid">' +
+        '<button class="mod" data-act="noop">' +
+          '<span class="mod-top"><span class="mod-ico" style="background:rgba(138,106,75,.14);color:var(--poop)">' + icon('loop') + '</span><span class="mod-cnt">1 次</span></span>' +
+          '<span class="mod-name">排便</span>' +
+          '<span class="mod-foot"><span class="mod-status">今天还没记录</span><span class="slot" data-act="noop">' + icon('plus') + '详细</span></span>' +
+        '</button>' +
+        '<button class="mod" data-act="noop">' +
+          '<span class="mod-top"><span class="mod-ico" style="background:rgba(61,115,145,.14);color:var(--water)">' + icon('water') + '</span><span class="mod-cnt">2 次</span></span>' +
+          '<span class="mod-name">饮水</span>' +
+          '<span class="mod-foot"><span class="mod-status">550 ml · 2 次</span><span class="slot" data-act="noop">' + icon('plus') + '详细</span></span>' +
+        '</button>' +
+        '<button class="mod hl" data-act="goSport">' +
+          '<span class="mod-top"><span class="mod-ico" style="background:rgba(76,122,87,.14);color:var(--sport)">' + icon('run') + '</span><span class="mod-cnt">' + sportToday.length + ' 次</span></span>' +
+          '<span class="mod-name">运动</span>' +
+          '<span class="mod-foot"><span class="mod-status">' + (sportToday.length ? '今天已记 ' + durationLabel(sportToday.reduce(function(a,r){return a+r.min;},0)) : '今天还没记录') + '</span>' +
+          '<span class="slot" data-act="openEditor">' + icon('plus') + '记一次</span></span>' +
+        '</button>' +
+        '<button class="mod" data-act="noop">' +
+          '<span class="mod-top"><span class="mod-ico" style="background:rgba(76,122,87,.14);color:var(--sport)">' + icon('chart') + '</span><span class="mod-cnt">—</span></span>' +
+          '<span class="mod-name">咖啡 / 茶</span>' +
+          '<span class="mod-foot"><span class="mod-status">今天还没记录</span><span class="slot" data-act="noop">' + icon('plus') + '记一杯</span></span>' +
+        '</button>' +
+      '</div>' +
+      '<div class="sec"><h3>今日记录</h3><span class="hint">' + dayRows.length + ' 条</span></div>' +
+      '<div class="day-list">' + dayRows.map(function (r) {
+        return '<div class="day-row"><span class="t">' + r.t + '</span><span class="b">' + r.n + '<em>' + r.d + '</em></span></div>';
+      }).join('') + '</div>' +
+      '</div>' +
+      '<div class="nav">' +
+        '<button class="on">' + icon('home') + '今天</button>' +
+        '<button>' + icon('calendar') + '历史</button>' +
+        '<button>' + icon('chart') + '统计</button>' +
+        '<button>' + icon('settings') + '设置</button>' +
+      '</div>';
+  }
+
+  function render() {
+    var phone = document.getElementById('phone');
+    document.documentElement.setAttribute('data-theme', S.theme);
+    document.documentElement.setAttribute('data-font', S.font);
+    ['page', 'theme', 'font', 'scenario'].forEach(function (g) {
+      var nodes = document.querySelectorAll('[data-group="' + g + '"] button');
+      Array.prototype.forEach.call(nodes, function (b) {
+        b.classList.toggle('on', b.getAttribute('data-value') === S[g]);
+      });
+    });
+    phone.innerHTML = S.page === 'today' ? todayPage() : sportPage();
+
+    var input = document.getElementById('draftMin');
+    if (input) {
+      input.addEventListener('input', function () {
+        S.draftMin = input.value.replace(/[^\d]/g, '');
+        input.value = S.draftMin;
+        var min = parseInt(S.draftMin, 10);
+        var ok = !isNaN(min) && min >= 1 && min <= 1440;
+        var save = phone.querySelector('[data-act="saveDraft"]');
+        if (save) save.disabled = !ok;
+      });
+    }
+  }
+
+  function toast(msg) {
+    S.toast = msg;
+    render();
+    window.setTimeout(function () {
+      S.toast = '';
+      var t = document.querySelector('.toast');
+      if (t) t.remove();
+    }, 2200);
+  }
+
+  function setActive(group, value) {
+    var nodes = document.querySelectorAll('[data-group="' + group + '"] button');
+    Array.prototype.forEach.call(nodes, function (b) {
+      b.classList.toggle('on', b.getAttribute('data-value') === value);
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]');
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'stop') { e.stopPropagation(); return; }
+
+    switch (act) {
+      case 'goSport':
+        S.page = 'sport';
+        setActive('page', 'sport');
+        render();
+        break;
+      case 'goToday':
+        S.page = 'today';
+        setActive('page', 'today');
+        render();
+        break;
+      case 'openEditor':
+        e.stopPropagation();
+        S.editorOpen = true;
+        var picked = el.getAttribute('data-type');
+        if (picked) S.draftType = picked;
+        S.draftMin = picked ? '35' : S.draftMin;
+        S.draftIntensity = 'medium';
+        render();
+        break;
+      case 'closeEditor':
+      case 'closeEditorMask':
+        if (act === 'closeEditorMask' && e.target !== el) return;
+        S.editorOpen = false;
+        render();
+        break;
+      case 'draftType':
+        S.draftType = el.getAttribute('data-value');
+        render();
+        break;
+      case 'draftIntensity':
+        S.draftIntensity = el.getAttribute('data-value');
+        render();
+        break;
+      case 'saveDraft':
+        var min = parseInt(S.draftMin, 10);
+        if (isNaN(min) || min < 1 || min > 1440) return;
+        S.records.push({
+          id: 'n' + Date.now(),
+          date: TODAY,
+          time: '15:05',
+          type: S.draftType,
+          min: min,
+          intensity: S.draftIntensity
+        });
+        S.scenario = 'full';
+        S.editorOpen = false;
+        S.filter = 'all';
+        setActive('scenario', 'full');
+        toast('已记录 ' + TYPE[S.draftType].name + ' ' + durationLabel(min));
+        break;
+      case 'filter':
+        S.filter = el.getAttribute('data-value');
+        render();
+        break;
+      case 'toggleBrief':
+        S.briefOpen = !S.briefOpen;
+        render();
+        break;
+      case 'noop':
+        break;
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-set]');
+    if (!btn) return;
+    var set = btn.getAttribute('data-set');
+    var value = btn.getAttribute('data-value');
+    if (set === 'page') S.page = value;
+    if (set === 'theme') S.theme = value;
+    if (set === 'font') S.font = value;
+    if (set === 'scenario') {
+      S.scenario = value;
+      S.filter = 'all';
+    }
+    setActive(set, value);
+    render();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && S.editorOpen) {
+      S.editorOpen = false;
+      render();
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

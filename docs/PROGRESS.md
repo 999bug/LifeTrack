@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | 🟡 | B3 TalkBack 实机朗读复核 | 需要真机 + 读屏 | 依次走 首页 → 历史 → 统计 → 设置，确认分段选中态、月历格、分布卡汇总句 |
 | 🟡 | B7 真机「卸载重装丢数据」验证 | 需要真机 | 装 0.6.5 → 记录 → 卸载重装 → 确认数据丢失（预期丢失，验的是 README 表述是否准确） |
+| 🟡 | 运动子应用真机走查 | 需要真机 | 点类型卡预选 → 保存后概览 / 今日记录同步 → 深色 / 200% / 360dp；口径见 `docs/sport-subapp-design.md` §7 |
 | 🟡 | B8 / C8 厂商 ROM 迁移走查 | 需要真机 | 与 B7 合并执行，重点看厂商 ROM 的设备迁移是否带走业务库 |
 | 🟡 | R11 CI 仪器测试任务未实跑 | `reactivecircus/android-emulator-runner` + KVM 链路 | 手动 dispatch 或给 PR 打 `run-instrumented` 标签；本地 `connectedDebugAndroidTest` 已全绿 |
 | 🔵 | A9 月经 E2 / E3 | E1 已于 2026-11-12 交付 | 体重 / 体温、自定义症状、完整报告（E2）；通知提醒、备孕 / 怀孕模式（E3），见 `docs/menstruation-module-design.md` |
@@ -93,6 +94,7 @@
 | 发布 0.6.7 | `a657ad5` | **mirror-gitee 首次全绿**：jq 修复生效，`latest.json` 由 CI 自动从 0.6.6 更新到 0.6.7；APK 5.19 MB，两个 job 均 success |
 | A9 月经模块（E1） | 2026-11-12 | 经期子应用（日历置顶 + 逐行填写 + 日记）、`CycleCalculator` 周期派生、起止动作自动补齐；66 项新单测（共 336 项 / 0 失败）；模拟器走查通过（启用 / 停用、FLAG_SECURE、补齐、持久化、200% 字体 / 360dp / 深色）；Room 仍 v3、备份格式不变；`VersionHistory.kt` 条目留待发版补 |
 | A9 经期自动延续 + 移除截屏限制 | 2026-11-12 | ① 点一次「来了」后 `ongoingPeriodStart` 记起点，`syncOngoingPeriod` 每天把 `[起点..昨天]` 补成仅标记事件、今天由 `PeriodOngoing.span` 派生，点「走了」按 `closingDates` 收尾；日历「经期中的今天」改模块色实心。② 删除 `FLAG_SECURE`：`ScreenCapturePolicy` → `SensitiveTypes`，设置页截屏状态行 / 模块启用弹窗一并删除。单测 339 项 / 0 失败，`lintDebug` 全绿；Room 仍 v3、备份格式不变 |
+| A13 运动子应用（节奏型） | 2026-11-13 | 新增隐藏底导的 `sport` 二级页：本周概览（次数 / 合计时长 / 三类占比条 / 7 天节奏）、三类快记卡（瑜伽 / 骑行 / 跑步，点卡开弹层并预选类型）、类型筛选记录列表、本期简报折叠；派生层 `SportStats` 纯函数不落库。`SPORTS` 收敛三类 + `LEGACY_SPORTS` 只读白名单（备份校验改用 `ALL_SPORT_VALUES`），旧记录与旧备份仍可读、编辑器不再静默改类型。单测 351 项 / 0 失败（新增 15 项）；Room 仍 v3、备份格式不变；设计文档 `docs/sport-subapp-design.md`、原型 `docs/sport-subapp-prototype.html` |
 
 ---
 
@@ -112,6 +114,7 @@
 | A10 | 亲密关系模块 | ✅ 0.6.0 发布 |
 | A11 | 统计 / 首页按类型适配，跨面板自洽 | ✅ |
 | A12 | 新模块字段校验与备份范围 | ✅ |
+| A13 | 运动子应用（节奏型）：本周概览 + 三类快记 + 筛选列表 + 简报，只留瑜伽 / 骑行 / 跑步 | ✅ 2026-11-13，真机走查待做 |
 
 ## 3. B · 测试与质量收尾包
 

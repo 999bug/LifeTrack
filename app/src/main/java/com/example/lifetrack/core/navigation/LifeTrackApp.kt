@@ -48,6 +48,7 @@ import com.example.lifetrack.feature.record.RecordDetailSheet
 import com.example.lifetrack.feature.settings.ModuleManagementScreen
 import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.sport.SportEditorDialog
+import com.example.lifetrack.feature.sport.SportScreen
 import com.example.lifetrack.feature.statistics.StatisticsScreen
 import com.example.lifetrack.feature.water.WaterEditorDialog
 
@@ -76,6 +77,8 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     val currentRoute = backStackEntry?.destination?.route
     var editorVisible by remember { mutableStateOf(false) }
     var editorTypeCode by remember { mutableStateOf(DEFAULT_POOP_TYPE.code) }
+    /** 运动编辑器预选类型：子应用点「瑜伽」时带过来，其他入口为 null。 */
+    var editorSport by remember { mutableStateOf<String?>(null) }
     var editingRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var detailRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
@@ -84,8 +87,9 @@ fun LifeTrackApp(viewModel: MainViewModel) {
         viewModel.checkForUpdate(auto = true)
     }
 
-    fun openEditor(typeCode: String, record: BackupRecord?) {
+    fun openEditor(typeCode: String, record: BackupRecord?, sport: String? = null) {
         editorTypeCode = typeCode
+        editorSport = sport
         editingRecord = record
         editorVisible = true
     }
@@ -143,6 +147,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
+                    onOpenSport = { navController.navigate("sport") },
                     onIntimacyRecord = { openEditor(IntimacyFields.TYPE_CODE, null) },
                     onOpenPeriod = { navController.navigate("cycle") },
                     onOpenSettings = { navController.navigate("settings") },
@@ -178,6 +183,16 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onBack = { navController.popBackStack() }
                 )
             }
+            composable("sport") {
+                SportScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onRecord = { sport -> openEditor(SportFields.TYPE_CODE, null, sport) },
+                    onShowDetail = { detailRecord = it },
+                    onEdit = { openEditor(SportFields.TYPE_CODE, it) },
+                    onDelete = { pendingDeleteId = it }
+                )
+            }
         }
     }
 
@@ -205,7 +220,8 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                 onSave = { draft ->
                     viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
-                }
+                },
+                initialSport = editorSport
             )
             IntimacyFields.TYPE_CODE -> IntimacyEditorDialog(
                 record = editingRecord,

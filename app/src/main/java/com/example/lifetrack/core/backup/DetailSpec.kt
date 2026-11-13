@@ -66,7 +66,8 @@ object DetailSpecRegistry {
                 SportFields.INTENSITY
             ),
             validators = mapOf(
-                SportFields.SPORT to { it in SportFields.SPORTS },
+                // 用完整白名单而不是界面枚举：界面下线的旧类型仍要能从备份恢复。
+                SportFields.SPORT to { it in SportFields.ALL_SPORT_VALUES },
                 SportFields.DURATION to SportFields::isValidDuration,
                 SportFields.INTENSITY to { it in SportFields.INTENSITIES }
             )

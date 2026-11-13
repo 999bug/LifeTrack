@@ -27,6 +27,8 @@ import com.example.lifetrack.core.model.DateRange
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PeriodFill
 import com.example.lifetrack.core.model.PeriodOngoing
+import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.feature.sport.SportStats
 import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
@@ -168,6 +170,17 @@ class MainViewModel(
                 today.minusYears(3).toString(),
                 today.toString(),
                 typeCode = MenstruationFields.TYPE_CODE
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 运动子应用：取数窗口与 [SportStats] 一致，供本周节奏、三类占比与简报派生；结果不落库。 */
+    val sportRecords: StateFlow<List<BackupRecord>> = todayDate
+        .flatMapLatest { today ->
+            repository.observeRecordsInRange(
+                SportStats.windowStart(today).toString(),
+                today.toString(),
+                typeCode = SportFields.TYPE_CODE
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

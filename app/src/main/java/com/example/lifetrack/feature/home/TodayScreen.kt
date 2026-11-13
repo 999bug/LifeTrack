@@ -51,6 +51,9 @@ private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE",
  *    奇数模块时最后一张自动升为通栏宽卡，不再用 Spacer 留半行空白。
  *
  * 停用的模块不进入首页，启用入口只在「设置 → 记录项目」；未启用月经时不显示概览卡。
+ *
+ * 运动卡留在网格里，但整卡点击改成进入「运动」子应用，右下角动作槽保留「记一次」直接开弹层——
+ * 「记录」是高频动作，「看节奏」不是，所以入口分层要反过来。
  */
 @Composable
 fun TodayScreen(
@@ -61,6 +64,7 @@ fun TodayScreen(
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
     onSportRecord: () -> Unit,
+    onOpenSport: () -> Unit,
     onIntimacyRecord: () -> Unit,
     onOpenPeriod: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -205,6 +209,9 @@ fun TodayScreen(
                             ) {
                                 rowTypes.forEach { type ->
                                     val quick = type.isQuickAction
+                                    // 运动卡是子应用入口：整卡进「运动」，右下角动作槽仍直接记一次，
+                                    // 高频记录路径不多点一次。
+                                    val opensSubApp = type.code == SportFields.TYPE_CODE
                                     val record = moduleAction(
                                         type, onQuickRecord, onWaterQuick, onWaterRecord,
                                         onCoffeeRecord, onSportRecord, onIntimacyRecord
@@ -218,8 +225,12 @@ fun TodayScreen(
                                         count = countsByType[type.code] ?: 0,
                                         summary = moduleSummary(records, type),
                                         actionLabel = moduleActionLabel(type, quick),
-                                        onRecord = record,
-                                        onAction = if (quick) detail else record,
+                                        onRecord = if (opensSubApp) onOpenSport else record,
+                                        onAction = when {
+                                            opensSubApp -> record
+                                            quick -> detail
+                                            else -> record
+                                        },
                                         cardHeight = cardHeight,
                                         wide = wide,
                                         modifier = Modifier.weight(1f)

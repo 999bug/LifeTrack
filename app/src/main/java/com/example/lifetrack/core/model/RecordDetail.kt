@@ -17,7 +17,11 @@ sealed interface RecordDetail {
         val effortCode: Int? = null,
         val urgency: Boolean? = null,
         val abdominalDiscomfort: Boolean? = null,
-        val incompleteEvacuation: Boolean? = null
+        val incompleteEvacuation: Boolean? = null,
+        /** 结束时刻，只在「再次进入后点结束」时写入；手动填用时或进行中时为 null。 */
+        val endedAtEpochMillis: Long? = null,
+        /** 最终用时（1–60 分钟）；超过阈值被判无效时为 null。 */
+        val durationMinutes: Int? = null
     ) : RecordDetail
 
     data class Generic(
@@ -38,7 +42,9 @@ fun PoopDetailEntity.toRecordDetail() = RecordDetail.Poop(
     effortCode = effortCode,
     urgency = urgency,
     abdominalDiscomfort = abdominalDiscomfort,
-    incompleteEvacuation = incompleteEvacuation
+    incompleteEvacuation = incompleteEvacuation,
+    endedAtEpochMillis = endedAtEpochMillis,
+    durationMinutes = durationMinutes
 )
 
 fun RecordDetail.Poop.toEntity(eventId: String) = PoopDetailEntity(
@@ -48,5 +54,7 @@ fun RecordDetail.Poop.toEntity(eventId: String) = PoopDetailEntity(
     effortCode = effortCode,
     urgency = urgency,
     abdominalDiscomfort = abdominalDiscomfort,
-    incompleteEvacuation = incompleteEvacuation
+    incompleteEvacuation = incompleteEvacuation,
+    endedAtEpochMillis = endedAtEpochMillis,
+    durationMinutes = durationMinutes
 )

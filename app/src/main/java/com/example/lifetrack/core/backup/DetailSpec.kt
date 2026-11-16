@@ -75,11 +75,14 @@ object DetailSpecRegistry {
         IntimacyFields.TYPE_CODE to DetailSpec(
             typeCode = IntimacyFields.TYPE_CODE,
             allowedFields = setOf(
+                IntimacyFields.METHOD,
+                // 旧版三项：只为兼容 ≤0.6.13 的记录与备份，界面不再写入。
                 IntimacyFields.PROTECTION,
                 IntimacyFields.EXPERIENCE,
                 IntimacyFields.DURATION
             ),
             validators = mapOf(
+                IntimacyFields.METHOD to IntimacyFields::isValidMethod,
                 IntimacyFields.PROTECTION to { it in IntimacyFields.PROTECTION_VALUES },
                 IntimacyFields.EXPERIENCE to { it in IntimacyFields.EXPERIENCE_VALUES },
                 IntimacyFields.DURATION to IntimacyFields::isValidDuration

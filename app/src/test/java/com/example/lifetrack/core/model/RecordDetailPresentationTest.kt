@@ -35,7 +35,7 @@ class RecordDetailPresentationTest {
     private fun values(section: DetailSection): List<String> = section.fields.map { it.value }
 
     @Test
-    fun `poop detail lists all six fields`() {
+    fun `poop detail lists all eight fields including duration`() {
         val view = BackupRecord(
             event(),
             RecordDetail.Poop(
@@ -44,14 +44,16 @@ class RecordDetailPresentationTest {
                 effortCode = 1,
                 urgency = false,
                 abdominalDiscomfort = true,
-                incompleteEvacuation = false
+                incompleteEvacuation = false,
+                endedAtEpochMillis = utcInstant + 12 * 60_000L,
+                durationMinutes = 12
             )
         ).toDetailView()
 
         assertEquals("排便 · 08:30", view.title)
         assertEquals(listOf("基本信息", "记录详情", "元数据"), view.sections.map { it.title })
         assertEquals(
-            listOf("4 型", "适中", "不费力", "否", "是", "否"),
+            listOf("4 型", "适中", "不费力", "否", "是", "否", "12 分钟", "08:42"),
             values(view.sections[1])
         )
         assertTrue(view.sections[1].fields.none { it.muted })
@@ -62,7 +64,7 @@ class RecordDetailPresentationTest {
         val view = BackupRecord(event()).toDetailView()
         val details = view.sections[1]
 
-        assertEquals(6, details.fields.size)
+        assertEquals(8, details.fields.size)
         assertTrue(details.fields.all { it.value == "未记录" && it.muted })
     }
 
@@ -114,8 +116,20 @@ class RecordDetailPresentationTest {
     fun `intimacy detail without any field shows placeholders`() {
         val view = generic(IntimacyFields.TYPE_CODE, emptyMap()).toDetailView()
 
-        assertEquals(3, view.sections[1].fields.size)
-        assertTrue(view.sections[1].fields.all { it.value == "未记录" && it.muted })
+        // 重构后主字段只剩「措施」：旧版感受 / 时长只在存在时附加，不占固定行。
+        assertEquals(listOf("未记录"), values(view.sections[1]))
+        assertTrue(view.sections[1].fields.all { it.muted })
+    }
+
+    @Test
+    fun `intimacy detail prefers the reconstructed method field`() {
+        val view = generic(
+            IntimacyFields.TYPE_CODE,
+            mapOf(IntimacyFields.METHOD to "condom")
+        ).toDetailView()
+
+        assertEquals(listOf("避孕套"), values(view.sections[1]))
+        assertTrue(view.sections[1].fields.none { it.muted })
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.AppLockTimeout
 import com.example.lifetrack.core.update.ReleaseInfo
 import com.example.lifetrack.core.update.UpdateRepository
@@ -25,6 +26,7 @@ import com.example.lifetrack.core.model.CycleCalculator
 import com.example.lifetrack.core.model.CycleSnapshot
 import com.example.lifetrack.core.model.DateRange
 import com.example.lifetrack.core.model.MenstruationFields
+import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.PeriodFill
 import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.model.SportFields
@@ -170,6 +172,20 @@ class MainViewModel(
                 today.minusYears(3).toString(),
                 today.toString(),
                 typeCode = MenstruationFields.TYPE_CODE
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * 亲密关系（重构后收进经期子应用）：取数区间与 [periodRecords] 对齐，
+     * 供选中日的记录列表与「上次」措施标记使用；记录本身仍是独立事件，不并进月经详情。
+     */
+    val intimacyRecords: StateFlow<List<BackupRecord>> = todayDate
+        .flatMapLatest { today ->
+            repository.observeRecordsInRange(
+                today.minusYears(3).toString(),
+                today.toString(),
+                typeCode = IntimacyFields.TYPE_CODE
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -489,6 +505,50 @@ class MainViewModel(
                 )
             )
             refreshToday()
+        }
+    }
+
+    private val poopFeedbackChannel = Channel<String>(Channel.BUFFERED)
+
+    /** 列表里「结束」的一次性反馈（用时已记录 / 超过阈值未记录），首页收集后弹 Snackbar。 */
+    val poopFeedback = poopFeedbackChannel.receiveAsFlow()
+
+    /**
+     * 在今日列表里直接结束一条进行中的排便记录：把「现在」写成结束时间并算出用时。
+     *
+     * 用时口径全部交给 [PoopFields.resolve]：超过 60 分钟不写用时（记录本身保留），
+     * 只回一条提示让用户改用手填。已有用时的记录不再重复结束，避免把历史值覆盖成 0。
+     */
+    fun endPoopRecord(record: BackupRecord) {
+        val detail = record.detail as? RecordDetail.Poop
+        if (detail?.durationMinutes != null) return
+        viewModelScope.launch {
+            val timing = PoopFields.resolve(
+                startEpochMillis = record.event.occurredAtEpochMillis,
+                endedAtEpochMillis = System.currentTimeMillis(),
+                manualMinutes = ""
+            )
+            repository.updatePoopRecord(
+                eventId = record.event.id,
+                draft = PoopRecordDraft(
+                    occurredAtEpochMillis = record.event.occurredAtEpochMillis,
+                    zoneId = record.event.zoneId,
+                    bristolType = detail?.bristolType,
+                    amountCode = detail?.amountCode,
+                    effortCode = detail?.effortCode,
+                    urgency = detail?.urgency,
+                    abdominalDiscomfort = detail?.abdominalDiscomfort,
+                    incompleteEvacuation = detail?.incompleteEvacuation,
+                    note = record.event.note,
+                    endedAtEpochMillis = timing.endedAtEpochMillis,
+                    durationMinutes = timing.durationMinutes
+                )
+            )
+            refreshToday()
+            poopFeedbackChannel.trySend(
+                timing.durationMinutes?.let { "本次用时 $it 分钟" }
+                    ?: "已超过 ${PoopFields.MAX_DURATION_MINUTES} 分钟，用时未记录；可在编辑里手动填写"
+            )
         }
     }
 

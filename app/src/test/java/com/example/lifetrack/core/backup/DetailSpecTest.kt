@@ -161,10 +161,19 @@ class DetailSpecTest {
     fun `intimacy spec enforces enums and optional duration range`() {
         val spec = DetailSpecRegistry.specFor(IntimacyFields.TYPE_CODE)!!
         assertEquals(
-            setOf(IntimacyFields.PROTECTION, IntimacyFields.EXPERIENCE, IntimacyFields.DURATION),
+            setOf(
+                IntimacyFields.METHOD,
+                IntimacyFields.PROTECTION,
+                IntimacyFields.EXPERIENCE,
+                IntimacyFields.DURATION
+            ),
             spec.allowedFields
         )
         assertTrue(spec.isFieldsValid(emptyMap()))
+        IntimacyFields.METHOD_VALUES.forEach {
+            assertTrue(it, spec.validators[IntimacyFields.METHOD]!!(it))
+        }
+        assertFalse(spec.validators[IntimacyFields.METHOD]!!("pill"))
         assertTrue(spec.isFieldsValid(mapOf(IntimacyFields.PROTECTION to "na")))
         assertTrue(spec.validators[IntimacyFields.DURATION]!!("1440"))
         assertFalse(spec.validators[IntimacyFields.DURATION]!!("1441"))

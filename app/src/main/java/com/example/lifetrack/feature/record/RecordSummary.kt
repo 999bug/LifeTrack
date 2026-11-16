@@ -5,6 +5,7 @@ import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
+import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.WaterFields
@@ -46,6 +47,8 @@ object RecordSummary {
                     detail?.bristolType?.let { add("布里斯托 $it 型") }
                     detail?.amountCode?.let { code -> amountLabels[code]?.let { add(it) } }
                     detail?.effortCode?.let { code -> effortLabels[code]?.let { add(it) } }
+                    // 用时只在算出来（或手填）之后才出现，「进行中」不占位。
+                    detail?.durationMinutes?.let { add("用时 ${PoopFields.durationLabel(it)}") }
                     if (note.isNotBlank()) add(note)
                 }.joinToString(" · ").ifBlank { "尚未填写详情" }
             }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,7 @@ import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CycleCalculator
 import com.example.lifetrack.core.model.CycleSnapshot
+import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PeriodDayFormModel
 import com.example.lifetrack.core.model.PeriodMonth
@@ -60,6 +62,8 @@ import com.example.lifetrack.core.model.Phase
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.intimacy.IntimacyDaySection
+import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
 import com.example.lifetrack.feature.statistics.CardShape
 import com.example.lifetrack.feature.statistics.rememberStatsColors
 import kotlinx.coroutines.launch
@@ -125,6 +129,27 @@ fun PeriodScreen(
         }.toSet()
     }
     val recordForDate = periodRecords.firstOrNull { it.event.localDate == selectedIso }
+
+    // 亲密关系：与月经同源但独立成事件（一天可以多次），只取选中日的记录 + 最近一次用过的措施。
+    val intimacyRecords by viewModel.intimacyRecords.collectAsStateWithLifecycle()
+    val intimacyEnabled = types.any { it.code == IntimacyFields.TYPE_CODE && it.enabled }
+    val dayIntimacy = remember(intimacyRecords, selectedIso) {
+        intimacyRecords
+            .filter { it.event.localDate == selectedIso }
+            .sortedBy { it.event.occurredAtEpochMillis }
+    }
+    // 「上次」= 除当前正在编辑的那条以外最近一次的措施；同一天更早的记录也算，不按天切。
+    fun lastIntimacyMethod(excludeId: String?): String? = intimacyRecords
+        .filter { it.event.id != excludeId }
+        .maxByOrNull { it.event.occurredAtEpochMillis }
+        ?.let { (it.detail as? RecordDetail.Generic)?.fields?.get(IntimacyFields.METHOD) }
+
+    var intimacyTarget by remember { mutableStateOf<IntimacyTarget?>(null) }
+    var intimacyPendingDelete by remember { mutableStateOf<BackupRecord?>(null) }
+
+    fun openIntimacyEditor(record: BackupRecord?, ordinal: Int) {
+        intimacyTarget = IntimacyTarget(record, ordinal)
+    }
 
     // 表单状态：切换选中日时从当天记录重建；用户一旦交互就不再被外部数据流覆盖。
     var formModel by remember(selectedDate) {
@@ -228,6 +253,22 @@ fun PeriodScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 24.dp)
                 )
+                // 只开了亲密关系时，本页仍要可用：给出今天这一段，不做周期推算。
+                if (intimacyEnabled) {
+                    Text(
+                        text = "今天 · 亲密关系",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    IntimacyDaySection(
+                        records = dayIntimacy,
+                        readOnly = false,
+                        moduleColor = LifeTrackTokens.ModuleColors.of(IntimacyFields.TYPE_CODE),
+                        onAdd = { openIntimacyEditor(null, dayIntimacy.size + 1) },
+                        onEdit = { record -> openIntimacyEditor(record, dayIntimacy.indexOf(record) + 1) },
+                        onDelete = { intimacyPendingDelete = it }
+                    )
+                }
                 return@Column
             }
 
@@ -307,6 +348,18 @@ fun PeriodScreen(
                     formModel.isFilled(it)
                 }
             )
+
+            // 亲密关系在「流量」一栏上方：它是独立事件，卡片自带记录列表与新增入口。
+            if (intimacyEnabled) {
+                IntimacyDaySection(
+                    records = dayIntimacy,
+                    readOnly = !canEdit,
+                    moduleColor = LifeTrackTokens.ModuleColors.of(IntimacyFields.TYPE_CODE),
+                    onAdd = { openIntimacyEditor(null, dayIntimacy.size + 1) },
+                    onEdit = { record -> openIntimacyEditor(record, dayIntimacy.indexOf(record) + 1) },
+                    onDelete = { intimacyPendingDelete = it }
+                )
+            }
 
             PeriodDayForm(
                 model = formModel,
@@ -390,7 +443,44 @@ fun PeriodScreen(
             modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
         )
     }
+
+    intimacyTarget?.let { target ->
+        IntimacyEditorDialog(
+            record = target.record,
+            ordinal = target.ordinal,
+            defaultDate = selectedDate,
+            lastMethod = lastIntimacyMethod(target.record?.event?.id),
+            onDismiss = { intimacyTarget = null },
+            onSave = { draft ->
+                viewModel.saveGenericRecord(target.record?.event?.id, draft)
+                intimacyTarget = null
+            }
+        )
+    }
+
+    intimacyPendingDelete?.let { record ->
+        AlertDialog(
+            onDismissRequest = { intimacyPendingDelete = null },
+            title = { Text("删除这条亲密记录？") },
+            text = { Text("删除后无法在应用内撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteRecord(record.event.id)
+                    intimacyPendingDelete = null
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { intimacyPendingDelete = null }) { Text("取消") }
+            }
+        )
+    }
 }
+
+/** 亲密关系编辑目标：null 记录 = 新增（[ordinal] 用于「第 N 次」标题）。 */
+private data class IntimacyTarget(
+    val record: BackupRecord?,
+    val ordinal: Int
+)
 
 /** 阶段文案：只描述已记录的事实与推算日期，不给健康结论或调理建议。 */
 private fun periodPhaseText(

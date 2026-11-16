@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -22,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +54,9 @@ internal fun CompactRecordRow(
     onShowDetail: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    showDivider: Boolean = true
+    showDivider: Boolean = true,
+    /** 非空时在行尾多一个「结束」按钮，用于进行中的排便记录。 */
+    onEndPoop: (() -> Unit)? = null
 ) {
     val time = RecordSummary.time(record)
     val typeName = RecordSummary.typeName(record.event.typeCode, typeNames)
@@ -117,6 +121,14 @@ internal fun CompactRecordRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                if (onEndPoop != null) {
+                    TextButton(
+                        onClick = onEndPoop,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("结束", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {

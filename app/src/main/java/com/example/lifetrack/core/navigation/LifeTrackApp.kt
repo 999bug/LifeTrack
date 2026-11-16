@@ -148,12 +148,12 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
                     onOpenSport = { navController.navigate("sport") },
-                    onIntimacyRecord = { openEditor(IntimacyFields.TYPE_CODE, null) },
                     onOpenPeriod = { navController.navigate("cycle") },
                     onOpenSettings = { navController.navigate("settings") },
                     onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
-                    onDelete = { pendingDeleteId = it }
+                    onDelete = { pendingDeleteId = it },
+                    onEndPoop = viewModel::endPoopRecord
                 )
             }
             composable("history") {

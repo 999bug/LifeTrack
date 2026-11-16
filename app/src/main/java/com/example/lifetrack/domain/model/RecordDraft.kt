@@ -22,6 +22,8 @@ fun PoopRecordDraft.toRecordDraft() = RecordDraft(
         effortCode = effortCode,
         urgency = urgency,
         abdominalDiscomfort = abdominalDiscomfort,
-        incompleteEvacuation = incompleteEvacuation
+        incompleteEvacuation = incompleteEvacuation,
+        endedAtEpochMillis = endedAtEpochMillis,
+        durationMinutes = durationMinutes
     )
 )

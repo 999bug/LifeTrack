@@ -4,6 +4,7 @@ import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
+import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
@@ -375,7 +376,11 @@ object BackupCodec {
             return DetailParse.Failed(BackupError.DETAIL_NOT_ALLOWED)
         }
 
-        val poopDetail = if (dto.typeCode == BASE_TYPE) dto.poop?.toEntity(dto.id) else null
+        val poopDetail = if (dto.typeCode == BASE_TYPE) {
+            dto.poop?.toEntity(dto.id, dto.occurredAtEpochMillis)
+        } else {
+            null
+        }
         if (poopDetail is DetailParse.Failed) return poopDetail
         val poop = (poopDetail as? DetailParse.Parsed)?.value as? RecordDetail.Poop
 
@@ -405,10 +410,31 @@ object BackupCodec {
         data class Failed(val error: BackupError) : DetailParse
     }
 
-    private fun BackupPoopDto.toEntity(eventId: String): DetailParse {
+    /**
+     * 排便详情校验（v2 起含用时）。
+     *
+     * 用时口径与 `PoopFields.resolve` 保持一致：1–60 分钟；只有结束时间而没有用时、
+     * 结束早于开始、结束距开始超过一小时，都属于不合法的组合，直接拒绝而不是静默丢弃。
+     * 结束时间与用时允许 ±1 分钟误差（分钟取整方向不同不会把合法备份判死）。
+     */
+    private fun BackupPoopDto.toEntity(eventId: String, startMillis: Long): DetailParse {
         bristolType?.let { if (it !in 1..7) return DetailParse.Failed(BackupError.INVALID_BRISTOL) }
         amountCode?.let { if (it !in 1..3) return DetailParse.Failed(BackupError.INVALID_AMOUNT) }
         effortCode?.let { if (it !in 1..3) return DetailParse.Failed(BackupError.INVALID_EFFORT) }
+        durationMinutes?.let {
+            if (!PoopFields.isMeasuredValid(it)) return DetailParse.Failed(BackupError.INVALID_DURATION)
+        }
+        endedAtEpochMillis?.let { ended ->
+            val duration = durationMinutes ?: return DetailParse.Failed(BackupError.INVALID_DURATION)
+            if (ended <= startMillis) return DetailParse.Failed(BackupError.INVALID_DURATION)
+            val measured = PoopFields.measuredMinutes(startMillis, ended)
+            if (!PoopFields.isMeasuredValid(measured)) {
+                return DetailParse.Failed(BackupError.INVALID_DURATION)
+            }
+            if (kotlin.math.abs(measured - duration) > 1) {
+                return DetailParse.Failed(BackupError.INVALID_DURATION)
+            }
+        }
         return DetailParse.Parsed(
             RecordDetail.Poop(
                 bristolType = bristolType,
@@ -416,7 +442,9 @@ object BackupCodec {
                 effortCode = effortCode,
                 urgency = urgency,
                 abdominalDiscomfort = abdominalDiscomfort,
-                incompleteEvacuation = incompleteEvacuation
+                incompleteEvacuation = incompleteEvacuation,
+                endedAtEpochMillis = endedAtEpochMillis,
+                durationMinutes = durationMinutes
             )
         )
     }
@@ -459,7 +487,9 @@ object BackupCodec {
                 effortCode = it.effortCode,
                 urgency = it.urgency,
                 abdominalDiscomfort = it.abdominalDiscomfort,
-                incompleteEvacuation = it.incompleteEvacuation
+                incompleteEvacuation = it.incompleteEvacuation,
+                endedAtEpochMillis = it.endedAtEpochMillis,
+                durationMinutes = it.durationMinutes
             )
         },
         detail = (detail as? RecordDetail.Generic)?.let {
@@ -521,7 +551,10 @@ internal data class BackupPoopDto(
     val effortCode: Int? = null,
     val urgency: Boolean? = null,
     val abdominalDiscomfort: Boolean? = null,
-    val incompleteEvacuation: Boolean? = null
+    val incompleteEvacuation: Boolean? = null,
+    /** v2 增补（缺省 null 向后兼容）：结束时刻与用时。 */
+    val endedAtEpochMillis: Long? = null,
+    val durationMinutes: Int? = null
 )
 
 @Serializable

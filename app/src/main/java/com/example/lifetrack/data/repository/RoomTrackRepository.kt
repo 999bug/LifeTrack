@@ -254,7 +254,9 @@ class RoomTrackRepository(
         effortCode = effortCode,
         urgency = urgency,
         abdominalDiscomfort = abdominalDiscomfort,
-        incompleteEvacuation = incompleteEvacuation
+        incompleteEvacuation = incompleteEvacuation,
+        endedAtEpochMillis = endedAtEpochMillis,
+        durationMinutes = durationMinutes
     )
 
     override suspend fun databaseSizeBytes(): Long = withContext(Dispatchers.IO) {

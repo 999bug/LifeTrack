@@ -88,7 +88,7 @@ fun BackupRecord.toDetailView(): RecordDetailView {
 }
 
 private fun BackupRecord.detailFields(): List<DetailField> = when (event.typeCode) {
-    DEFAULT_POOP_TYPE.code -> poopFields(detail as? RecordDetail.Poop)
+    DEFAULT_POOP_TYPE.code -> poopFields(detail as? RecordDetail.Poop, event.zoneId)
     WaterFields.TYPE_CODE -> waterFields(genericFields())
     CoffeeFields.TYPE_CODE -> coffeeFields(genericFields())
     SportFields.TYPE_CODE -> sportFields(genericFields())
@@ -102,13 +102,19 @@ private fun BackupRecord.detailFields(): List<DetailField> = when (event.typeCod
 private fun BackupRecord.genericFields(): Map<String, String> =
     (detail as? RecordDetail.Generic)?.fields.orEmpty()
 
-private fun poopFields(detail: RecordDetail.Poop?): List<DetailField> = listOf(
+private fun poopFields(detail: RecordDetail.Poop?, zoneId: String): List<DetailField> = listOf(
     field("布里斯托类型", detail?.bristolType?.let { "$it 型" }),
     field("排便量", detail?.amountCode?.let { amountLabels[it] }),
     field("费力程度", detail?.effortCode?.let { effortLabels[it] }),
     field("便意急迫感", detail?.urgency?.let { yesNo(it) }),
     field("腹部不适", detail?.abdominalDiscomfort?.let { yesNo(it) }),
-    field("排不净感", detail?.incompleteEvacuation?.let { yesNo(it) })
+    field("排不净感", detail?.incompleteEvacuation?.let { yesNo(it) }),
+    // 用时与结束时间是同一件事的两个视角：手动填用时只有前者，自动结束两者都有。
+    field("用时", detail?.durationMinutes?.let(PoopFields::durationLabel)),
+    field(
+        "结束时间",
+        detail?.endedAtEpochMillis?.let { formatAt(it, zoneId, shortTimeFormatter) }
+    )
 )
 
 private fun yesNo(value: Boolean): String = if (value) "是" else "否"
@@ -131,11 +137,23 @@ private fun sportFields(fields: Map<String, String>): List<DetailField> = listOf
     field("强度", fields[SportFields.INTENSITY]?.let(SportFields::intensityLabel))
 )
 
-private fun intimacyFields(fields: Map<String, String>): List<DetailField> = listOf(
-    field("保护措施", fields[IntimacyFields.PROTECTION]?.let(IntimacyFields::protectionLabel)),
-    field("主观感受", fields[IntimacyFields.EXPERIENCE]?.let(IntimacyFields::experienceLabel)),
-    field("时长", fields[IntimacyFields.DURATION]?.let(IntimacyFields::durationLabel))
-)
+/**
+ * 亲密关系：重构后主字段是「措施」。旧记录没有 `method` 键时退回显示旧版「保护措施」，
+ * 不把已经记过的老数据说成「未记录」；感受与时长只在存在时附加，不再占固定行。
+ */
+private fun intimacyFields(fields: Map<String, String>): List<DetailField> {
+    val method = fields[IntimacyFields.METHOD]
+    val primary = if (method != null) {
+        field("措施", IntimacyFields.methodLabel(method))
+    } else {
+        field("措施", fields[IntimacyFields.PROTECTION]?.let(IntimacyFields::protectionLabel))
+    }
+    return listOfNotNull(
+        primary,
+        fields[IntimacyFields.EXPERIENCE]?.let { field("主观感受", IntimacyFields.experienceLabel(it)) },
+        fields[IntimacyFields.DURATION]?.let { field("时长", IntimacyFields.durationLabel(it)) }
+    )
+}
 
 private fun menstruationFields(fields: Map<String, String>): List<DetailField> = listOf(
     field("流量", fields[MenstruationFields.FLOW]?.let(MenstruationFields::flowLabel)),

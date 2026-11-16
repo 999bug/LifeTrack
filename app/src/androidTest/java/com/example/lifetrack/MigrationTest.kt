@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.lifetrack.core.database.AppDatabase
 import com.example.lifetrack.core.database.MIGRATION_1_2
 import com.example.lifetrack.core.database.MIGRATION_2_3
+import com.example.lifetrack.core.database.MIGRATION_3_4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -141,6 +142,56 @@ class MigrationTest {
                 "应新增 localDate 单列索引，实际：$names",
                 names.contains("index_track_event_localDate")
             )
+        }
+    }
+
+    /**
+     * v3 → v4：给 `poop_detail` 补 `endedAtEpochMillis` / `durationMinutes` 两列。
+     *
+     * 只加可空列：存量行迁移后两列为 NULL（等于「还没记用时」），其余字段一个不动。
+     * 列顺序与 `4.json` 不一致时 `runMigrationsAndValidate` 会直接失败。
+     */
+    @Test
+    fun migrate3To4_addsPoopDurationColumnsAndKeepsRecords() {
+        helper.createDatabase(TEST_DB, 3).use { db ->
+            db.execSQL(
+                "INSERT INTO track_type (code, name, iconKey, category, trackingMode, enabled, sortOrder, schemaVersion) " +
+                    "VALUES ('poop', '排便', 'poop', 'body', 'EVENT', 1, 10, 1)"
+            )
+            db.execSQL(
+                "INSERT INTO track_event (id, typeCode, occurredAtEpochMillis, localDate, zoneId, note, " +
+                    "createdAtEpochMillis, updatedAtEpochMillis) " +
+                    "VALUES ('e4', 'poop', 1762657200000, '2026-11-16', 'Asia/Tokyo', '用时迁移前', " +
+                    "1762657200000, 1762657200000)"
+            )
+            db.execSQL(
+                "INSERT INTO poop_detail (eventId, bristolType, amountCode, effortCode, urgency, " +
+                    "abdominalDiscomfort, incompleteEvacuation) VALUES ('e4', 5, 3, 2, 1, 0, 1)"
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 4, true, MIGRATION_3_4)
+
+        db.query(
+            "SELECT bristolType, amountCode, effortCode, endedAtEpochMillis, durationMinutes " +
+                "FROM poop_detail WHERE eventId = 'e4'"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(5, cursor.getInt(0))
+            assertEquals(3, cursor.getInt(1))
+            assertEquals(2, cursor.getInt(2))
+            assertTrue("存量记录不应凭空出现结束时间", cursor.isNull(3))
+            assertTrue("存量记录不应凭空出现用时", cursor.isNull(4))
+        }
+
+        // 新增的两列可以正常写入并读回：迁移后的表结构确实是 v4。
+        db.execSQL(
+            "UPDATE poop_detail SET endedAtEpochMillis = 1762657920000, durationMinutes = 12 WHERE eventId = 'e4'"
+        )
+        db.query("SELECT endedAtEpochMillis, durationMinutes FROM poop_detail WHERE eventId = 'e4'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1762657920000L, cursor.getLong(0))
+            assertEquals(12, cursor.getInt(1))
         }
     }
 

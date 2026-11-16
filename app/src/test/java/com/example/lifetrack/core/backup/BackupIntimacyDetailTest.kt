@@ -50,6 +50,31 @@ class BackupIntimacyDetailTest {
     }
 
     @Test
+    fun `production defaults accept the reconstructed method field`() {
+        IntimacyFields.METHOD_VALUES.forEach { method ->
+            val result = BackupCodec.decode(encode(mapOf(IntimacyFields.METHOD to method)), fixedNow)
+            assertTrue(method, result is BackupDecodeResult.Success)
+            val record = (result as BackupDecodeResult.Success).payload.events.single()
+            assertEquals(
+                mapOf(IntimacyFields.METHOD to method),
+                (record.detail as RecordDetail.Generic).fields
+            )
+        }
+    }
+
+    @Test
+    fun `rejects unknown method code`() {
+        val result = BackupCodec.decode(
+            encode(mapOf(IntimacyFields.METHOD to "partnerName")),
+            fixedNow
+        )
+        assertEquals(
+            BackupError.INVALID_DETAIL_FIELD,
+            (result as BackupDecodeResult.Invalid).error
+        )
+    }
+
+    @Test
     fun `rejects intimacy duration out of range`() {
         listOf("0", "1441", "abc").forEach { value ->
             val fields = validFields + (IntimacyFields.DURATION to value)

@@ -42,3 +42,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         )
     }
 }
+
+/**
+ * v3 → v4：给 `poop_detail` 补两列，用来记录排便结束时间与用时。
+ *
+ * 只加可空列、不动存量数据：升级上来的旧记录两列都是 null，等于「未见结束时间」，
+ * 编辑时按「进行中」处理。列顺序必须与 `4.json` 一致（ALTER TABLE 追加在末尾）。
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `poop_detail` ADD COLUMN `endedAtEpochMillis` INTEGER")
+        db.execSQL("ALTER TABLE `poop_detail` ADD COLUMN `durationMinutes` INTEGER")
+    }
+}

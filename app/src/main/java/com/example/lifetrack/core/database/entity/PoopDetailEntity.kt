@@ -24,5 +24,9 @@ data class PoopDetailEntity(
     val effortCode: Int? = null,
     val urgency: Boolean? = null,
     val abdominalDiscomfort: Boolean? = null,
-    val incompleteEvacuation: Boolean? = null
+    val incompleteEvacuation: Boolean? = null,
+    /** v4：第二次进入时记下的结束时刻；手动填用时或仍在进行中时为 null。 */
+    val endedAtEpochMillis: Long? = null,
+    /** v4：最终用时（1–60 分钟）；超过阈值被判无效时保持 null。 */
+    val durationMinutes: Int? = null
 )

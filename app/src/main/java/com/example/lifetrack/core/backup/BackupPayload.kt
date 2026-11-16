@@ -26,6 +26,9 @@ enum class BackupError {
     INVALID_BRISTOL,
     INVALID_AMOUNT,
     INVALID_EFFORT,
+
+    /** 排便用时口径不合法：超出 1–60 分钟、结束时间早于开始，或只有结束时间没有用时。 */
+    INVALID_DURATION,
     UNSUPPORTED_DETAIL_TYPE,
     DETAIL_TYPE_MISMATCH,
     INVALID_DETAIL_FIELD,

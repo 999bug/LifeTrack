@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.14",
+        date = "2026-11-16",
+        summary = "排便记录可写结束时间并自动算用时，超过一小时提示无效；亲密关系移入经期页，支持措施宫格与时间滚轮"
+    ),
+    VersionNote(
         version = "0.6.13",
         date = "2026-11-13",
         summary = "运动页卡片改同色系渐变；快记卡显示本周次数与上次时长，节奏格可点选；编辑器新增图标与时长快选"

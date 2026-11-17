@@ -100,7 +100,6 @@ fun PeriodScreen(
     val ongoingStart by viewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
     val cycleDays by viewModel.cycleLengthDays.collectAsStateWithLifecycle()
     val periodDays by viewModel.periodLengthDays.collectAsStateWithLifecycle()
-    val canUndo by viewModel.canUndoPeriodAction.collectAsStateWithLifecycle()
 
     val today = LocalDate.now(ZoneId.systemDefault())
     val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
@@ -110,7 +109,6 @@ fun PeriodScreen(
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
     var selectedIso by rememberSaveable { mutableStateOf(today.toString()) }
     var insightOpen by rememberSaveable { mutableStateOf(false) }
-    var pickStartMode by rememberSaveable { mutableStateOf(false) }
     var endPickerOpen by rememberSaveable { mutableStateOf(false) }
     val selectedDate = remember(selectedIso) { LocalDate.parse(selectedIso) }
     val month = remember(today, monthOffset) { PeriodMonth.of(today, monthOffset) }
@@ -125,6 +123,14 @@ fun PeriodScreen(
             if (start != null) addAll(PeriodOngoing.span(start, today))
         }
     }
+    // 最近一段经期：起止修改只作用于它，避免一次误触动到几个月前的历史。
+    val lastSegment = remember(recordedDates, today) {
+        CycleCalculator.segmentsOf(recordedDates, today).lastOrNull()
+    }
+    val lastSegmentDays = remember(lastSegment) {
+        lastSegment?.let { PeriodOngoing.span(it.start, it.end).toSet() }.orEmpty()
+    }
+    val selectedInSegment = lastSegment != null && selectedDate in lastSegmentDays
     val predictedDates = remember(snapshot) {
         snapshot.predictedPeriods.flatMap { range ->
             (0 until range.lengthDays).map { range.start.plusDays(it.toLong()) }
@@ -200,16 +206,16 @@ fun PeriodScreen(
         nextStart = nextStart
     )
 
-    // 「改结束日期」的可选范围：本段首日 .. 今天。已结束的段只额外放宽 PeriodFill.MAX_GAP_DAYS 天，
-    // 免得一次误触把一段很老的经期一路补到今天；进行中的段本来就显示到「今天」，放宽没有意义。
-    val lastSegment = snapshot.segments.lastOrNull()
-    val endEditFirst = ongoingStart ?: lastSegment?.start
-    val endEditInitial = if (ongoingStart != null) today else lastSegment?.end ?: today
+    // 「改结束日期」的可选范围：最近一段的首日 .. 今天。已结束的段只额外放宽
+    // PeriodFill.MAX_GAP_DAYS 天，免得一次误触把一段很老的经期一路补到今天。
+    val endEditFirst = lastSegment?.start
+    val endEditInitial = lastSegment?.end ?: today
     val endEditLast = if (ongoingStart != null) {
         today
     } else {
         minOf(today, endEditInitial.plusDays(PeriodFill.MAX_GAP_DAYS.toLong()))
     }
+    val canSetStart = selectedInSegment && selectedDate != lastSegment.start
 
     // 单一主行动状态机：未开始 → 经期中 → 已结束（有历史记录但无进行中区间）。
     val primaryLabel: String
@@ -317,44 +323,40 @@ fun PeriodScreen(
                 onToday = {
                     monthOffset = 0
                     selectedIso = today.toString()
-                    pickStartMode = false
                 },
-                onSelectDate = { date ->
-                    if (pickStartMode) {
-                        pickStartMode = false
-                        viewModel.changePeriodStart(date)
-                        selectedIso = date.toString()
-                    } else {
-                        selectedIso = date.toString()
-                    }
-                }
+                onSelectDate = { date -> selectedIso = date.toString() }
             )
 
             if (canEdit) {
+                val segmentHint = lastSegment?.let {
+                    "最近一段：${cn(it.start)} – ${cn(it.end)} · 共 ${it.lengthDays} 天"
+                }
                 PeriodPrimaryActions(
                     primaryLabel = primaryLabel,
                     primaryIsCheck = primaryIsCheck,
                     onPrimary = primaryAction,
-                    canUndo = canUndo,
-                    onUndo = viewModel::undoLastPeriodAction,
-                    onChangeStart = { pickStartMode = !pickStartMode },
-                    pickStartMode = pickStartMode,
-                    onChangeEnd = {
-                        pickStartMode = false
-                        endPickerOpen = true
-                    },
-                    canChangeEnd = endEditFirst != null,
-                    hint = if (pickStartMode) {
-                        "选择模式：点日历上任意一天，把它设为本次经期的开始日期；再点「取消选择」退出。"
-                    } else {
-                        null
+                    showSecondary = selectedInSegment,
+                    canSetStart = canSetStart,
+                    onSetStart = { viewModel.changePeriodStart(selectedDate) },
+                    canEditEnd = selectedInSegment,
+                    onEditEnd = { endPickerOpen = true },
+                    hint = when {
+                        selectedInSegment -> buildString {
+                            append(segmentHint)
+                            if (selectedDate == lastSegment.start) {
+                                append("；这一天已经是开始日")
+                            }
+                        }
+                        lastSegment != null ->
+                            "$segmentHint。把某天设为开始日、或调整结束日：先点这段里的某一天。"
+                        else -> null
                     }
                 )
                 // 忘了点「大姨妈走了」是这里最常见的状态：连日数明显超过平常时，直接给出改法。
                 if (ongoingStart != null && recordedDays > periodLength) {
                     Text(
                         text = "本次已连记 $recordedDays 天，比你通常的 $periodLength 天更长。" +
-                            "如果早就结束了，点「改结束日期」把结束日调回去。",
+                            "如果早就结束了，点日历上这段里的任意一天，再点「改结束日期」把结束日调回去。",
                         style = MaterialTheme.typography.bodySmall,
                         color = moduleColor
                     )

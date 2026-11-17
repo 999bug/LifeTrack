@@ -62,7 +62,29 @@ jobs:
       - name: Unit tests, lint and debug build
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+          # runner 到 Maven Central / Google Maven 偶发抖动时，Gradle 会把「下载失败」
+          # 报成「插件 was not found」，整条 CI 因此标红（2026-11-17 的 0.6.16 就撞了一次）。
+          # 只在这类**依赖解析**失败上重试一次；真实的测试 / lint / 编译失败仍直接标红。
+          attempt=1
+          while :; do
+            set +e
+            ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon 2>&1 \
+              | tee gradle-ci.log
+            status=${PIPESTATUS[0]}
+            set -e
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ] && grep -qE \
+              "was not found in any of the following sources|Could not resolve|Could not GET|Could not HEAD|Connection reset|Read timed out|Connect timed out" \
+              gradle-ci.log; then
+              echo "::warning::第 $attempt 次构建因依赖解析失败中止，20 秒后重试（疑似网络抖动，与代码无关）"
+              attempt=$((attempt + 1))
+              sleep 20
+              continue
+            fi
+            exit "$status"
+          done
 
       - name: Upload test and lint reports
         if: failure()
@@ -73,6 +95,7 @@ jobs:
             app/build/reports/tests/testDebugUnitTest
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.txt
+            gradle-ci.log
           if-no-files-found: ignore
 
   instrumented:

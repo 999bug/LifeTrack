@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.16",
+        date = "2026-11-17",
+        summary = "改经期起止先点中经期日，开始日终于能往后挪；填过流量 / 症状的日子会拦下修改，去掉了撤销按钮"
+    ),
+    VersionNote(
         version = "0.6.15",
         date = "2026-11-17",
         summary = "经期结束日期可事后修改，忘了点「走了」也能改回来；「走了」选更早的日子会顺带撤掉之后自动记下的天数，撤销可还原"

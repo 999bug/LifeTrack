@@ -7,6 +7,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -65,6 +67,7 @@ private val WEEK_LABELS = listOf("一", "二", "三", "四", "五", "六", "日"
  *
  * 只切换下方选中日、不打开弹层；未来日期的只读状态由 [PeriodDayForm] 决定。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PeriodCalendarView(
     month: PeriodMonth,
@@ -189,7 +192,12 @@ fun PeriodCalendarView(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // 图例用 FlowRow：字体放大到 200% 时三条并排放不下，自动折行，
+        // 否则最后一条会被挤成一列竖排的单字。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             LegendSwatch(label = "经期连续色带") {
                 Box(
                     Modifier

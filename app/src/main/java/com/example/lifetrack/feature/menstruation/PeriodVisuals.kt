@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,7 +50,7 @@ import java.time.temporal.ChronoUnit
 /**
  * 经期页首屏的三段视觉组件（界面定稿 v2 · 批 2）：
  * [PeriodPhaseCard] 92dp 周期环、[PeriodCycleBandCard] 28 段连续色带、
- * [PeriodPrimaryActions] 单一 62dp 主行动 + 撤销 / 改开始日期、[PeriodInsightSection] 洞察折叠。
+ * [PeriodPrimaryActions] 单一 62dp 主行动 + 撤销 / 改开始 / 改结束、[PeriodInsightSection] 洞察折叠。
  *
  * 这里只负责呈现，状态与写入全部由 [PeriodScreen] / [com.example.lifetrack.feature.home.MainViewModel] 提供。
  */
@@ -228,9 +229,13 @@ fun PeriodCycleBandCard(
     }
 }
 
+/** 三键共用的窄内边距：默认 24dp 在 360dp 屏上会把 5 个汉字挤到换行。 */
+private val SecondaryActionPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+
 /**
- * 单一主行动 + 两个次级动作。旧版的 FlowRow 双按钮里有一个 disabled 灰块，
- * 与另一键错位（深色模式尤其明显）；现在只保留一个状态相关的主按钮。
+ * 单一主行动 + 三个次级纠错动作。旧版的 FlowRow 双按钮里有一个 disabled 灰块，
+ * 与另一键错位（深色模式尤其明显）；现在只保留一个状态相关的主按钮，
+ * 次级动作固定为「撤销这一步 / 改开始日期 / 改结束日期」——起止都能事后修正。
  */
 @Composable
 fun PeriodPrimaryActions(
@@ -241,6 +246,8 @@ fun PeriodPrimaryActions(
     onUndo: () -> Unit,
     onChangeStart: () -> Unit,
     pickStartMode: Boolean,
+    onChangeEnd: () -> Unit,
+    canChangeEnd: Boolean,
     hint: String?,
     modifier: Modifier = Modifier
 ) {
@@ -272,31 +279,65 @@ fun PeriodPrimaryActions(
             Spacer(Modifier.size(9.dp))
             Text(primaryLabel, style = MaterialTheme.typography.titleSmall)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onUndo,
-                enabled = canUndo,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-            ) { Text("撤销上一步", style = MaterialTheme.typography.bodySmall) }
-            OutlinedButton(
-                onClick = onChangeStart,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .semantics { stateDescription = if (pickStartMode) "正在选择开始日期" else "未选择" },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (pickStartMode) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
+        // 三键等分：默认 24dp 的横向内边距在 360dp 屏上会把 5 个汉字挤到换行，
+        // 所以收窄内边距、单行显示。字体放大到 1.3 倍以上时三键并排放不下，
+        // 改成「撤销 / 改开始」一行、「改结束」独占一行，避免文字被裁。
+        val largeFont = LocalDensity.current.fontScale > 1.3f
+        if (largeFont) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SecondaryActionButton(
+                        label = "撤销上一步",
+                        onClick = onUndo,
+                        enabled = canUndo,
+                        description = "撤销上一步",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SecondaryActionButton(
+                        label = if (pickStartMode) "取消选择" else "改开始日期",
+                        onClick = onChangeStart,
+                        enabled = true,
+                        description = null,
+                        state = if (pickStartMode) "正在选择开始日期" else "未选择",
+                        highlight = pickStartMode,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                SecondaryActionButton(
+                    label = "改结束日期",
+                    onClick = onChangeEnd,
+                    enabled = canChangeEnd,
+                    description = null,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            ) {
-                Text(
-                    text = if (pickStartMode) "取消选择" else "改开始日期",
-                    style = MaterialTheme.typography.bodySmall
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryActionButton(
+                    label = "撤销上一步",
+                    onClick = onUndo,
+                    enabled = canUndo,
+                    description = "撤销上一步",
+                    modifier = Modifier.weight(1f)
+                )
+                SecondaryActionButton(
+                    label = if (pickStartMode) "取消选择" else "改开始日期",
+                    onClick = onChangeStart,
+                    enabled = true,
+                    description = null,
+                    state = if (pickStartMode) "正在选择开始日期" else "未选择",
+                    highlight = pickStartMode,
+                    modifier = Modifier.weight(1f)
+                )
+                SecondaryActionButton(
+                    label = "改结束日期",
+                    onClick = onChangeEnd,
+                    enabled = canChangeEnd,
+                    description = null,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -308,6 +349,39 @@ fun PeriodPrimaryActions(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
+    }
+}
+
+/** 次级动作按钮：窄内边距 + 单行，保证三个按钮等分一行时不裁字。 */
+@Composable
+private fun SecondaryActionButton(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    description: String?,
+    modifier: Modifier = Modifier,
+    state: String? = null,
+    highlight: Boolean = false
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = SecondaryActionPadding,
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .semantics {
+                if (description != null) contentDescription = description
+                if (state != null) stateDescription = state
+            },
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = if (highlight) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+        )
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodySmall, maxLines = 1)
     }
 }
 

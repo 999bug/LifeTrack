@@ -27,6 +27,7 @@ import com.example.lifetrack.core.model.CycleSnapshot
 import com.example.lifetrack.core.model.DateRange
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PoopFields
+import com.example.lifetrack.core.model.PeriodEndEdit
 import com.example.lifetrack.core.model.PeriodFill
 import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.model.SportFields
@@ -264,12 +265,14 @@ class MainViewModel(
      *
      * 只记住**本次动作自己新增的事件 id** 与动作前的进行中起点：撤销时精确删除这些
      * 仅标记记录、恢复起点，绝不按日期范围扫库，避免误删用户填过详情 / 备注的记录。
+     * [removedDates] 是「改结束日期 / 提前结束」时撤掉的仅标记日子，撤销时按原样补回。
      * 状态只存在内存里，重进应用后可撤销状态自然消失（不落库、不跨会话承诺）。
      */
     private data class PeriodActionUndo(
         val addedEventIds: List<String>,
         val previousOngoingStart: LocalDate?,
-        val label: String
+        val label: String,
+        val removedDates: List<LocalDate> = emptyList()
     )
 
     private val lastPeriodAction = MutableStateFlow<PeriodActionUndo?>(null)
@@ -665,6 +668,9 @@ class MainViewModel(
      * 「大姨妈走了」：有进行中的起点时，把 `[起点..结束日]` 全部落库（仅标记，不覆盖已有详情）并清状态；
      * 没有进行中状态时，沿用原来的「从最近一段首日补齐」逻辑（兼容旧版本升级上来的数据）。
      * 间隔超过 [PeriodFill.MAX_GAP_DAYS] 天不自动补，返回提示要求逐日确认（设计 §5.2）。
+     *
+     * 结束日早于「今天」时，[previousOngoingStart] 之后自动延续写下的日子还在库里：
+     * 这里顺手把结束日之后的**仅标记**记录撤掉，否则用户选早了结束日，界面上结束日也退不回去。
      */
     fun markPeriodEnd(date: LocalDate) {
         viewModelScope.launch {
@@ -672,22 +678,44 @@ class MainViewModel(
                 withContext(Dispatchers.IO) {
                     val today = LocalDate.now(ZoneId.systemDefault())
                     val addedEventIds = mutableListOf<String>()
+                    val removedDates = mutableListOf<LocalDate>()
                     val previousOngoingStart = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
                     if (previousOngoingStart != null) {
                         if (date.isBefore(previousOngoingStart)) {
                             "结束日不能早于开始日（${cnDate(previousOngoingStart)}）"
                         } else {
                             val dates = PeriodOngoing.closingDates(previousOngoingStart, date)
-                            val recorded = repository.observeRecordsInRange(
-                                previousOngoingStart.toString(), date.toString(), MenstruationFields.TYPE_CODE
-                            ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+                            val records = repository.observeRecordsInRange(
+                                previousOngoingStart.toString(), today.toString(), MenstruationFields.TYPE_CODE
+                            ).first()
+                            val recorded = records.mapNotNullTo(mutableSetOf()) {
+                                parseDateOrNull(it.event.localDate)
+                            }
                             dates.filterNot { it in recorded }
                                 .forEach { addedEventIds += repository.addRecord(periodMarkDraft(it)) }
+                            // 结束日之后由「自动延续」写下的仅标记日子撤掉；填过内容的一天原样保留。
+                            val trailing = records.filter { record ->
+                                val day = parseDateOrNull(record.event.localDate)
+                                day != null && day.isAfter(date)
+                            }
+                            val trimmable = trailing.filter { isMarkOnly(it) }
+                            val keptTrailing = trailing.size - trimmable.size
+                            trimmable.forEach { record ->
+                                repository.deletePoopRecord(record.event.id)
+                                parseDateOrNull(record.event.localDate)?.let(removedDates::add)
+                            }
                             settingsRepository.setOngoingPeriodStart(null)
                             lastPeriodAction.value = PeriodActionUndo(
-                                addedEventIds, previousOngoingStart, "结束这一段经期（${cnDate(date)}）"
+                                addedEventIds,
+                                previousOngoingStart,
+                                "结束这一段经期（${cnDate(date)}）",
+                                removedDates
                             )
-                            "经期已结束：共 ${dates.size} 天（${cnDate(previousOngoingStart)} – ${cnDate(date)}）"
+                            buildString {
+                                append("经期已结束：共 ${dates.size} 天（${cnDate(previousOngoingStart)} – ${cnDate(date)}）")
+                                if (removedDates.isNotEmpty()) append("，撤销了之后 ${removedDates.size} 天")
+                                if (keptTrailing > 0) append("（$keptTrailing 天填过内容已保留）")
+                            }
                         }
                     } else {
                         val records = repository.observeRecordsInRange(
@@ -745,8 +773,9 @@ class MainViewModel(
     /**
      * 撤销最近一次起止动作（界面定稿 v2 · 批 2 的「撤销上一步」）。
      *
-     * 只删除该动作自己新增的仅标记事件、恢复动作前的进行中起点；
-     * 用户填过详情 / 备注的记录从不在 [PeriodActionUndo.addedEventIds] 里，因此不会被碰。
+     * 只删除该动作自己新增的仅标记事件、恢复动作前的进行中起点，
+     * 并把该动作撤掉的仅标记日子补回；用户填过详情 / 备注的记录从不在
+     * [PeriodActionUndo.addedEventIds] 里，因此不会被碰。
      */
     fun undoLastPeriodAction() {
         viewModelScope.launch {
@@ -756,6 +785,12 @@ class MainViewModel(
                 withContext(Dispatchers.IO) {
                     action.addedEventIds.forEach { id ->
                         runCatching { repository.deletePoopRecord(id) }
+                    }
+                    action.removedDates.forEach { day ->
+                        val exists = repository.observeRecordsInRange(
+                            day.toString(), day.toString(), MenstruationFields.TYPE_CODE
+                        ).first().isNotEmpty()
+                        if (!exists) repository.addRecord(periodMarkDraft(day))
                     }
                     settingsRepository.setOngoingPeriodStart(action.previousOngoingStart?.toString())
                 }
@@ -784,7 +819,7 @@ class MainViewModel(
                     if (previous != null && date.isAfter(previous)) {
                         val stale = repository.observeRecordsInRange(
                             previous.toString(), date.minusDays(1).toString(), MenstruationFields.TYPE_CODE
-                        ).first().filter { it.detail == null && it.event.note.isBlank() }
+                        ).first().filter { isMarkOnly(it) }
                         stale.forEach { repository.deletePoopRecord(it.event.id) }
                     }
                     val existing = repository.observeRecordsInRange(
@@ -802,6 +837,88 @@ class MainViewModel(
             periodFeedbackChannel.trySend(message)
         }
     }
+
+    /**
+     * 「改结束日期」（参考 App 的经期结束滚轮）：把最近一段经期的结尾挪到用户选的那天。
+     *
+     * 这是「忘了点大姨妈走了、结束日一路跑到今天」的唯一出路：
+     * - 新结束日晚于已记录末日 → 补写 `(旧末日..新结束日]` 里缺的日子；
+     * - 新结束日早于已记录末日 → 撤掉结束日之后的**仅标记**日子（自动延续写下的那些），
+     *   用户填过流量 / 症状 / 日记的一天一律保留，并在提示里报数；
+     * - 进行中的经期改完即视为结束（清掉进行中状态，之后不再自动延续）。
+     *
+     * 向后补写沿用 [PeriodFill.MAX_GAP_DAYS] 的口径，超过就要求逐日确认，不一次性大批量写入。
+     * 可「撤销上一步」——撤掉的日子会按原样补回。
+     */
+    fun changePeriodEnd(date: LocalDate) {
+        viewModelScope.launch {
+            val message = periodWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val today = LocalDate.now(ZoneId.systemDefault())
+                    if (date.isAfter(today)) return@withContext "结束日期不能晚于今天"
+                    val previousOngoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
+                    val records = repository.observeRecordsInRange(
+                        today.minusYears(3).toString(), today.toString(), MenstruationFields.TYPE_CODE
+                    ).first()
+                    val recorded = records.mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
+                    val derived = if (previousOngoing != null) {
+                        recorded + PeriodOngoing.span(previousOngoing, today)
+                    } else {
+                        recorded
+                    }
+                    val segment = CycleCalculator.segmentsOf(derived, today).lastOrNull()
+                        ?: return@withContext "还没有可修改的经期记录，先点「大姨妈来了」开始一段"
+                    if (date.isBefore(segment.start)) {
+                        return@withContext "结束日期不能早于本段开始日（${cnDate(segment.start)}）"
+                    }
+                    if (ChronoUnit.DAYS.between(segment.end, date) > PeriodFill.MAX_GAP_DAYS) {
+                        return@withContext "比原结束日晚 ${ChronoUnit.DAYS.between(segment.end, date)} 天，" +
+                            "超过 ${PeriodFill.MAX_GAP_DAYS} 天请逐日确认后再补齐"
+                    }
+
+                    val plan = PeriodEndEdit.plan(segment.start, segment.end, date, recorded)
+                    val addedEventIds = mutableListOf<String>()
+                    val removedDates = mutableListOf<LocalDate>()
+                    plan.fillDates.forEach { addedEventIds += repository.addRecord(periodMarkDraft(it)) }
+
+                    val trimSet = plan.trimDates.toHashSet()
+                    val trimmable = mutableListOf<BackupRecord>()
+                    var kept = 0
+                    records.forEach { record ->
+                        val day = parseDateOrNull(record.event.localDate) ?: return@forEach
+                        if (day !in trimSet) return@forEach
+                        if (isMarkOnly(record)) trimmable += record else kept++
+                    }
+                    trimmable.forEach { record ->
+                        repository.deletePoopRecord(record.event.id)
+                        parseDateOrNull(record.event.localDate)?.let(removedDates::add)
+                    }
+
+                    settingsRepository.setOngoingPeriodStart(null)
+                    lastPeriodAction.value = PeriodActionUndo(
+                        addedEventIds,
+                        previousOngoing,
+                        "结束日期改为 ${cnDate(date)}",
+                        removedDates
+                    )
+                    buildString {
+                        append("结束日期已改为 ${cnDate(date)}")
+                        if (plan.fillDates.isNotEmpty()) append("，补写 ${plan.fillDates.size} 天")
+                        if (removedDates.isNotEmpty()) append("，撤销 ${removedDates.size} 天")
+                        if (kept > 0) {
+                            append("（$kept 天填过内容已保留，进那一天逐项清空后可再改）")
+                        }
+                    }
+                }
+            }
+            refreshToday()
+            periodFeedbackChannel.trySend(message)
+        }
+    }
+
+    /** 仅标记事件：没有详情、备注也为空——只有这种由自动延续写下的日子才可以被撤掉。 */
+    private fun isMarkOnly(record: BackupRecord): Boolean =
+        record.detail == null && record.event.note.isBlank()
 
     /** 仅标记事件：detail = null、note 空，时刻取当天正午避开夏令时边界。 */
     private fun periodMarkDraft(date: LocalDate): RecordDraft {

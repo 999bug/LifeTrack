@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.6.15",
+        date = "2026-11-17",
+        summary = "经期结束日期可事后修改，忘了点「走了」也能改回来；「走了」选更早的日子会顺带撤掉之后自动记下的天数，撤销可还原"
+    ),
+    VersionNote(
         version = "0.6.14",
         date = "2026-11-16",
         summary = "排便记录可写结束时间并自动算用时，超过一小时提示无效；亲密关系移入经期页，支持措施宫格与时间滚轮"

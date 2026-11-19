@@ -1,27 +1,44 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.example.lifetrack.feature.intimacy
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,15 +49,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.lifetrack.core.model.BackupRecord
@@ -56,19 +74,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val dateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA)
+private val intimacyDateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA)
 
 /**
- * 亲密关系编辑器（重构版）：整屏「取消 / 标题 / 确定」+ 措施图标宫格 + 时:分滚轮。
+ * 亲密关系编辑器：梅紫全屏私密记录页。
  *
- * 与旧版的差别：
- * - 措施从 3 选 1 的「保护措施」换成 10 选 1 的图标宫格，并给最近一次用过的措施打「上次」角标；
- * - 时间不再走系统时间选择器，而是常驻的时 / 分滚轮，一进页面就能看到当前值；
- * - 旧版的「主观感受 / 时长」不再提供输入，但编辑老记录时会原样保留（不因重构丢数据）。
- *
- * 全屏 Dialog 而不是 AlertDialog：10 枚宫格 + 滚轮 + 备注在 AlertDialog 的宽度里会挤成两列，
- * 参考界面本身就是整屏。日期不在本页修改：选中日由经期子应用的日历决定，
- * 编辑老记录也保持原来的日期，只改时间。
+ * 对外签名、措施字段、旧版字段保留策略与隐私文案均保持不变。页面只调整信息层级，
+ * 日期仍由经期日历决定，备注不会进入首页或历史摘要。
  */
 @Composable
 fun IntimacyEditorDialog(
@@ -109,129 +121,291 @@ fun IntimacyEditorDialog(
     var hour by remember(record, defaultDate) { mutableIntStateOf(initial.hour) }
     var minute by remember(record, defaultDate) { mutableIntStateOf(initial.minute) }
     var note by remember(record) { mutableStateOf(record?.event?.note.orEmpty()) }
+    val largeFont = LocalDensity.current.fontScale > 1.3f
 
     val title = if (record == null) "第 ${ordinal.coerceAtLeast(1)} 次亲密记录" else "编辑亲密记录"
+    val timeLabel = String.format(Locale.CHINA, "%02d:%02d", hour, minute)
+    val methodLabel = method?.let(IntimacyFields::methodLabel) ?: "未选择措施"
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+            color = MaterialTheme.colorScheme.background
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .padding(horizontal = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) { Text("取消") }
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        onClick = {
-                            val millis = date.atTime(LocalTime.of(hour, minute))
-                                .atZone(zone).toInstant().toEpochMilli()
-                            val fields = buildMap {
-                                putAll(legacyFields)
-                                method?.let { put(IntimacyFields.METHOD, it) }
-                            }
-                            onSave(
-                                RecordDraft(
-                                    typeCode = IntimacyFields.TYPE_CODE,
-                                    occurredAtEpochMillis = millis,
-                                    zoneId = zone.id,
-                                    note = note.trim(),
-                                    detail = if (fields.isEmpty()) {
-                                        null
-                                    } else {
-                                        RecordDetail.Generic(IntimacyFields.TYPE_CODE, fields)
-                                    }
-                                )
-                            )
-                        }
-                    ) { Text("确定", color = accent) }
-                }
+                IntimacyEditorHeader(
+                    title = title,
+                    accent = accent,
+                    onDismiss = onDismiss
+                )
 
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = LifeTrackTokens.Spacing.page),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    SectionTitle(text = "措施", accent = accent)
-                    Text(
-                        text = "单选，可不选。只记录措施本身，不记录伴侣或任何可识别身份的信息。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    IntimacyMethodGrid(
-                        selected = method,
-                        lastMethod = lastMethod,
-                        accent = accent,
-                        onSelect = { picked -> method = if (method == picked) null else picked }
+                    IntimacyHeroCard(
+                        timeLabel = timeLabel,
+                        methodLabel = methodLabel,
+                        accent = accent
                     )
 
-                    Spacer(Modifier.size(4.dp))
-                    SectionTitle(text = "时间", accent = accent)
-                    Text(
-                        text = date.format(dateFormatter),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TimeWheelPicker(
-                        hour = hour,
-                        minute = minute,
-                        accent = accent,
-                        onHourChange = { hour = it },
-                        onMinuteChange = { minute = it }
-                    )
+                    IntimacySectionCard(
+                        number = "01",
+                        title = "日期与时间",
+                        description = "日期沿用当前选择日；这里只调整本次记录的时间。",
+                        accent = accent
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Schedule,
+                                contentDescription = null,
+                                tint = accent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = date.format(intimacyDateFormatter),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        TimeWheelPicker(
+                            hour = hour,
+                            minute = minute,
+                            accent = accent,
+                            onHourChange = { hour = it },
+                            onMinuteChange = { minute = it }
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("备注（可选）") },
-                        minLines = 2
-                    )
-                    Text(
-                        text = "建议在「设置 → 安全」开启应用锁；本月记录只保存在本机。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                    IntimacySectionCard(
+                        number = "02",
+                        title = "防护方式",
+                        description = "单选，可不选。只记录措施本身，不记录伴侣或任何可识别身份的信息。",
+                        accent = accent
+                    ) {
+                        IntimacyMethodGrid(
+                            selected = method,
+                            lastMethod = lastMethod,
+                            accent = accent,
+                            onSelect = { picked -> method = if (method == picked) null else picked }
+                        )
+                        Surface(
+                            color = accent.copy(alpha = 0.09f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "当前选择",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = methodLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = accent,
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                        }
+                    }
+
+                    IntimacySectionCard(
+                        number = "03",
+                        title = "备注",
+                        description = "备注不会进入首页、历史摘要或读屏汇总。",
+                        accent = accent
+                    ) {
+                        OutlinedTextField(
+                            value = note,
+                            onValueChange = { note = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("给这次记录留一句话") },
+                            placeholder = { Text("只记录自己需要的信息，请勿填写他人身份信息。") },
+                            minLines = 3,
+                            supportingText = { Text("${note.length} / 500") }
+                        )
+                        Text(
+                            text = "建议在「设置 → 安全」开启应用锁；本月记录只保存在本机。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(6.dp))
                 }
+
+                IntimacySaveBar(
+                    summary = "$timeLabel · $methodLabel",
+                    isEditing = record != null,
+                    largeFont = largeFont,
+                    onSave = {
+                        val millis = date.atTime(LocalTime.of(hour, minute))
+                            .atZone(zone).toInstant().toEpochMilli()
+                        val fields = buildMap {
+                            putAll(legacyFields)
+                            method?.let { put(IntimacyFields.METHOD, it) }
+                        }
+                        onSave(
+                            RecordDraft(
+                                typeCode = IntimacyFields.TYPE_CODE,
+                                occurredAtEpochMillis = millis,
+                                zoneId = zone.id,
+                                note = note.trim(),
+                                detail = if (fields.isEmpty()) {
+                                    null
+                                } else {
+                                    RecordDetail.Generic(IntimacyFields.TYPE_CODE, fields)
+                                }
+                            )
+                        )
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String, accent: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun IntimacyEditorHeader(
+    title: String,
+    accent: Color,
+    onDismiss: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 58.dp)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onDismiss) {
+            Icon(Icons.Filled.Close, contentDescription = "关闭")
+        }
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 6.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "亲密关系 · 私密记录",
+                style = MaterialTheme.typography.labelSmall,
+                color = accent
+            )
+        }
         Box(
             modifier = Modifier
-                .size(6.dp)
                 .clip(CircleShape)
-                .background(accent)
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+                .background(accent.copy(alpha = 0.12f))
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Text("仅本机", style = MaterialTheme.typography.labelSmall, color = accent)
+        }
+    }
+}
+
+@Composable
+private fun IntimacyHeroCard(
+    timeLabel: String,
+    methodLabel: String,
+    accent: Color
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = accent.copy(alpha = 0.09f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(accent.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Favorite, contentDescription = null, tint = accent)
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("本次记录", style = MaterialTheme.typography.labelMedium, color = accent)
+                Text(timeLabel, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "$methodLabel · 详情只在本机保存",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntimacySectionCard(
+    number: String,
+    title: String,
+    description: String,
+    accent: Color,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = number,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(accent.copy(alpha = 0.12f))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            content()
+        }
     }
 }
 
 /**
- * 措施宫格：常驻 10 项，5 列 × 2 行；大字号降到 3 列，避免 5 个字被压成一横条。
- * 选中 = 实心圆 + 白色图示 + 对勾；最近一次用过的项在没有选中时打「上次」角标。
+ * 措施宫格：常规字号 5 列，大字号 2 列并允许两行文案，避免选项文字被压扁或截断。
  */
 @Composable
 private fun IntimacyMethodGrid(
@@ -240,12 +414,12 @@ private fun IntimacyMethodGrid(
     accent: Color,
     onSelect: (String) -> Unit
 ) {
-    // 5 列在常规字号下正好两行；大字号下 5 个字会被压成一横条，降到 3 列。
-    val columns = if (LocalDensity.current.fontScale > 1.3f) 3 else 5
+    val largeFont = LocalDensity.current.fontScale > 1.3f
+    val columns = if (largeFont) 2 else 5
     IntimacyFields.METHOD_OPTIONS.chunked(columns).forEach { row ->
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             row.forEach { (code, label) ->
                 MethodTile(
@@ -254,6 +428,7 @@ private fun IntimacyMethodGrid(
                     selected = selected == code,
                     isLast = lastMethod == code && selected != code,
                     accent = accent,
+                    largeFont = largeFont,
                     onSelect = onSelect,
                     modifier = Modifier.weight(1f)
                 )
@@ -270,12 +445,20 @@ private fun MethodTile(
     selected: Boolean,
     isLast: Boolean,
     accent: Color,
+    largeFont: Boolean,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val onAccent = if (accent.luminance() > 0.5f) Color(0xFF281920) else Color.White
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .border(
+                width = 1.dp,
+                color = if (selected) accent.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .background(if (selected) accent.copy(alpha = 0.09f) else Color.Transparent)
             .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(code) })
             .semantics {
                 contentDescription = label
@@ -285,14 +468,14 @@ private fun MethodTile(
                     else -> "未选中"
                 }
             }
-            .padding(vertical = 6.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(if (largeFont) 46.dp else 48.dp)
                     .clip(CircleShape)
                     .background(if (selected) accent else accent.copy(alpha = 0.12f))
                     .border(1.dp, accent.copy(alpha = if (selected) 0f else 0.25f), CircleShape),
@@ -300,8 +483,8 @@ private fun MethodTile(
             ) {
                 IntimacyMethodIcon(
                     method = code,
-                    color = if (selected) Color.White else accent,
-                    size = 26.dp
+                    color = if (selected) onAccent else accent,
+                    size = if (largeFont) 24.dp else 25.dp
                 )
             }
             if (selected) {
@@ -310,7 +493,7 @@ private fun MethodTile(
                         .align(Alignment.BottomEnd)
                         .size(18.dp)
                         .clip(CircleShape)
-                        .background(Color.White),
+                        .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
                     PeriodCheck(color = accent, size = 12.dp)
@@ -319,8 +502,8 @@ private fun MethodTile(
             if (isLast) {
                 Text(
                     text = "上次",
-                    fontSize = 9.sp,
-                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = onAccent,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .clip(RoundedCornerShape(8.dp))
@@ -331,11 +514,81 @@ private fun MethodTile(
         }
         Text(
             text = label,
-            fontSize = 9.5.sp,
-            maxLines = 1,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = if (largeFont) 2 else 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun IntimacySaveBar(
+    summary: String,
+    isEditing: Boolean,
+    largeFont: Boolean,
+    onSave: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 10.dp,
+        tonalElevation = 0.dp
+    ) {
+        if (largeFont) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IntimacySaveButton(isEditing, onSave, Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IntimacySaveButton(isEditing, onSave)
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntimacySaveButton(
+    isEditing: Boolean,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onSave,
+        modifier = modifier.heightIn(min = 50.dp),
+        shape = RoundedCornerShape(15.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(
+            text = if (isEditing) "保存修改" else "保存私密记录",
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
         )
     }
 }

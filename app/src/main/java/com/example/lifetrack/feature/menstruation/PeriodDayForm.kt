@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
@@ -70,14 +71,15 @@ fun PeriodDayForm(
     modifier: Modifier = Modifier
 ) {
     val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
+    val palette = rememberPeriodPalette()
 
     if (model.readOnly) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
                 .clip(CardShape)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CardShape)
+                .background(palette.accentContainer)
+                .border(1.dp, palette.accentBorder, CardShape)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -111,7 +113,7 @@ fun PeriodDayForm(
                 .fillMaxWidth()
                 .clip(CardShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CardShape)
+                .border(1.dp, palette.accentBorder.copy(alpha = 0.42f), CardShape)
         ) {
             PeriodField.entries.forEachIndexed { index, field ->
                 if (index > 0) {
@@ -128,19 +130,41 @@ fun PeriodDayForm(
                 )
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "选择后即时保存，同一天只记一条；不填也可以。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Button(onClick = onDone) { Text("完成") }
+        val stacked = LocalDensity.current.fontScale > 1.3f
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FormSaveHint()
+                FormDoneButton(onDone, Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FormSaveHint(Modifier.weight(1f))
+                FormDoneButton(onDone)
+            }
         }
+    }
+}
+
+@Composable
+private fun FormSaveHint(modifier: Modifier = Modifier) {
+    Text(
+        text = "选择后即时保存，同一天只记一条；不填也可以。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun FormDoneButton(onDone: () -> Unit, modifier: Modifier = Modifier) {
+    Button(onClick = onDone, modifier = modifier) {
+        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("完成")
     }
 }
 
@@ -153,6 +177,9 @@ private fun FormProgress(model: PeriodDayFormModel, moduleColor: Color) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(moduleColor.copy(alpha = 0.07f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
             .heightIn(min = 44.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -225,14 +252,14 @@ private fun PeriodFieldRow(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                    .background(moduleColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 PeriodFieldGlyph(
                     field = field,
                     level = level,
                     symptomLevel = model.symptoms.size.coerceAtMost(4),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (filled) moduleColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     size = 20.dp
                 )
             }

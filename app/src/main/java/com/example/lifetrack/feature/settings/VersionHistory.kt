@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.7.1",
+        date = "2026-11-19",
+        summary = "统一咖啡、饮水、茶、运动、排便、经期和亲密关系的记录页视觉；咖啡改为全屏点单体验，各模块拥有更清晰的配色、快捷选项和大字号布局"
+    ),
+    VersionNote(
         version = "0.7.0",
         date = "2026-11-19",
         summary = "咖啡和茶拆成两个独立记录；咖啡新增杯型、温度、豆子、糖度和热量，茶能记茶种与杯数毫升；品种都能自定义"

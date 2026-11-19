@@ -1,6 +1,7 @@
 package com.example.lifetrack.feature.menstruation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,6 +49,33 @@ import com.example.lifetrack.core.ui.cycleVisualColors
 import com.example.lifetrack.feature.statistics.CardShape
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+
+/** 经期页使用的模块色派生色；深浅主题各取一次，避免各组件自行拼色。 */
+internal data class PeriodPalette(
+    val accent: Color,
+    val onAccent: Color,
+    val accentContainer: Color,
+    val accentBorder: Color,
+    val surface: Color,
+    val muted: Color,
+    val danger: Color
+)
+
+@Composable
+internal fun rememberPeriodPalette(): PeriodPalette {
+    val colorScheme = MaterialTheme.colorScheme
+    val isDark = colorScheme.background.luminance() < 0.5f
+    val accent = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
+    return PeriodPalette(
+        accent = accent,
+        onAccent = onModuleColor(accent),
+        accentContainer = accent.copy(alpha = if (isDark) 0.18f else 0.10f),
+        accentBorder = accent.copy(alpha = if (isDark) 0.38f else 0.30f),
+        surface = colorScheme.surface,
+        muted = colorScheme.onSurfaceVariant,
+        danger = colorScheme.error
+    )
+}
 
 /**
  * 经期页首屏的三段视觉组件（界面定稿 v2 · 批 2）：
@@ -68,19 +98,69 @@ fun PeriodPhaseCard(
     modifier: Modifier = Modifier
 ) {
     val colors = cycleVisualColors()
+    val palette = rememberPeriodPalette()
     val stacked = LocalDensity.current.fontScale > 1.3f
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(24.dp)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
-            .padding(16.dp)
+            .background(palette.accentContainer)
+            .border(1.dp, palette.accentBorder, shape)
+            .padding(horizontal = 18.dp, vertical = 17.dp)
             .semantics { this.contentDescription = summary },
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Bloodtype,
+                        contentDescription = null,
+                        tint = palette.accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = palette.accent
+                    )
+                }
+                Text(
+                    text = "周期 $cycleLength 天 · 经期 $periodLength 天",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.muted
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Bloodtype,
+                    contentDescription = null,
+                    tint = palette.accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = palette.accent
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "周期 $cycleLength 天 · 经期 $periodLength 天",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.muted
+                )
+            }
+        }
         if (stacked) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 CycleRing(
@@ -93,7 +173,7 @@ fun PeriodPhaseCard(
                     contentDescription = "周期第 $dayIndex 天，共 $cycleLength 天，经期 $periodLength 天，已记录 $recordedDays 天"
                 )
             }
-            PeriodPhaseText(badge, title, description, colors.period)
+            PeriodPhaseText(title, description, palette.accent)
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -110,7 +190,7 @@ fun PeriodPhaseCard(
                     contentDescription = "周期第 $dayIndex 天，共 $cycleLength 天，经期 $periodLength 天，已记录 $recordedDays 天"
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    PeriodPhaseText(badge, title, description, colors.period)
+                    PeriodPhaseText(title, description, palette.accent)
                 }
             }
         }
@@ -118,20 +198,19 @@ fun PeriodPhaseCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            PeriodLegendItem("经期实色弧", colors.period, solid = true)
-            PeriodLegendItem("预计虚线弧", colors.period, solid = false)
-            PeriodLegendItem("今天定位点", colors.primary, solid = true)
+            PeriodLegendItem("已记录", colors.period, solid = true)
+            PeriodLegendItem("预计日期", colors.period, solid = false)
+            PeriodLegendItem("今天", palette.accent, solid = true)
         }
     }
 }
 
 @Composable
-private fun PeriodPhaseText(badge: String, title: String, description: String, periodColor: Color) {
-    Text(text = badge, style = MaterialTheme.typography.labelSmall, color = periodColor)
+private fun PeriodPhaseText(title: String, description: String, periodColor: Color) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+        modifier = Modifier.padding(bottom = 5.dp)
     )
     Text(
         text = description,
@@ -164,6 +243,7 @@ fun PeriodCycleBandCard(
     modifier: Modifier = Modifier
 ) {
     val colors = cycleVisualColors()
+    val palette = rememberPeriodPalette()
     val shape = RoundedCornerShape(16.dp)
     val endDate = startDate?.plusDays((cycleLength - 1).toLong())
     val range = if (startDate != null && endDate != null) {
@@ -177,8 +257,8 @@ fun PeriodCycleBandCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+            .background(palette.surface)
+            .border(1.dp, palette.accentBorder.copy(alpha = 0.55f), shape)
             .padding(horizontal = 14.dp, vertical = 13.dp)
     ) {
         if (LocalDensity.current.fontScale > 1.3f) {
@@ -253,8 +333,7 @@ fun PeriodPrimaryActions(
     hint: String?,
     modifier: Modifier = Modifier
 ) {
-    val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
-    val onModule = onModuleColor(moduleColor)
+    val palette = rememberPeriodPalette()
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Button(
@@ -265,12 +344,12 @@ fun PeriodPrimaryActions(
                 .semantics { contentDescription = primaryLabel },
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = moduleColor,
-                contentColor = onModule
+                containerColor = palette.accent,
+                contentColor = palette.onAccent
             )
         ) {
             if (primaryIsCheck) {
-                PeriodCheck(color = onModule, size = 20.dp)
+                PeriodCheck(color = palette.onAccent, size = 20.dp)
             } else {
                 Icon(
                     imageVector = LifeTrackTokens.ModuleIcons.of(MenstruationFields.TYPE_CODE),
@@ -323,7 +402,7 @@ fun PeriodPrimaryActions(
             Text(
                 text = hint,
                 style = MaterialTheme.typography.bodySmall,
-                color = moduleColor,
+                color = palette.accent,
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
@@ -339,9 +418,15 @@ private fun SecondaryActionButton(
     description: String?,
     modifier: Modifier = Modifier
 ) {
+    val palette = rememberPeriodPalette()
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
+        border = BorderStroke(1.dp, palette.accent.copy(alpha = if (enabled) 0.5f else 0.2f)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = palette.accent,
+            disabledContentColor = palette.muted.copy(alpha = 0.55f)
+        ),
         contentPadding = SecondaryActionPadding,
         modifier = modifier
             .heightIn(min = 44.dp)
@@ -359,13 +444,14 @@ fun PeriodInsightSection(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val palette = rememberPeriodPalette()
     val shape = RoundedCornerShape(16.dp)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+            .background(palette.surface)
+            .border(1.dp, palette.accentBorder.copy(alpha = 0.55f), shape)
     ) {
         Row(
             modifier = Modifier
@@ -393,7 +479,7 @@ fun PeriodInsightSection(
             Icon(
                 imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = palette.accent
             )
         }
         AnimatedVisibility(visible = expanded) {

@@ -84,6 +84,7 @@ fun PeriodCalendarView(
 ) {
     val colors = rememberStatsColors()
     val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
+    val palette = rememberPeriodPalette()
     val fontScale = LocalDensity.current.fontScale
     val minCellHeight = if (fontScale > 1.3f) 56.dp else 40.dp
     // 模型固定 6 行，视图只裁掉尾部整周空白：11 月这类 5 行月份首屏能省下 40dp。
@@ -94,43 +95,48 @@ fun PeriodCalendarView(
             .fillMaxWidth()
             .clip(CardShape)
             .background(colors.surface)
-            .border(1.dp, colors.border, CardShape)
+            .border(1.dp, palette.accentBorder.copy(alpha = 0.55f), CardShape)
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = month.label,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
+        if (fontScale > 1.3f) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = month.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                CalendarNavButtons(canGoNext = canGoNext, onPrevious = onPrevious, onNext = onNext)
+            }
             TextButton(
                 onClick = onToday,
-                modifier = Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
             ) {
+                Text("回到今天", color = palette.accent)
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "回到今天",
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
+                    text = month.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
-                Icon(
-                    Icons.Filled.ChevronLeft,
-                    contentDescription = "上个月",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(44.dp)) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = "下个月",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (canGoNext) 1f else 0.3f),
-                    modifier = Modifier.size(18.dp)
-                )
+                TextButton(
+                    onClick = onToday,
+                    modifier = Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
+                ) {
+                    Text(
+                        text = "回到今天",
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center,
+                        color = palette.accent,
+                        maxLines = 2
+                    )
+                }
+                CalendarNavButtons(canGoNext = canGoNext, onPrevious = onPrevious, onNext = onNext)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -222,12 +228,12 @@ fun PeriodCalendarView(
                         }
                 )
             }
-            LegendSwatch(label = "今天 2dp 环") {
+            LegendSwatch(label = "今天 / 选中") {
                 Box(
                     Modifier
                         .size(12.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp))
+                        .border(2.dp, moduleColor, RoundedCornerShape(3.dp))
                 )
             }
         }
@@ -238,6 +244,30 @@ fun PeriodCalendarView(
             text = "本月已记录 $recordedInMonth 天 · 预计 $predictedInMonth 天",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun CalendarNavButtons(
+    canGoNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
+        Icon(
+            Icons.Filled.ChevronLeft,
+            contentDescription = "上个月",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    IconButton(onClick = onNext, enabled = canGoNext, modifier = Modifier.size(44.dp)) {
+        Icon(
+            Icons.Filled.ChevronRight,
+            contentDescription = "下个月",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (canGoNext) 1f else 0.3f),
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -267,6 +297,7 @@ private fun RowScope.PeriodDayCell(
     val isRecorded = date != null && date in recordedDates
     val isPredicted = date != null && date in predictedDates
     val isSelected = date != null && date == selectedDate
+    val palette = rememberPeriodPalette()
 
     val description = if (date == null) {
         "非本月日期"
@@ -281,12 +312,12 @@ private fun RowScope.PeriodDayCell(
 
     // 经期底色由周 Row 画成连续带，这里只保留选中日的淡底，不切断色带。
     val container = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        palette.accentContainer
     } else {
         Color.Transparent
     }
     val contentColor = when {
-        isToday -> MaterialTheme.colorScheme.primary
+        isToday || isSelected -> moduleColor
         isRecorded -> moduleColor
         else -> MaterialTheme.colorScheme.onSurface
     }
@@ -302,7 +333,7 @@ private fun RowScope.PeriodDayCell(
             .background(container)
             .then(
                 // 经期不画逐格边框：连续带由周 Row 一次画完，逐格描边会把它切回三段方框。
-                if (ring) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier
+                if (ring) Modifier.border(2.dp, moduleColor, shape) else Modifier
             )
             .drawBehind {
                 if (dashed) {

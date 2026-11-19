@@ -35,7 +35,10 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +82,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.cos
@@ -90,6 +95,49 @@ internal fun sportIcon(sport: String): ImageVector = when (sport) {
     "yoga" -> Icons.Filled.SelfImprovement
     "ride" -> Icons.AutoMirrored.Filled.DirectionsBike
     else -> Icons.AutoMirrored.Filled.DirectionsRun
+}
+
+/** 运动模块专用色：青绿只承担识别，页面背景与保存按钮仍由全局主题负责。 */
+internal data class SportPalette(
+    val accent: Color,
+    val accentStrong: Color,
+    val accentContainer: Color,
+    val onAccentContainer: Color,
+    val onAccent: Color,
+    val hero: Color,
+    val heroElevated: Color,
+    val onHero: Color
+)
+
+@Composable
+internal fun sportPalette(): SportPalette = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+    SportPalette(
+        accent = Color(0xFF73D5C2),
+        accentStrong = Color(0xFFA5E9DD),
+        accentContainer = Color(0xFF1D3A35),
+        onAccentContainer = Color(0xFFD6F8F0),
+        onAccent = Color(0xFF0E1510),
+        hero = Color(0xFF0D322F),
+        heroElevated = Color(0xFF174A45),
+        onHero = Color(0xFFE7FAF5)
+    )
+} else {
+    SportPalette(
+        accent = Color(0xFF12796F),
+        accentStrong = Color(0xFF0B5F58),
+        accentContainer = Color(0xFFD7F2EC),
+        onAccentContainer = Color(0xFF0B4E49),
+        onAccent = Color.White,
+        hero = Color(0xFF123E3A),
+        heroElevated = Color(0xFF205B55),
+        onHero = Color(0xFFF1FBF7)
+    )
+}
+
+/** 三类同色相微差异；颜色之外始终保留图标和文字，避免只靠色相识别。 */
+internal fun sportTypeColor(sport: String, accent: Color, background: Color): Color {
+    val index = SportFields.SPORTS.indexOf(sport).coerceAtLeast(0)
+    return sportShade(accent, background, index)
 }
 
 /**
@@ -128,31 +176,38 @@ private fun SportPill(
     text: String,
     idle: Boolean = false,
     dot: Boolean = false,
-    leadingIcon: ImageVector? = null
+    leadingIcon: ImageVector? = null,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer
 ) {
     Row(
         modifier = Modifier
             .clip(pillShape)
             .background(
                 if (idle) MaterialTheme.colorScheme.surfaceContainerHigh
-                else MaterialTheme.colorScheme.secondaryContainer
+                else containerColor
             )
             .padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        val tint = if (idle) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
+        val contentTint = if (idle) MaterialTheme.colorScheme.onSurfaceVariant else tint
         if (dot) {
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(tint))
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(contentTint))
         }
         if (leadingIcon != null) {
-            Icon(imageVector = leadingIcon, contentDescription = null, tint = tint, modifier = Modifier.size(13.dp))
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = contentTint,
+                modifier = Modifier.size(13.dp)
+            )
         }
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (idle) FontWeight.Normal else FontWeight.Medium,
-            color = tint
+            color = contentTint
         )
     }
 }
@@ -164,8 +219,8 @@ private fun SportIconBubble(sport: String, accent: Color, size: Int = 40, iconSi
         modifier = Modifier
             .size(size.dp)
             .clip(RoundedCornerShape((size * 0.32f).dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .border(1.dp, accent.copy(alpha = 0.20f), RoundedCornerShape((size * 0.32f).dp)),
+            .background(accent.copy(alpha = 0.12f))
+            .border(1.dp, accent.copy(alpha = 0.24f), RoundedCornerShape((size * 0.32f).dp)),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -257,58 +312,82 @@ internal fun SportWeekCard(
     surface: Color,
     stacked: Boolean
 ) {
+    val palette = sportPalette()
+    val activeDays = week.days.count { it.minutes > 0 }
+    val weekRange = "${week.start.monthValue}/${week.start.dayOfMonth} - " +
+        "${week.end.monthValue}/${week.end.dayOfMonth}"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .background(sportWashBrush(moduleColor, surface, soft = true))
-            .border(1.dp, moduleColor.copy(alpha = 0.24f), cardShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(palette.hero, palette.heroElevated),
+                    start = androidx.compose.ui.geometry.Offset.Zero,
+                    end = androidx.compose.ui.geometry.Offset(1200f, 900f)
+                )
+            )
+            .border(1.dp, palette.accent.copy(alpha = 0.28f), cardShape)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "本周概览",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            SportPill(text = gap, idle = week.isIdle, dot = true)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "THIS WEEK",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.accent,
+                    letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing
+                )
+                Text(
+                    text = "本周概览 · $weekRange",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = palette.onHero.copy(alpha = 0.72f)
+                )
+            }
+            HeroPill(text = gap, palette = palette, active = !week.isIdle)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                WeekCount(week = week, palette = palette)
+                Text(
+                    text = if (week.isIdle) {
+                        "这周还没有记录，先留下第一次节奏。"
+                    } else {
+                        "共 ${SportFields.minutesLabel(week.totalMinutes)} · 动过 $activeDays 天"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.onHero.copy(alpha = 0.76f)
+                )
+            }
+        } else {
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "${week.count}",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = " 次",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 5.dp)
-                )
-                if (!stacked && !week.isIdle) {
-                    Spacer(Modifier.weight(1f))
+                WeekCount(week = week, palette = palette)
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "共 ${SportFields.minutesLabel(week.totalMinutes)}",
+                        text = if (week.isIdle) "等待第一次记录" else SportFields.minutesLabel(week.totalMinutes),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = palette.onHero
+                    )
+                    Text(
+                        text = if (week.isIdle) "不追配速，只记录节奏" else "动过 $activeDays 天",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        color = palette.onHero.copy(alpha = 0.68f)
                     )
                 }
             }
-            if (stacked || week.isIdle) {
-                Text(
-                    text = if (week.isIdle) "这周还没有记录" else "共 ${SportFields.minutesLabel(week.totalMinutes)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
 
-        WeekBar(week = week, moduleColor = moduleColor, surface = surface)
+        WeekBar(
+            week = week,
+            moduleColor = moduleColor,
+            trackColor = palette.onHero.copy(alpha = 0.13f)
+        )
 
         if (week.knownMinutes.isNotEmpty() || week.legacyMinutes > 0) {
             FlowRow(
@@ -316,29 +395,74 @@ internal fun SportWeekCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                week.knownMinutes.forEachIndexed { index, (sport, minutes) ->
+                week.knownMinutes.forEach { (sport, minutes) ->
                     LegendItem(
-                        label = "${SportFields.sportLabel(sport)} ${minutes} 分",
-                        color = sportShade(moduleColor, surface, index)
+                        label = "${SportFields.sportLabel(sport)} $minutes 分",
+                        color = sportTypeColor(sport, moduleColor, surface),
+                        textColor = palette.onHero.copy(alpha = 0.76f)
                     )
                 }
                 if (week.legacyMinutes > 0) {
                     LegendItem(
                         label = "其他旧类型 ${week.legacyMinutes} 分",
-                        color = moduleColor.copy(alpha = 0.28f)
+                        color = palette.onHero.copy(alpha = 0.32f),
+                        textColor = palette.onHero.copy(alpha = 0.76f)
                     )
                 }
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HorizontalDivider(color = palette.onHero.copy(alpha = 0.14f))
 
         WeekRhythm(week = week, moduleColor = moduleColor)
     }
 }
 
 @Composable
-private fun WeekBar(week: SportWeek, moduleColor: Color, surface: Color) {
+private fun WeekCount(week: SportWeek, palette: SportPalette) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            text = "${week.count}",
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = palette.onHero
+        )
+        Text(
+            text = " 次",
+            style = MaterialTheme.typography.titleMedium,
+            color = palette.onHero.copy(alpha = 0.72f),
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun HeroPill(text: String, palette: SportPalette, active: Boolean) {
+    Row(
+        modifier = Modifier
+            .clip(pillShape)
+            .background(palette.onHero.copy(alpha = 0.11f))
+            .border(1.dp, palette.onHero.copy(alpha = 0.14f), pillShape)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (active) palette.accent else palette.onHero.copy(alpha = 0.42f))
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = palette.onHero.copy(alpha = 0.84f)
+        )
+    }
+}
+
+@Composable
+private fun WeekBar(week: SportWeek, moduleColor: Color, trackColor: Color) {
     val segments = week.knownMinutes
     val legacy = week.legacyMinutes
     val total = segments.sumOf { it.second } + legacy
@@ -360,20 +484,20 @@ private fun WeekBar(week: SportWeek, moduleColor: Color, surface: Color) {
             .fillMaxWidth()
             .height(12.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(trackColor)
             .semantics { contentDescription = summary },
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         if (total > 0) {
             val count = segments.size + if (legacy > 0) 1 else 0
-            segments.forEachIndexed { index, (_, minutes) ->
+            segments.forEachIndexed { index, (sport, minutes) ->
                 Box(
                     modifier = Modifier
                         .weight(minutes.toFloat())
                         .widthIn(min = 4.dp)
                         .fillMaxHeight()
                         .clip(segmentShape(index == 0, index == count - 1))
-                        .background(sportShade(moduleColor, surface, index))
+                        .background(sportTypeColor(sport, moduleColor, MaterialTheme.colorScheme.surface))
                 )
             }
             if (legacy > 0) {
@@ -383,7 +507,7 @@ private fun WeekBar(week: SportWeek, moduleColor: Color, surface: Color) {
                         .widthIn(min = 4.dp)
                         .fillMaxHeight()
                         .clip(segmentShape(segments.isEmpty(), true))
-                        .background(moduleColor.copy(alpha = 0.28f))
+                        .background(moduleColor.copy(alpha = 0.42f))
                 )
             }
         }
@@ -398,30 +522,34 @@ private fun segmentShape(first: Boolean, last: Boolean): RoundedCornerShape = Ro
 )
 
 @Composable
-private fun LegendItem(label: String, color: Color) {
+private fun LegendItem(
+    label: String,
+    color: Color,
+    textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Box(modifier = Modifier.size(9.dp).clip(RoundedCornerShape(3.dp)).background(color))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = textColor
         )
     }
 }
-
 /**
  * 七天节奏：一格一天，高度按当天分钟数归一到本周峰值；点格子在下方看当天分钟数与次数。
  * 未来日期用虚线底槽表示「还没到」，今天实心加一圈描边，不靠颜色单独表意。
  */
 @Composable
 private fun WeekRhythm(week: SportWeek, moduleColor: Color) {
+    val palette = sportPalette()
     var selectedDate by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = week.days.firstOrNull { it.date.toString() == selectedDate }
         ?: week.days.firstOrNull { it.isToday }
         ?: week.days.first()
     val maxMinutes = week.days.maxOfOrNull { it.minutes } ?: 0
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    val futureColor = MaterialTheme.colorScheme.outlineVariant
+    val trackColor = palette.onHero.copy(alpha = 0.13f)
+    val futureColor = palette.onHero.copy(alpha = 0.34f)
     val summary = week.days.joinToString("，") { day ->
         "${day.label}${if (day.minutes > 0) " ${day.minutes} 分钟" else " 无记录"}"
     }
@@ -433,13 +561,13 @@ private fun WeekRhythm(week: SportWeek, moduleColor: Color) {
             Text(
                 text = "本周节奏",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = palette.onHero.copy(alpha = 0.72f),
                 modifier = Modifier.weight(1f)
             )
             Text(
                 text = "点格子看当天",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = palette.onHero.copy(alpha = 0.58f)
             )
         }
         Row(
@@ -479,7 +607,7 @@ private fun WeekRhythm(week: SportWeek, moduleColor: Color) {
                             .background(
                                 when {
                                     day.isFuture -> Color.Transparent
-                                    day.minutes > 0 -> moduleColor.copy(alpha = if (day.isToday) 1f else 0.55f)
+                                    day.minutes > 0 -> moduleColor.copy(alpha = if (day.isToday) 1f else 0.66f)
                                     else -> trackColor
                                 }
                             )
@@ -496,9 +624,9 @@ private fun WeekRhythm(week: SportWeek, moduleColor: Color) {
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (day.isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (day.isToday || isSelected) {
-                            MaterialTheme.colorScheme.primary
+                            palette.accent
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            palette.onHero.copy(alpha = 0.64f)
                         }
                     )
                 }
@@ -507,7 +635,7 @@ private fun WeekRhythm(week: SportWeek, moduleColor: Color) {
         Text(
             text = info,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = palette.onHero.copy(alpha = 0.76f),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
         )
     }
@@ -575,9 +703,19 @@ internal fun SportQuickCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                SportPill(text = lastLine, idle = last == null)
+                SportPill(
+                    text = lastLine,
+                    idle = last == null,
+                    tint = accent,
+                    containerColor = accent.copy(alpha = 0.12f)
+                )
             }
-            SportPill(text = "记一次", leadingIcon = Icons.Filled.Add)
+            SportPill(
+                text = "记一次",
+                leadingIcon = Icons.Filled.Add,
+                tint = accent,
+                containerColor = accent.copy(alpha = 0.12f)
+            )
         }
     } else {
         Box(modifier = cardModifier.heightIn(min = 150.dp)) {
@@ -597,13 +735,13 @@ internal fun SportQuickCard(
                         modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                            .background(accent.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Add,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = accent,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -625,7 +763,12 @@ internal fun SportQuickCard(
                     modifier = Modifier.padding(top = 2.dp)
                 )
                 Spacer(Modifier.height(6.dp))
-                SportPill(text = lastLine, idle = last == null)
+                SportPill(
+                    text = lastLine,
+                    idle = last == null,
+                    tint = accent,
+                    containerColor = accent.copy(alpha = 0.12f)
+                )
             }
         }
     }
@@ -645,78 +788,134 @@ internal fun SportHistoryRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val palette = sportPalette()
+    val accent = sportTypeColor(session.sport, palette.accent, MaterialTheme.colorScheme.surface)
     val dateLabel = when (session.date) {
         today -> "今天"
         today.minusDays(1) -> "昨天"
         else -> session.date.format(dateFormatter)
     }
+    val timeLabel = runCatching {
+        Instant.ofEpochMilli(session.epochMillis)
+            .atZone(ZoneId.of(session.zoneId))
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+    }.getOrDefault("--:--")
     val meta = buildList {
-        add(dateLabel)
         session.intensity.takeIf { it.isNotEmpty() }?.let { add(SportFields.intensityLabel(it)) }
         if (session.note.isNotBlank()) add(session.note)
-    }.joinToString(" · ")
-    val accent = LifeTrackTokens.ModuleColors.of(SportFields.TYPE_CODE)
+    }.joinToString(" · ").ifBlank { "只记录了类型与时长" }
+    var menuOpen by remember { mutableStateOf(false) }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(cardShape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), cardShape)
+            .border(1.dp, accent.copy(alpha = 0.20f), cardShape)
             .clickable(onClick = onShowDetail)
-            .heightIn(min = 56.dp)
-            .padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp)
+            .heightIn(min = 68.dp)
+            .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SportIconBubble(sport = session.sport, accent = accent, size = 36, iconSize = 19)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                    itemVerticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = SportFields.sportLabel(session.sport),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    SportPill(text = SportFields.minutesLabel(session.minutes))
-                }
+        if (!stacked) {
+            Column(
+                modifier = Modifier.widthIn(min = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
                 Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (stacked) 3 else 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = dateLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accent
+                )
+                Text(
+                    text = session.date.format(DateTimeFormatter.ofPattern("M/d")),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (!stacked) {
-                RowActionIcons(onEdit = onEdit, onDelete = onDelete)
-            }
         }
-        if (stacked) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+
+        SportIconBubble(sport = session.sport, accent = accent, size = 38, iconSize = 20)
+
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                itemVerticalAlignment = Alignment.CenterVertically
             ) {
-                RowActionIcons(onEdit = onEdit, onDelete = onDelete)
+                Text(
+                    text = SportFields.sportLabel(session.sport),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (stacked) MetaPill(text = SportFields.minutesLabel(session.minutes), accent = accent)
+            }
+            Text(
+                text = if (stacked) "$dateLabel · $timeLabel · $meta" else "$timeLabel · $meta",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (stacked) 3 else 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (!stacked) {
+            Text(
+                text = SportFields.minutesLabel(session.minutes),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = accent
+            )
+        }
+
+        Box {
+            IconButton(
+                onClick = { menuOpen = true },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "管理这条运动记录",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("编辑") },
+                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onEdit()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("删除") },
+                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onDelete()
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun RowActionIcons(onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row {
-        IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Filled.Edit, contentDescription = "编辑这条运动记录")
-        }
-        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Filled.DeleteOutline, contentDescription = "删除这条运动记录")
-        }
-    }
+private fun MetaPill(text: String, accent: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Medium,
+        color = accent,
+        modifier = Modifier
+            .clip(pillShape)
+            .background(accent.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
 }
-
 /** 空态提示：虚线框 + 一句引导，与未来节奏格同一套「还没有」语言。 */
 @Composable
 internal fun SportEmptyHint(text: String) {
@@ -771,7 +970,7 @@ internal fun SportInsightSection(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .background(accent.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

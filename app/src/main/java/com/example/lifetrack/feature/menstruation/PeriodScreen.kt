@@ -16,11 +16,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -248,22 +251,14 @@ fun PeriodScreen(
                 .wrapContentWidth(Alignment.CenterHorizontally)
                 .widthIn(max = 640.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
+                .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回今天")
-                }
-                Text(
-                    text = "经期",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f)
-                )
-                if (enabled) {
-                    TextButton(onClick = { insightOpen = true }) { Text("周期设置") }
-                }
-            }
+            PeriodPageHeader(
+                onBack = onBack,
+                settingsEnabled = enabled,
+                onOpenSettings = { insightOpen = true }
+            )
 
             if (!enabled) {
                 Text(
@@ -389,6 +384,7 @@ fun PeriodScreen(
                 selectedDate = selectedDate,
                 today = today,
                 canEdit = canEdit,
+                accent = moduleColor,
                 filledCount = com.example.lifetrack.core.model.PeriodField.entries.count {
                     formModel.isFilled(it)
                 }
@@ -583,36 +579,143 @@ private fun periodPhaseText(
 }
 
 @Composable
+private fun PeriodPageHeader(
+    onBack: () -> Unit,
+    settingsEnabled: Boolean,
+    onOpenSettings: () -> Unit
+) {
+    val accent = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
+    val stacked = LocalDensity.current.fontScale > 1.3f
+    if (stacked) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回今天")
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("经期", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "关注周期，不判断健康",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                PeriodHeaderMark(accent)
+            }
+            if (settingsEnabled) {
+                TextButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("周期设置")
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回今天")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("经期", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "关注周期，不判断健康",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            PeriodHeaderMark(accent)
+            if (settingsEnabled) {
+                TextButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text("设置")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodHeaderMark(accent: Color) {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 6.dp)
+            .size(42.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(accent.copy(alpha = 0.11f))
+            .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(13.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Bloodtype,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
 private fun SelectedDayHeader(
     selectedDate: LocalDate,
     today: LocalDate,
     canEdit: Boolean,
+    accent: Color,
     filledCount: Int
 ) {
     val weekday = selectedDate.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINA)
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = "${cn(selectedDate)} · $weekday${if (selectedDate == today) " · 今天" else ""}",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = "已填 $filledCount / ${com.example.lifetrack.core.model.PeriodField.entries.size}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary
-        )
-        if (!canEdit) {
-            Text(
-                text = "只读",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    val title = "${cn(selectedDate)} · $weekday${if (selectedDate == today) " · 今天" else ""}"
+    val count = "已填 $filledCount / ${com.example.lifetrack.core.model.PeriodField.entries.size}"
+    if (LocalDensity.current.fontScale > 1.3f) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                SelectedDayBadge(count, accent)
+                if (!canEdit) ReadOnlyBadge()
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            SelectedDayBadge(count, accent)
+            if (!canEdit) ReadOnlyBadge()
         }
     }
+}
+
+@Composable
+private fun SelectedDayBadge(text: String, accent: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = accent,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .padding(horizontal = 9.dp, vertical = 5.dp)
+    )
+}
+
+@Composable
+private fun ReadOnlyBadge() {
+    Text(
+        text = "只读",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 /** 简报只呈现用户自己记录的数据：中位数 / 最长最短 / 已记录天数 / 常见症状 Top 3，不做健康判断。 */

@@ -21,7 +21,7 @@
 | 🔵 | `latest.json` 首次生效验证 | 依赖下一次发版 | 发版后确认：文件已生成、`apkUrl` 能 HEAD 到 200、客户端能走到 `Available` |
 | 🔵 | baseline profile 真机生成 | 需要 arm 设备 | 按 `docs/baseline-profile.md` §4 用 Macrobenchmark 生成，会整体替换手写版 |
 | 🔵 | 0.6.6 发版前补 changelog | — | `VersionHistory.kt` 首条补 0.6.6，否则 CI 会按设计在构建前拦下 |
-| 🔄 | 记录模块 UI 统一重设计 | 用户 2026-11-19 已批准统一骨架 + 模块主色 | 咖啡 Compose 已完成并通过构建/单测/lint；其他模块原型见 `docs/ui-redesign-prototypes/index.html`，确认后再逐模块落地 |
+| 🔄 | 记录模块 UI 统一实现与 v0.7.1 发版 | 用户 2026-11-19 批准全量落地并发版 | 饮水/茶、运动、排便/亲密关系、经期四个 Compose 子任务并行；计划见 `.sdd/2026-11-19-module-ui-compose/progress.md` |
 
 图例：🟡 需要设备 / 外部条件，🔵 待排期的改进，⛔ 明确挂起。
 

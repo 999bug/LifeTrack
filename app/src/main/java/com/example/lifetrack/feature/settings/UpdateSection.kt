@@ -40,7 +40,7 @@ private const val GITHUB_RELEASES = "https://github.com/999bug/LifeTrack/release
  * 不渲染下载按钮也不显示进度条。
  */
 @Composable
-internal fun UpdateSection(viewModel: MainViewModel) {
+internal fun UpdateSection(viewModel: UpdateViewModel) {
     val state by viewModel.updateState.collectAsStateWithLifecycle()
 
     SettingsRow(

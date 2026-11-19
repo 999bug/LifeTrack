@@ -14,6 +14,8 @@ import com.example.lifetrack.core.ui.DatabaseUnavailableScreen
 import com.example.lifetrack.core.ui.LifeTrackTheme
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.lock.AppLockGate
+import com.example.lifetrack.feature.lock.AppLockViewModel
+import com.example.lifetrack.feature.settings.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,11 +37,20 @@ class MainActivity : ComponentActivity() {
                         factory = MainViewModel.Factory(
                             repository = container.trackRepository,
                             settingsRepository = container.settingsRepository,
-                            updateRepository = container.updateRepository
+                            todaySource = container.todaySource
                         )
                     )
+                    val appLockViewModel: AppLockViewModel = viewModel(
+                        factory = AppLockViewModel.Factory(
+                            settingsRepository = container.settingsRepository,
+                            todaySource = container.todaySource
+                        )
+                    )
+                    val updateViewModel: UpdateViewModel = viewModel(
+                        factory = UpdateViewModel.Factory(container.updateRepository)
+                    )
                     val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
-                    val appLocked by mainViewModel.appLocked.collectAsStateWithLifecycle()
+                    val appLocked by appLockViewModel.appLocked.collectAsStateWithLifecycle()
                     // 「跟随系统」在这里解析成实际的明暗，主题切换只影响本次组合，不需要重建 Activity。
                     val darkTheme = when (themeMode) {
                         ThemeMode.LIGHT -> false
@@ -47,8 +58,12 @@ class MainActivity : ComponentActivity() {
                         ThemeMode.SYSTEM -> isSystemInDarkTheme()
                     }
                     LifeTrackTheme(darkTheme = darkTheme) {
-                        AppLockGate(locked = appLocked, viewModel = mainViewModel) {
-                            LifeTrackApp(viewModel = mainViewModel)
+                        AppLockGate(locked = appLocked, viewModel = appLockViewModel) {
+                            LifeTrackApp(
+                                viewModel = mainViewModel,
+                                appLockViewModel = appLockViewModel,
+                                updateViewModel = updateViewModel
+                            )
                         }
                     }
                 }

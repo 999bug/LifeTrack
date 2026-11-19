@@ -45,10 +45,12 @@ import com.example.lifetrack.feature.menstruation.MenstruationEditorDialog
 import com.example.lifetrack.feature.menstruation.PeriodScreen
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
+import com.example.lifetrack.feature.lock.AppLockViewModel
 import com.example.lifetrack.feature.poop.PoopEditorDialog
 import com.example.lifetrack.feature.record.RecordDetailSheet
 import com.example.lifetrack.feature.settings.ModuleManagementScreen
 import com.example.lifetrack.feature.settings.SettingsScreen
+import com.example.lifetrack.feature.settings.UpdateViewModel
 import com.example.lifetrack.feature.sport.SportEditorDialog
 import com.example.lifetrack.feature.sport.SportScreen
 import com.example.lifetrack.feature.statistics.StatisticsScreen
@@ -74,7 +76,11 @@ private fun BackupRecord.toPoopRelation() = PoopRecordRelation(
 )
 
 @Composable
-fun LifeTrackApp(viewModel: MainViewModel) {
+fun LifeTrackApp(
+    viewModel: MainViewModel,
+    appLockViewModel: AppLockViewModel,
+    updateViewModel: UpdateViewModel
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -89,7 +95,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     val customTeaVarieties by viewModel.customTeaVarieties.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.checkForUpdate(auto = true)
+        updateViewModel.checkForUpdate(auto = true)
     }
 
     fun openEditor(typeCode: String, record: BackupRecord?, sport: String? = null) {
@@ -174,6 +180,8 @@ fun LifeTrackApp(viewModel: MainViewModel) {
             composable("settings") {
                 SettingsScreen(
                     viewModel = viewModel,
+                    appLockViewModel = appLockViewModel,
+                    updateViewModel = updateViewModel,
                     onOpenModules = { navController.navigate("modules") }
                 )
             }

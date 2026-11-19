@@ -12,9 +12,6 @@ import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
 import com.example.lifetrack.core.model.IntimacyFields
-import com.example.lifetrack.core.model.AppLockTimeout
-import com.example.lifetrack.core.update.ReleaseInfo
-import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.core.model.HistoryFilter
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.ModuleOrdering
@@ -33,7 +30,6 @@ import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.model.PeriodStartEdit
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.feature.sport.SportStats
-import com.example.lifetrack.core.security.AppLockPolicy
 import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
@@ -65,7 +61,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -79,10 +74,8 @@ private const val QUICK_WATER_AMOUNT_ML = 250
 class MainViewModel(
     private val repository: TrackRepository,
     private val settingsRepository: SettingsRepository,
-    private val updateRepository: UpdateRepository,
-    clock: Clock = Clock.systemDefaultZone()
+    private val todaySource: TodaySource
 ) : ViewModel() {
-    private val todaySource = TodaySource(clock)
 
     /** 应用内唯一的业务日期；页面不得再自行调用 LocalDate.now()。 */
     val today: StateFlow<LocalDate> = todaySource.today
@@ -329,48 +322,6 @@ class MainViewModel(
 
     fun removeCustomTeaVariety(name: String) {
         viewModelScope.launch { settingsRepository.removeCustomTeaVariety(name) }
-    }
-
-    /** null 表示设置尚未从 DataStore 读出；此时不能先渲染正文，避免锁屏前闪一下内容。 */
-    val appLockEnabled: StateFlow<Boolean?> = settingsRepository.appLockEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val appLockTimeout: StateFlow<AppLockTimeout> = settingsRepository.appLockTimeout
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppLockTimeout.IMMEDIATE)
-
-    private var lastBackgroundAtMillis: Long? = null
-    private val appLockedState = MutableStateFlow<Boolean?>(null)
-
-    /** null 表示设置尚未读出或尚未判定；true 时必须先通过系统认证才渲染正文。 */
-    val appLocked: StateFlow<Boolean?> = appLockedState.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            settingsRepository.appLockEnabled.collect { enabled ->
-                if (!enabled) {
-                    appLockedState.value = false
-                    lastBackgroundAtMillis = null
-                } else if (appLockedState.value == null) {
-                    // 冷启动或进程被杀后重建：只要设置里开着，先锁再谈其他。
-                    appLockedState.value = true
-                }
-            }
-        }
-    }
-
-    val updateState: StateFlow<UpdateRepository.Status> =
-        updateRepository.state.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            UpdateRepository.Status.Idle
-        )
-
-    fun checkForUpdate(auto: Boolean = false) {
-        viewModelScope.launch { updateRepository.check(auto) }
-    }
-
-    fun downloadAndInstall(release: ReleaseInfo) {
-        viewModelScope.launch { updateRepository.downloadAndInstall(release) }
     }
 
     fun refreshToday() {
@@ -935,44 +886,6 @@ class MainViewModel(
         viewModelScope.launch { settingsRepository.setThemeMode(mode) }
     }
 
-    fun setAppLockEnabled(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setAppLockEnabled(enabled) }
-    }
-
-    fun setAppLockTimeout(timeout: AppLockTimeout) {
-        viewModelScope.launch { settingsRepository.setAppLockTimeout(timeout) }
-    }
-
-    /** 由 Activity 的 ON_STOP 调用：记录退到后台的时间。 */
-    fun onAppBackgrounded() {
-        if (appLockEnabled.value == true) {
-            lastBackgroundAtMillis = System.currentTimeMillis()
-        }
-    }
-
-    /** 由 Activity 的 ON_START 调用：先校正业务日期，再按超时策略决定是否重新上锁。 */
-    fun onAppForegrounded() {
-        refreshToday()
-        // 设置还没读出来时不要解锁：null 不等于「已关闭」。
-        val enabled = appLockEnabled.value ?: return
-        if (!enabled) {
-            appLockedState.value = false
-            return
-        }
-        if (AppLockPolicy.shouldLock(
-                timeout = appLockTimeout.value,
-                lastBackgroundAtMillis = lastBackgroundAtMillis,
-                nowMillis = System.currentTimeMillis()
-            )
-        ) {
-            appLockedState.value = true
-        }
-    }
-
-    fun unlockApp() {
-        appLockedState.value = false
-    }
-
     private fun initialHistoryQuery(): HistoryQuery {
         val today = todaySource.currentDate()
         return HistoryQuery(today.minusDays(29), today, filtered = false)
@@ -981,14 +894,14 @@ class MainViewModel(
     class Factory(
         private val repository: TrackRepository,
         private val settingsRepository: SettingsRepository,
-        private val updateRepository: UpdateRepository
+        private val todaySource: TodaySource
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (!modelClass.isAssignableFrom(MainViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return MainViewModel(repository, settingsRepository, updateRepository) as T
+            return MainViewModel(repository, settingsRepository, todaySource) as T
         }
     }
 }

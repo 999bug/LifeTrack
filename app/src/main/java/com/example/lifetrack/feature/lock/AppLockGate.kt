@@ -43,7 +43,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.lifetrack.feature.home.MainViewModel
 
 /**
  * 应用锁入口。
@@ -57,7 +56,7 @@ import com.example.lifetrack.feature.home.MainViewModel
 @Composable
 fun AppLockGate(
     locked: Boolean?,
-    viewModel: MainViewModel,
+    viewModel: AppLockViewModel,
     content: @Composable () -> Unit
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current

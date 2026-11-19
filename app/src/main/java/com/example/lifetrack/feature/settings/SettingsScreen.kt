@@ -84,6 +84,7 @@ import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.SensitiveTypes
 import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.lock.AppLockViewModel
 import com.example.lifetrack.feature.lock.canUseAppLock
 import com.example.lifetrack.feature.settings.backup.BackupController
 import com.example.lifetrack.feature.settings.backup.BackupOperations
@@ -111,13 +112,15 @@ private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
+    appLockViewModel: AppLockViewModel,
+    updateViewModel: UpdateViewModel,
     onOpenModules: () -> Unit
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val updateState by updateViewModel.updateState.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
-    val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
-    val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
+    val appLockEnabled by appLockViewModel.appLockEnabled.collectAsStateWithLifecycle()
+    val appLockTimeout by appLockViewModel.appLockTimeout.collectAsStateWithLifecycle()
     val compactState by viewModel.compactState.collectAsStateWithLifecycle()
     val customCoffeeVarieties by viewModel.customCoffeeVarieties.collectAsStateWithLifecycle()
     val customTeaVarieties by viewModel.customTeaVarieties.collectAsStateWithLifecycle()
@@ -308,7 +311,7 @@ fun SettingsScreen(
                     if (enable && !canUseAppLock(context)) {
                         appLockError = "请先在系统设置中设置锁屏密码（PIN、图案或密码），再开启应用锁。"
                     } else {
-                        viewModel.setAppLockEnabled(enable)
+                        appLockViewModel.setAppLockEnabled(enable)
                     }
                 },
                 trailing = {
@@ -396,7 +399,7 @@ fun SettingsScreen(
         }
 
         MoreSection(
-            viewModel = viewModel,
+            updateViewModel = updateViewModel,
             availableVersion = availableVersion,
             privacyExpanded = privacyExpanded,
             onOpenChangelog = { changelogVisible = true },
@@ -793,7 +796,7 @@ fun SettingsScreen(
                             selected = appLockTimeout == option,
                             title = option.label(),
                             subtitle = option.description(),
-                            onClick = { viewModel.setAppLockTimeout(option) }
+                            onClick = { appLockViewModel.setAppLockTimeout(option) }
                         )
                     }
                 }
@@ -1030,7 +1033,7 @@ private fun ThemeModeRow(
  */
 @Composable
 private fun MoreSection(
-    viewModel: MainViewModel,
+    updateViewModel: UpdateViewModel,
     availableVersion: String?,
     privacyExpanded: Boolean,
     onOpenChangelog: () -> Unit,
@@ -1109,7 +1112,7 @@ private fun MoreSection(
             }
         }
         SettingsDivider()
-        UpdateSection(viewModel = viewModel)
+        UpdateSection(viewModel = updateViewModel)
     }
 }
 

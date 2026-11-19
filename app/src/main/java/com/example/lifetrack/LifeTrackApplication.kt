@@ -8,6 +8,7 @@ import com.example.lifetrack.core.database.DatabaseEncryption
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.security.DatabaseKeyRepository
 import com.example.lifetrack.core.security.DatabaseKeyStore
+import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.data.repository.RoomTrackRepository
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +66,7 @@ class AppContainer(private val application: Application) {
         get() = (_databaseState.value as? DatabaseState.Ready)?.database
             ?: error("database is unavailable")
 
+    val todaySource = TodaySource()
     val trackRepository by lazy { RoomTrackRepository(database) }
     val settingsRepository = SettingsRepository(application)
     val updateRepository = UpdateRepository(application, settingsRepository)

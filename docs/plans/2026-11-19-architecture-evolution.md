@@ -37,7 +37,10 @@
 **Files:** Create `feature/{home,history,statistics,settings,menstruation}/...ViewModel.kt`；Modify `core/navigation/LifeTrackApp.kt`、`MainActivity.kt`、对应页面和测试
 **Interfaces:** Produces 各页面独立状态流；消费共享 `TodaySource`、repository 和 controllers。
 
-- [ ] 先拆应用锁、更新和经期状态，再拆首页、历史、统计。
+- [x] 3A：拆出 `AppLockViewModel` 与 `UpdateViewModel`，共享 `AppContainer` 的 `TodaySource`，设置页和启动链完成接线。
+- [ ] 3B：拆出 `PeriodViewModel`，迁移经期流、周期快照与写入逻辑。
+- [ ] 3C：拆出首页、历史、统计 ViewModel。
+- [ ] 3D：删除剩余页面对 `feature.home.MainViewModel` 的反向依赖。
 - [ ] 保持导航参数、页面行为和状态恢复不变。
 - [ ] 删除非 home feature 对 `feature.home.MainViewModel` 的依赖。
 - [ ] 补每屏核心状态流测试。

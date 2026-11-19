@@ -10,6 +10,8 @@
 
 | 状态 | 事项 | 依赖 / 阻塞 | 下一步 |
 | --- | --- | --- | --- |
+| 🔄 | 架构演进总计划：先修日期一致性，再抽备份状态机、拆 ViewModel、收敛仓储与类型注册、补 paging 和测试门禁 | 方案与 9 个子任务见 `docs/specs/2026-11-19-architecture-evolution-design.md`、`docs/plans/2026-11-19-architecture-evolution.md` | 按 Task 1 → 9 顺序逐个实现、逐个提交并更新本表 |
+| 🔄 | Task 1：统一“今天”业务日期源 | 当前页面混用 `todayDate` 与 `LocalDate.now()` | 实现 `TodaySource`，覆盖跨午夜测试，跑单测 / lint / 构建 |
 | 🟡 | B3 TalkBack 实机朗读复核 | 需要真机 + 读屏 | 依次走 首页 → 历史 → 统计 → 设置，确认分段选中态、月历格、分布卡汇总句 |
 | 🟡 | B7 真机「卸载重装丢数据」验证 | 需要真机 | 装 0.6.5 → 记录 → 卸载重装 → 确认数据丢失（预期丢失，验的是 README 表述是否准确） |
 | 🟡 | 运动子应用真机走查 | 需要真机 | 点类型卡预选 → 保存后概览 / 今日记录同步 → 深色 / 200% / 360dp；口径见 `docs/sport-subapp-design.md` §7 |

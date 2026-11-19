@@ -48,7 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.HistoryQuery
 import com.example.lifetrack.core.model.PickerDateMapper
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.home.HistoryViewModel
 import com.example.lifetrack.feature.record.RecordRow
 import com.example.lifetrack.feature.statistics.StatsColors
 import com.example.lifetrack.feature.statistics.rememberStatsColors
@@ -62,7 +62,7 @@ private val fullDateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    viewModel: MainViewModel,
+    viewModel: HistoryViewModel,
     onShowDetail: (BackupRecord) -> Unit,
     onEdit: (BackupRecord) -> Unit,
     onDelete: (String) -> Unit

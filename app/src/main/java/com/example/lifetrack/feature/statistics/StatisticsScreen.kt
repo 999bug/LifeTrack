@@ -72,13 +72,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.StatsPeriod
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.home.StatisticsViewModel
 import java.time.LocalDate
 import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun StatisticsScreen(viewModel: MainViewModel) {
+fun StatisticsScreen(viewModel: StatisticsViewModel) {
     val statsByPeriod by viewModel.statistics.collectAsStateWithLifecycle()
     val today by viewModel.today.collectAsStateWithLifecycle()
     val statsScope by viewModel.statsScope.collectAsStateWithLifecycle()

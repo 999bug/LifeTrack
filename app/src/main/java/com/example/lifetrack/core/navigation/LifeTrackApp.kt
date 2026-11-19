@@ -44,7 +44,10 @@ import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
 import com.example.lifetrack.feature.menstruation.MenstruationEditorDialog
 import com.example.lifetrack.feature.menstruation.PeriodScreen
 import com.example.lifetrack.feature.menstruation.PeriodViewModel
+import com.example.lifetrack.feature.home.HistoryViewModel
 import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.home.StatisticsViewModel
+import com.example.lifetrack.feature.home.TodayViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.lock.AppLockViewModel
 import com.example.lifetrack.feature.poop.PoopEditorDialog
@@ -81,7 +84,10 @@ fun LifeTrackApp(
     viewModel: MainViewModel,
     appLockViewModel: AppLockViewModel,
     updateViewModel: UpdateViewModel,
-    periodViewModel: PeriodViewModel
+    periodViewModel: PeriodViewModel,
+    todayViewModel: TodayViewModel,
+    historyViewModel: HistoryViewModel,
+    statisticsViewModel: StatisticsViewModel
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -153,10 +159,10 @@ fun LifeTrackApp(
         ) {
             composable("today") {
                 TodayScreen(
-                    viewModel = viewModel,
+                    viewModel = todayViewModel,
                     periodViewModel = periodViewModel,
-                    onQuickRecord = viewModel::quickRecord,
-                    onWaterQuick = viewModel::quickWaterRecord,
+                    onQuickRecord = todayViewModel::quickRecord,
+                    onWaterQuick = todayViewModel::quickWaterRecord,
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
@@ -168,18 +174,18 @@ fun LifeTrackApp(
                     onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it },
-                    onEndPoop = viewModel::endPoopRecord
+                    onEndPoop = todayViewModel::endPoopRecord
                 )
             }
             composable("history") {
                 HistoryScreen(
-                    viewModel = viewModel,
+                    viewModel = historyViewModel,
                     onShowDetail = { detailRecord = it },
                     onEdit = { record -> openEditor(record.event.typeCode, record) },
                     onDelete = { pendingDeleteId = it }
                 )
             }
-            composable("statistics") { StatisticsScreen(viewModel = viewModel) }
+            composable("statistics") { StatisticsScreen(viewModel = statisticsViewModel) }
             composable("settings") {
                 SettingsScreen(
                     viewModel = viewModel,
@@ -219,7 +225,7 @@ fun LifeTrackApp(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -229,7 +235,7 @@ fun LifeTrackApp(
                 onAddVariety = viewModel::addCustomCoffeeVariety,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -239,7 +245,7 @@ fun LifeTrackApp(
                 onAddVariety = viewModel::addCustomTeaVariety,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -247,7 +253,7 @@ fun LifeTrackApp(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 },
                 initialSport = editorSport
@@ -256,7 +262,7 @@ fun LifeTrackApp(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -264,7 +270,7 @@ fun LifeTrackApp(
                 record = editingRecord,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveGenericRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -272,7 +278,7 @@ fun LifeTrackApp(
                 record = editingRecord?.toPoopRelation(),
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
-                    viewModel.saveRecord(editingRecord?.event?.id, draft)
+                    todayViewModel.saveRecord(editingRecord?.event?.id, draft)
                     editorVisible = false
                 }
             )
@@ -293,7 +299,7 @@ fun LifeTrackApp(
             text = { Text("删除后无法在应用内撤销。") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteRecord(id)
+                    todayViewModel.deleteRecord(id)
                     pendingDeleteId = null
                 }) { Text("删除") }
             },

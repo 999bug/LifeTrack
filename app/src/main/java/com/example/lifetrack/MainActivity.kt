@@ -12,7 +12,10 @@ import com.example.lifetrack.core.navigation.LifeTrackApp
 import com.example.lifetrack.core.ui.DatabaseLoadingScreen
 import com.example.lifetrack.core.ui.DatabaseUnavailableScreen
 import com.example.lifetrack.core.ui.LifeTrackTheme
+import com.example.lifetrack.feature.home.HistoryViewModel
 import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.home.StatisticsViewModel
+import com.example.lifetrack.feature.home.TodayViewModel
 import com.example.lifetrack.feature.lock.AppLockGate
 import com.example.lifetrack.feature.lock.AppLockViewModel
 import com.example.lifetrack.feature.menstruation.PeriodViewModel
@@ -57,6 +60,24 @@ class MainActivity : ComponentActivity() {
                             todaySource = container.todaySource
                         )
                     )
+                    val todayViewModel: TodayViewModel = viewModel(
+                        factory = TodayViewModel.Factory(
+                            repository = container.trackRepository,
+                            todaySource = container.todaySource
+                        )
+                    )
+                    val historyViewModel: HistoryViewModel = viewModel(
+                        factory = HistoryViewModel.Factory(
+                            repository = container.trackRepository,
+                            todaySource = container.todaySource
+                        )
+                    )
+                    val statisticsViewModel: StatisticsViewModel = viewModel(
+                        factory = StatisticsViewModel.Factory(
+                            repository = container.trackRepository,
+                            todaySource = container.todaySource
+                        )
+                    )
                     val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
                     val appLocked by appLockViewModel.appLocked.collectAsStateWithLifecycle()
                     // 「跟随系统」在这里解析成实际的明暗，主题切换只影响本次组合，不需要重建 Activity。
@@ -71,7 +92,10 @@ class MainActivity : ComponentActivity() {
                                 viewModel = mainViewModel,
                                 appLockViewModel = appLockViewModel,
                                 updateViewModel = updateViewModel,
-                                periodViewModel = periodViewModel
+                                periodViewModel = periodViewModel,
+                                todayViewModel = todayViewModel,
+                                historyViewModel = historyViewModel,
+                                statisticsViewModel = statisticsViewModel
                             )
                         }
                     }

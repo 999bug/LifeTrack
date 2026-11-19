@@ -67,7 +67,7 @@ private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE",
  */
 @Composable
 fun TodayScreen(
-    viewModel: MainViewModel,
+    viewModel: TodayViewModel,
     periodViewModel: PeriodViewModel,
     onQuickRecord: () -> Unit,
     onWaterQuick: () -> Unit,

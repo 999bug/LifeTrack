@@ -1,6 +1,6 @@
 # 发布与签名指南
 
-> 最新已发布：0.7.2（2026-11-19，versionCode 25）· 下次发版默认由 CI 从最高 tag patch+1；跳 minor/major 才在 workflow 手填 `version`（如本次 v0.7.0）· 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
+> 最新已发布：0.7.3（2026-11-19，versionCode 26）· 下次发版默认由 CI 从最高 tag patch+1；跳 minor/major 才在 workflow 手填 `version`（如本次 v0.7.0）· 权威发布：GitHub Releases · 国内分发：Gitee Releases · 流水线：`.github/workflows/release.yml`
 
 这份文档说明怎么把「生活记」的签名 APK 发到 GitHub Releases 并同步到 Gitee，以及为什么签名密钥一旦丢失就无法挽回。代码开发与发布始终以 GitHub 为准，Gitee 只承担国内手机的更新下载。
 

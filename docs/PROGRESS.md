@@ -18,10 +18,10 @@
 | 🔵 | A9 月经 E2 / E3 | E1 已于 2026-11-12 交付 | 体重 / 体温、自定义症状、完整报告（E2）；通知提醒、备孕 / 怀孕模式（E3），见 `docs/menstruation-module-design.md` |
 | 🔵 | 备份流程抽 `BackupController` | 无 | 把 `SettingsScreen` 里导出 / 恢复 / 换口令的 30 多个 state 与 4 套 launcher 抽成 state holder |
 | 🔵 | 按屏拆 ViewModel | 需先引入 `TodayProvider` 之类的共享日期源 | `todayDate` 同时驱动首页 / 历史 / 月历 / 统计，各自维护会跨天不一致，先抽共享源再拆 |
-| 🔵 | `latest.json` 首次生效验证 | 依赖下一次发版 | 发版后确认：文件已生成、`apkUrl` 能 HEAD 到 200、客户端能走到 `Available` |
+
 | 🔵 | baseline profile 真机生成 | 需要 arm 设备 | 按 `docs/baseline-profile.md` §4 用 Macrobenchmark 生成，会整体替换手写版 |
 | 🔵 | 0.6.6 发版前补 changelog | — | `VersionHistory.kt` 首条补 0.6.6，否则 CI 会按设计在构建前拦下 |
-| 🔄 | 记录模块 UI 统一实现与 v0.7.1 发版 | 用户 2026-11-19 批准全量落地并发版 | 饮水/茶、运动、排便/亲密关系、经期四个 Compose 子任务并行；计划见 `.sdd/2026-11-19-module-ui-compose/progress.md` |
+
 
 图例：🟡 需要设备 / 外部条件，🔵 待排期的改进，⛔ 明确挂起。
 
@@ -45,6 +45,8 @@
 | A6 台账与确认单 | `88c20d1` | 确认单 §6 实施记录、B1 双基线就绪、R8/R9 登记 |
 | A7 咖啡 / 茶 | 2026-11-09 | 单类型 + 四字段规格；103 项单测；Room 仍 v2（验证「加类型不必升 Room」） |
 | 饮品拆分与扩展（A7 升级） | 2026-11-19 | 拆成 coffee / tea 两类型；咖啡补品种/杯型/温度/豆子/浓度/糖度/奶油/热量，茶独立字段；自定义品种存 DataStore；旧茶记录幂等迁移 + 恢复兼容；未升 Room、未改备份；单测/lint/assembleDebug 全绿，真机未验 |
+| 记录模块 UI 统一实现与 v0.7.1 发布 | 2026-11-19 | 咖啡、饮水、茶、运动、排便、经期、亲密关系统一模块配色与全屏录入；405 项单测、16 项仪器测试、lint、debug/release 构建通过；GitHub / Gitee 附件与 SHA-256 验证通过 |
+| Gitee latest.json v0.7.1 验证 | 2026-11-19 | 内容指向 v0.7.1；APK HEAD 200，Content-Length 5706434 |
 | A8 / A11 / A12 + B 包门禁 | 2026-11-09 | 运动模块、跨面板口径统一、字段校验收口、B1 迁移测试、B2 仪器测试、B11 CI 门禁 |
 | 发布 v0.2.0 | `b419afc` | versionCode 2；APK 14.4 MB；签名证书 `6A6CC4…59D9` 可覆盖安装 |
 | 发布 v0.3.0 | `df10075` | versionCode 3；流水线 4m05s，新增 lint 门禁 |

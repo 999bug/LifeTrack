@@ -3,6 +3,8 @@ package com.example.lifetrack.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.lifetrack.core.ui.ActionFeedback
+import com.example.lifetrack.core.ui.launchAction
 import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
@@ -74,6 +76,9 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
+    val actionFeedback = ActionFeedback()
+    val actionMessages = actionFeedback.messages
+
 
     /** 应用内唯一的业务日期；页面不得再自行调用 LocalDate.now()。 */
     val today: StateFlow<LocalDate> = todaySource.today
@@ -92,31 +97,31 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addCustomCoffeeVariety(name: String) {
-        viewModelScope.launch { settingsRepository.addCustomCoffeeVariety(name) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.addCustomCoffeeVariety(name) }
     }
 
     fun addCustomTeaVariety(name: String) {
-        viewModelScope.launch { settingsRepository.addCustomTeaVariety(name) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.addCustomTeaVariety(name) }
     }
 
     fun removeCustomCoffeeVariety(name: String) {
-        viewModelScope.launch { settingsRepository.removeCustomCoffeeVariety(name) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.removeCustomCoffeeVariety(name) }
     }
 
     fun removeCustomTeaVariety(name: String) {
-        viewModelScope.launch { settingsRepository.removeCustomTeaVariety(name) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.removeCustomTeaVariety(name) }
     }
 
 
     fun setTypeEnabled(code: String, enabled: Boolean) {
-        viewModelScope.launch { repository.setTypeEnabled(code, enabled) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { repository.setTypeEnabled(code, enabled) }
     }
 
     fun moveType(code: String, offset: Int) {
         val current = trackTypes.value
         val reordered = ModuleOrdering.move(current, code, offset)
         if (reordered != current) {
-            viewModelScope.launch { repository.reorderTypes(reordered) }
+            viewModelScope.launchAction(actionFeedback, "操作失败") { repository.reorderTypes(reordered) }
         }
     }
 
@@ -177,7 +182,7 @@ class SettingsViewModel(
 
     fun compactDatabase() {
         if (_compactState.value is CompactState.Running) return
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             _compactState.value = CompactState.Running
             val before = runCatching { repository.databaseSizeBytes() }.getOrDefault(0L)
             runCatching { repository.compactDatabase() }
@@ -190,7 +195,7 @@ class SettingsViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch { settingsRepository.setThemeMode(mode) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.setThemeMode(mode) }
     }
 
     class Factory(

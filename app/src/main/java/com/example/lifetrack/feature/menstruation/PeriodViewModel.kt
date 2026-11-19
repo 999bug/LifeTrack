@@ -3,6 +3,8 @@ package com.example.lifetrack.feature.menstruation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.lifetrack.core.ui.ActionFeedback
+import com.example.lifetrack.core.ui.launchAction
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
@@ -47,6 +49,9 @@ class PeriodViewModel(
     private val settingsRepository: SettingsRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
+    val actionFeedback = ActionFeedback()
+    val actionMessages = actionFeedback.messages
+
     val today: StateFlow<LocalDate> = todaySource.today
 
     val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
@@ -140,7 +145,7 @@ class PeriodViewModel(
      * 全空时落 `detail = null` 的仅标记事件，与恢复路径一致。
      */
     fun savePeriodDay(date: LocalDate, fields: Map<String, String>, note: String) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val existing = repository.observeRecordsInRange(
@@ -178,7 +183,7 @@ class PeriodViewModel(
      * 更早的历史日期只标当天，避免一次误触把整月染成经期。
      */
     fun markPeriodStart(date: LocalDate) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = todaySource.currentDate()
@@ -228,7 +233,7 @@ class PeriodViewModel(
      * 这里顺手把结束日之后的**仅标记**记录撤掉，否则用户选早了结束日，界面上结束日也退不回去。
      */
     fun markPeriodEnd(date: LocalDate) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = todaySource.currentDate()
@@ -305,11 +310,11 @@ class PeriodViewModel(
     }
 
     fun setCycleLengthDays(days: Int) {
-        viewModelScope.launch { settingsRepository.setCycleLengthDays(days) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.setCycleLengthDays(days) }
     }
 
     fun setPeriodLengthDays(days: Int) {
-        viewModelScope.launch { settingsRepository.setPeriodLengthDays(days) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { settingsRepository.setPeriodLengthDays(days) }
     }
 
     /**
@@ -322,7 +327,7 @@ class PeriodViewModel(
      * 会留下一段孤立的脏数据，比改不动更糟。提示里报出是哪几天。
      */
     fun changePeriodStart(date: LocalDate) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = todaySource.currentDate()
@@ -388,7 +393,7 @@ class PeriodViewModel(
      * 可「撤销上一步」——撤掉的日子会按原样补回。
      */
     fun changePeriodEnd(date: LocalDate) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = todaySource.currentDate()
@@ -443,7 +448,7 @@ class PeriodViewModel(
     }
 
     fun saveGenericRecord(eventId: String?, draft: RecordDraft) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             if (eventId == null) repository.addRecord(draft)
             else repository.updateRecord(eventId, draft)
             todaySource.refresh()
@@ -451,7 +456,7 @@ class PeriodViewModel(
     }
 
     fun deleteRecord(eventId: String) {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             repository.deletePoopRecord(eventId)
             todaySource.refresh()
         }

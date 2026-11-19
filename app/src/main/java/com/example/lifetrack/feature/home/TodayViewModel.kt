@@ -3,6 +3,8 @@ package com.example.lifetrack.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.lifetrack.core.ui.ActionFeedback
+import com.example.lifetrack.core.ui.launchAction
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.PoopFields
@@ -33,6 +35,9 @@ class TodayViewModel(
     private val repository: TrackRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
+    val actionFeedback = ActionFeedback()
+    val actionMessages = actionFeedback.messages
+
     val today: StateFlow<LocalDate> = todaySource.today
 
     val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()

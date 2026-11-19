@@ -179,6 +179,12 @@ fun PeriodScreen(
             snackbarHostState.showSnackbar(message)
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.actionMessages.collect { message ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     fun persist(model: PeriodDayFormModel) {
         viewModel.savePeriodDay(selectedDate, model.toFields(), model.toNote())

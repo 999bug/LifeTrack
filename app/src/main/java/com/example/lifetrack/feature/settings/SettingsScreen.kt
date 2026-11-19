@@ -173,6 +173,7 @@ fun SettingsScreen(
     var varietiesDialogVisible by remember { mutableStateOf(false) }
     var timeoutDialogVisible by remember { mutableStateOf(false) }
     var appLockError by remember { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
     var licensesVisible by remember { mutableStateOf(false) }
     var changelogVisible by remember { mutableStateOf(false) }
 
@@ -262,6 +263,9 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.actionMessages.collect { actionError = it }
+    }
     LaunchedEffect(backupState.pendingRekeyText) {
         if (backupState.pendingRekeyText != null) {
             rekeySaveLauncher.launch(backupFileName(suffix = "rekeyed"))
@@ -807,6 +811,16 @@ fun SettingsScreen(
         )
     }
 
+    actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { actionError = null },
+            title = { Text("操作失败") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { actionError = null }) { Text("知道了") }
+            }
+        )
+    }
     val lockMessage = appLockError
     if (lockMessage != null) {
         AlertDialog(

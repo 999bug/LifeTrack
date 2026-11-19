@@ -121,6 +121,12 @@ fun TodayScreen(
             snackbarHostState.showSnackbar(message)
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.actionMessages.collect { message ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(

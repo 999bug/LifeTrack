@@ -50,9 +50,9 @@
 **Files:** Create `core/ui/ActionState.kt`、对应测试；Modify 各 ViewModel / controller 与页面 Snackbar 展示
 **Interfaces:** Produces 统一 `ActionState` 或 `Result` 映射，供所有写操作消费。
 
-- [ ] 覆盖保存、编辑、删除、类型排序、品种管理和备份恢复。
-- [ ] 取消静默吞错；保留 `CancellationException` 语义。
-- [ ] 增加失败路径单测。
+- [x] 覆盖保存、编辑、删除、类型排序、品种管理和备份恢复。
+- [x] 取消静默吞错；保留 `CancellationException` 语义。
+- [x] 增加失败路径单测。
 
 ### Task 5: 拆分仓储接口与领域边界
 

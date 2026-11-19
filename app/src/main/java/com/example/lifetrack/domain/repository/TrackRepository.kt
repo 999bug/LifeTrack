@@ -1,84 +1,11 @@
 package com.example.lifetrack.domain.repository
 
-import com.example.lifetrack.core.backup.BackupPayload
-import com.example.lifetrack.core.database.model.DailyCountProjection
-import com.example.lifetrack.core.database.model.DailyTypeCountProjection
-import com.example.lifetrack.core.database.model.EventTimestamp
-import com.example.lifetrack.core.database.model.PoopRecordRelation
-import com.example.lifetrack.core.database.model.StatDetailProjection
-import com.example.lifetrack.core.model.BackupRecord
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.domain.model.PoopRecordDraft
-import com.example.lifetrack.domain.model.RecordDraft
-import kotlinx.coroutines.flow.Flow
-
-interface TrackRepository {
-    fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>>
-    /** 今天页：所有类型的记录，详情已按 typeCode 归一成 [BackupRecord]。 */
-    fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>>
-    /** 历史页：按类型过滤的区间记录（null = 全部类型）。 */
-    fun observeRecordsInRange(
-        startDate: String,
-        endDate: String,
-        typeCode: String?
-    ): Flow<List<BackupRecord>>
-    fun observeDailyCounts(
-        startDate: String,
-        endDate: String,
-        typeCode: String?
-    ): Flow<List<DailyCountProjection>>
-
-    /** 月历格子：按日期 + 类型聚合，顺序为当天首次出现时间。 */
-    fun observeDailyTypeCounts(
-        startDate: String,
-        endDate: String
-    ): Flow<List<DailyTypeCountProjection>>
-    fun observeEventTimestamps(
-        startDate: String,
-        endDate: String,
-        typeCode: String?
-    ): Flow<List<EventTimestamp>>
-    fun observeStatDetails(startDate: String, endDate: String): Flow<List<StatDetailProjection>>
-    fun observeTrackTypes(): Flow<List<TrackTypeEntity>>
-
-    /** 首次进入应用时补齐内置类型，已存在的不会被覆盖（保留用户的启用/排序设置）。 */
-    suspend fun ensureDefaultTypes()
-
-    /**
-     * v0.7 类型拆分的一次性数据修正：把旧版记在 coffee 类型里、drinkType=tea 的
-     * 记录迁到 tea 类型。幂等——没有旧茶记录时不做任何写入，重复调用安全。
-     * 返回本次迁移的记录条数（0 表示无需迁移），供调用方记录日志。
-     */
-    suspend fun migrateLegacyTeaRecords(): Int
-
-    suspend fun setTypeEnabled(code: String, enabled: Boolean)
-    suspend fun reorderTypes(types: List<TrackTypeEntity>)
-
-    suspend fun addPoopRecord(draft: PoopRecordDraft): String
-    suspend fun updatePoopRecord(eventId: String, draft: PoopRecordDraft)
-    /** 删除任意类型的事件（两类详情随外键级联）。 */
-    suspend fun deletePoopRecord(eventId: String)
-
-    /** 通用写入：按 draft.typeCode 与 detail 分派到 poop_detail 或 event_detail。 */
-    suspend fun addRecord(draft: RecordDraft): String
-    suspend fun updateRecord(eventId: String, draft: RecordDraft)
-
-    /** 导出用的完整快照。 */
-    suspend fun readBackup(): BackupPayload
-
-    /** 整体替换现有数据，必须在事务内完成。 */
-    suspend fun restoreBackup(payload: BackupPayload)
-
-    suspend fun countAllRecords(): Int
-
-    /** 数据库文件的当前大小（字节），用于展示整理前后的对比。 */
-    suspend fun databaseSizeBytes(): Long
-
-    /**
-     * 回收数据库占用的多余空间，返回整理后的文件大小（主库 + `-wal` + `-shm`）。
-     *
-     * Room 默认 WAL 模式，删除只释放页、不缩文件，空间主要堆在 `-wal` 里；
-     * 这里做一次 `wal_checkpoint(TRUNCATE)` 把日志落盘并截断。调用方需在 IO 线程执行。
-     */
-    suspend fun compactDatabase(): Long
-}
+/**
+ * 兼容聚合接口。新代码应依赖最小职责接口；保留该接口用于现有实现与测试平滑迁移。
+ */
+interface TrackRepository :
+    RecordRepository,
+    StatisticsRepository,
+    TypeCatalogRepository,
+    BackupRepository,
+    DatabaseMaintenanceRepository

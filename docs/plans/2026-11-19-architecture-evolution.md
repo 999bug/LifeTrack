@@ -59,8 +59,8 @@
 **Files:** Modify `domain/repository/TrackRepository.kt`、`data/repository/RoomTrackRepository.kt`、`AppContainer.kt` 及消费方
 **Interfaces:** Produces `RecordRepository`、`StatisticsRepository`、`TypeCatalogRepository`、`BackupRepository`、`DatabaseMaintenanceRepository`；可暂时由同一 Room 实现组合。
 
-- [ ] 先拆统计、类型目录、备份和维护接口，再拆记录 CRUD。
-- [ ] 逐步用领域模型替代 feature 对 Room entity / projection 的直接依赖。
+- [x] 先拆统计、类型目录、备份和维护接口，再拆记录 CRUD。
+- [ ] 逐步用领域模型替代 feature 对 Room entity / projection 的直接依赖（转入后续演进）。
 - [ ] 保持 Room schema 与查询语义不变。
 
 ### Task 6: 记录类型注册表

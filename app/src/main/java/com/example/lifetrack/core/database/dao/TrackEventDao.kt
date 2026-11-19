@@ -81,6 +81,19 @@ interface TrackEventDao {
         typeCode: String?
     ): Flow<List<EventWithDetails>>
 
+    @Transaction
+    @Query(
+        "SELECT * FROM track_event " +
+            "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +
+            "AND localDate BETWEEN :startDate AND :endDate " +
+            "ORDER BY occurredAtEpochMillis DESC, id DESC LIMIT :limit"
+    )
+    fun observeHistoryPage(
+        startDate: String,
+        endDate: String,
+        typeCode: String?,
+        limit: Int
+    ): Flow<List<EventWithDetails>>
     @Query(
         "SELECT localDate AS localDate, COUNT(*) AS count FROM track_event " +
             "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +

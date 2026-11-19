@@ -55,7 +55,7 @@ class HistoryViewModel(
     val historyRecords: StateFlow<List<BackupRecord>> = historyQuery
         .flatMapLatest {
             // 历史列表默认展示全部类型：停用模块只影响新增入口，不影响已有记录的回看。
-            repository.observeRecordsInRange(it.start.toString(), it.end.toString(), typeCode = null)
+            repository.observeHistoryPage(it.start.toString(), it.end.toString(), typeCode = null, limit = (historyExtraPages.value + 1) * 100)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

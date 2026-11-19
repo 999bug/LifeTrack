@@ -10,6 +10,7 @@ interface RecordRepository {
     fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>>
     fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>>
     fun observeRecordsInRange(startDate: String, endDate: String, typeCode: String?): Flow<List<BackupRecord>>
+    fun observeHistoryPage(startDate: String, endDate: String, typeCode: String?, limit: Int): Flow<List<BackupRecord>>
     suspend fun addPoopRecord(draft: PoopRecordDraft): String
     suspend fun updatePoopRecord(eventId: String, draft: PoopRecordDraft)
     suspend fun deletePoopRecord(eventId: String)

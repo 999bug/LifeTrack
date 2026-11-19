@@ -54,6 +54,15 @@ class RoomTrackRepository(
             rows.map { it.toBackupRecord() }
         }
 
+    override fun observeHistoryPage(
+        startDate: String,
+        endDate: String,
+        typeCode: String?,
+        limit: Int
+    ): Flow<List<BackupRecord>> =
+        dao.observeHistoryPage(startDate, endDate, typeCode, limit).map { rows ->
+            rows.map { it.toBackupRecord() }
+        }
     override fun observeDailyCounts(
         startDate: String,
         endDate: String,

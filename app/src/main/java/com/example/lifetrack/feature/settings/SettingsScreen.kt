@@ -50,7 +50,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,7 +72,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.BuildConfig
 import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
-import com.example.lifetrack.core.backup.BackupError
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
@@ -82,13 +80,13 @@ import com.example.lifetrack.core.model.AppLockTimeout
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.ThemeMode
-import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
-import com.example.lifetrack.core.security.RetryBackoff
 import com.example.lifetrack.core.security.SensitiveTypes
 import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.lock.canUseAppLock
+import com.example.lifetrack.feature.settings.backup.BackupController
+import com.example.lifetrack.feature.settings.backup.BackupOperations
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
@@ -126,12 +124,45 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf<String?>(null) }
-    var failure by remember { mutableStateOf<String?>(null) }
-    var pending by remember { mutableStateOf<BackupPayload?>(null) }
-    var pendingCount by remember { mutableIntStateOf(0) }
-    var currentCount by remember { mutableIntStateOf(0) }
+    val backupOperations = remember(viewModel) {
+        object : BackupOperations {
+            override suspend fun buildBackupJson(passphrase: CharArray?): String =
+                viewModel.buildBackupJson(passphrase)
+
+            override suspend fun decodeBackupJson(
+                text: String,
+                passphrase: CharArray?
+            ): BackupDecodeResult = viewModel.decodeBackupJson(text, passphrase)
+
+            override suspend fun reencryptBackup(
+                text: String,
+                oldPassphrase: CharArray,
+                newPassphrase: CharArray
+            ): BackupReencryptResult = viewModel.reencryptBackup(text, oldPassphrase, newPassphrase)
+
+            override suspend fun restoreBackup(payload: BackupPayload) =
+                viewModel.restoreBackup(payload)
+
+            override suspend fun countAllRecords(): Int = viewModel.countAllRecords()
+        }
+    }
+    val backupController = remember(scope, backupOperations) {
+        BackupController(scope, backupOperations)
+    }
+    val backupState by backupController.state.collectAsStateWithLifecycle()
+    val busy = backupState.busy
+    val status = backupState.status
+    val failure = backupState.failure
+    val pending = backupState.pendingRestore
+    val pendingCount = backupState.pendingRestoreCount
+    val currentCount = backupState.currentRecordCount
+    val pendingEncryptedText = backupState.pendingEncryptedText
+    val importPassphraseError = backupState.importErrorMessage
+    val importCooldown = backupState.importCooldownSeconds
+    val rekeySourceText = backupState.rekeySourceText
+    val rekeyError = backupState.rekeyErrorMessage
+    val rekeyCooldown = backupState.rekeyCooldownSeconds
+
     var privacyExpanded by remember { mutableStateOf(false) }
     // 数据与备份默认收起；低频项不持久化展开态，下次进来仍是一行。
     var dataExpanded by remember { mutableStateOf(false) }
@@ -152,34 +183,17 @@ fun SettingsScreen(
     var plainExportWarningVisible by remember { mutableStateOf(false) }
 
     // 恢复：加密备份先读文本，拿到口令后再解一次。
-    var pendingEncryptedText by remember { mutableStateOf<String?>(null) }
     var importPassphrase by remember { mutableStateOf("") }
-    var importPassphraseError by remember { mutableStateOf<String?>(null) }
 
     // 更换备份口令：选一份加密备份，解旧 → 用新口令重加密 → 另存为新文件。
-    var rekeySourceText by remember { mutableStateOf<String?>(null) }
     var rekeyOldPassphrase by remember { mutableStateOf("") }
     var rekeyNewPassphrase by remember { mutableStateOf("") }
     var rekeyNewPassphraseConfirm by remember { mutableStateOf("") }
-    var rekeyError by remember { mutableStateOf<String?>(null) }
-    var pendingRekeyText by remember { mutableStateOf<String?>(null) }
 
-    // 失败节流：累计失败次数 → 下一次尝试前的等待秒数；成功后清零。
-    var importFailures by remember { mutableIntStateOf(0) }
-    var importCooldown by remember { mutableIntStateOf(0) }
-    var rekeyFailures by remember { mutableIntStateOf(0) }
-    var rekeyCooldown by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(importCooldown) {
-        if (importCooldown > 0) {
+    LaunchedEffect(importCooldown, rekeyCooldown) {
+        if (importCooldown > 0 || rekeyCooldown > 0) {
             delay(1_000)
-            importCooldown -= 1
-        }
-    }
-    LaunchedEffect(rekeyCooldown) {
-        if (rekeyCooldown > 0) {
-            delay(1_000)
-            rekeyCooldown -= 1
+            backupController.tickCooldowns()
         }
     }
 
@@ -192,30 +206,11 @@ fun SettingsScreen(
             passphrase?.fill('\u0000')
             return@rememberLauncherForActivityResult
         }
-        scope.launch {
-            busy = true
-            status = null
-            failure = null
-            try {
-                val payload = viewModel.buildBackupJson(passphrase)
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        BackupIo.writeUtf8(output, payload)
-                    } ?: error("无法写入所选位置")
-                }
-                val count = viewModel.countAllRecords()
-                status = if (passphrase == null) {
-                    "已导出 $count 条明文记录。"
-                } else {
-                    "已导出 $count 条加密记录，请牢记口令。"
-                }
-            } catch (e: BackupCrypto.Failure) {
-                failure = "导出失败：${e.reason.exportMessage()}"
-            } catch (e: Exception) {
-                failure = "导出失败：${e.message ?: "无法写入所选位置"}"
-            } finally {
-                passphrase?.fill('\u0000')
-                busy = false
+        backupController.export(passphrase) { text ->
+            withContext(Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    BackupIo.writeUtf8(output, text)
+                } ?: error("无法写入所选位置")
             }
         }
     }
@@ -225,37 +220,12 @@ fun SettingsScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            busy = true
-            status = null
-            failure = null
             val text = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openInputStream(uri)?.use { BackupIo.readUtf8(it) }
                 }.getOrNull()
             }
-            if (text == null) {
-                failure = "无法读取文件，或文件超过 ${BackupIo.MAX_BYTES / 1024 / 1024} MB。"
-            } else {
-                when (val result = viewModel.decodeBackupJson(text)) {
-                    is BackupDecodeResult.Success -> {
-                        pending = result.payload
-                        pendingCount = result.payload.events.size
-                    }
-
-                    is BackupDecodeResult.Invalid -> {
-                        failure = result.describe()
-                    }
-
-                    BackupDecodeResult.PassphraseRequired -> {
-                        importPassphrase = ""
-                        importPassphraseError = null
-                        importFailures = 0
-                        importCooldown = 0
-                        pendingEncryptedText = text
-                    }
-                }
-            }
-            busy = false
+            backupController.loadRestoreText(text)
         }
     }
 
@@ -264,66 +234,35 @@ fun SettingsScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            busy = true
-            status = null
-            failure = null
             val text = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openInputStream(uri)?.use { BackupIo.readUtf8(it) }
                 }.getOrNull()
             }
-            if (text == null) {
-                failure = "无法读取文件，或文件超过 ${BackupIo.MAX_BYTES / 1024 / 1024} MB。"
-            } else {
-                // 不带口令先判类型：明文没有口令可换，坏文件直接给原因。
-                when (val result = viewModel.decodeBackupJson(text)) {
-                    is BackupDecodeResult.Success ->
-                        failure = "这是未加密的备份，没有口令可以更换。"
-
-                    is BackupDecodeResult.Invalid -> failure = result.describe()
-
-                    BackupDecodeResult.PassphraseRequired -> {
-                        rekeySourceText = text
-                        rekeyOldPassphrase = ""
-                        rekeyNewPassphrase = ""
-                        rekeyNewPassphraseConfirm = ""
-                        rekeyError = null
-                        rekeyFailures = 0
-                        rekeyCooldown = 0
-                    }
-                }
-            }
-            busy = false
+            backupController.loadRekeyText(text)
         }
     }
 
     val rekeySaveLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        val text = pendingRekeyText
-        pendingRekeyText = null
-        if (uri == null || text == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            busy = true
-            status = null
-            failure = null
-            try {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        BackupIo.writeUtf8(output, text)
-                    } ?: error("无法写入所选位置")
-                }
-                status = "已生成新口令的备份。确认能恢复后，再删除旧文件。"
-            } catch (e: Exception) {
-                failure = "写入失败：${e.message ?: "无法写入所选位置"}"
-            } finally {
-                busy = false
+        if (uri == null) {
+            backupController.cancelRekey()
+            return@rememberLauncherForActivityResult
+        }
+        backupController.saveRekeyed { text ->
+            withContext(Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    BackupIo.writeUtf8(output, text)
+                } ?: error("无法写入所选位置")
             }
         }
     }
 
-    LaunchedEffect(pending) {
-        currentCount = if (pending == null) 0 else viewModel.countAllRecords()
+    LaunchedEffect(backupState.pendingRekeyText) {
+        if (backupState.pendingRekeyText != null) {
+            rekeySaveLauncher.launch(backupFileName(suffix = "rekeyed"))
+        }
     }
 
     // 状态外溢：导出 / 恢复进行中、刚完成或失败时自动展开，不让状态藏在折叠区里。
@@ -331,7 +270,6 @@ fun SettingsScreen(
     LaunchedEffect(busy, status, failure) {
         if (busy || status != null || failure != null) dataExpanded = true
     }
-
     // 有可下载的新版本时，首屏「更新日志」行同步标记，避免更新入口沉到页脚后被错过。
     val availableVersion = (updateState as? UpdateRepository.Status.Available)?.release?.version
 
@@ -665,11 +603,8 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = {
                 if (!busy) {
-                    pendingEncryptedText = null
+                    backupController.cancelRestore()
                     importPassphrase = ""
-                    importPassphraseError = null
-                    importFailures = 0
-                    importCooldown = 0
                 }
             },
             title = { Text("输入备份口令") },
@@ -683,7 +618,7 @@ fun SettingsScreen(
                         value = importPassphrase,
                         onValueChange = {
                             importPassphrase = it
-                            importPassphraseError = null
+                            backupController.clearImportError()
                         },
                         label = { Text("备份口令") },
                         singleLine = true,
@@ -705,44 +640,11 @@ fun SettingsScreen(
                     enabled = !busy && importCooldown == 0,
                     onClick = {
                         if (importPassphrase.isBlank()) {
-                            importPassphraseError = "请输入口令。"
+                            backupController.setImportError("请输入口令。")
                             return@TextButton
                         }
-                        scope.launch {
-                            busy = true
-                            val passphrase = importPassphrase.toCharArray()
-                            try {
-                                when (val result = viewModel.decodeBackupJson(encryptedText, passphrase)) {
-                                    is BackupDecodeResult.Success -> {
-                                        pending = result.payload
-                                        pendingCount = result.payload.events.size
-                                        pendingEncryptedText = null
-                                        importPassphrase = ""
-                                        importPassphraseError = null
-                                        importFailures = 0
-                                        importCooldown = 0
-                                    }
-
-                                    is BackupDecodeResult.Invalid -> {
-                                        importPassphraseError = result.describe()
-                                        if (result.error == BackupError.WRONG_PASSPHRASE) {
-                                            importFailures += 1
-                                            importCooldown =
-                                                RetryBackoff.secondsAfter(importFailures)
-                                        }
-                                    }
-
-                                    BackupDecodeResult.PassphraseRequired -> {
-                                        importPassphraseError = "请输入口令。"
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                importPassphraseError = "解密失败：${e.message ?: "无法读取备份"}"
-                            } finally {
-                                passphrase.fill('\u0000')
-                                busy = false
-                            }
-                        }
+                        backupController.submitRestorePassphrase(importPassphrase.toCharArray())
+                        importPassphrase = ""
                     }
                 ) {
                     Text(if (importCooldown > 0) "请等待 $importCooldown 秒" else "解密")
@@ -750,11 +652,8 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    pendingEncryptedText = null
+                    backupController.cancelRestore()
                     importPassphrase = ""
-                    importPassphraseError = null
-                    importFailures = 0
-                    importCooldown = 0
                 }) { Text("取消") }
             }
         )
@@ -765,13 +664,10 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = {
                 if (!busy) {
-                    rekeySourceText = null
+                    backupController.cancelRekey()
                     rekeyOldPassphrase = ""
                     rekeyNewPassphrase = ""
                     rekeyNewPassphraseConfirm = ""
-                    rekeyError = null
-                    rekeyFailures = 0
-                    rekeyCooldown = 0
                 }
             },
             title = { Text("更换备份口令") },
@@ -785,7 +681,7 @@ fun SettingsScreen(
                         value = rekeyOldPassphrase,
                         onValueChange = {
                             rekeyOldPassphrase = it
-                            rekeyError = null
+                            backupController.clearRekeyError()
                         },
                         label = { Text("当前口令") },
                         singleLine = true,
@@ -800,7 +696,7 @@ fun SettingsScreen(
                         value = rekeyNewPassphrase,
                         onValueChange = {
                             rekeyNewPassphrase = it
-                            rekeyError = null
+                            backupController.clearRekeyError()
                         },
                         label = { Text("新口令") },
                         supportingText = {
@@ -829,7 +725,7 @@ fun SettingsScreen(
                         value = rekeyNewPassphraseConfirm,
                         onValueChange = {
                             rekeyNewPassphraseConfirm = it
-                            rekeyError = null
+                            backupController.clearRekeyError()
                         },
                         label = { Text("再输一次新口令") },
                         singleLine = true,
@@ -860,43 +756,16 @@ fun SettingsScreen(
                             else -> null
                         }
                         if (error != null) {
-                            rekeyError = error
+                            backupController.setRekeyError(error)
                             return@TextButton
                         }
-                        scope.launch {
-                            busy = true
-                            val oldChars = rekeyOldPassphrase.toCharArray()
-                            val newChars = rekeyNewPassphrase.toCharArray()
-                            try {
-                                when (val result = viewModel.reencryptBackup(rekeyText, oldChars, newChars)) {
-                                    is BackupReencryptResult.Success -> {
-                                        rekeySourceText = null
-                                        rekeyOldPassphrase = ""
-                                        rekeyNewPassphrase = ""
-                                        rekeyNewPassphraseConfirm = ""
-                                        rekeyError = null
-                                        rekeyFailures = 0
-                                        rekeyCooldown = 0
-                                        pendingRekeyText = result.text
-                                        rekeySaveLauncher.launch(backupFileName(suffix = "rekeyed"))
-                                    }
-
-                                    is BackupReencryptResult.Invalid -> {
-                                        rekeyError = result.describe()
-                                        if (result.error == BackupError.WRONG_PASSPHRASE) {
-                                            rekeyFailures += 1
-                                            rekeyCooldown = RetryBackoff.secondsAfter(rekeyFailures)
-                                        }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                rekeyError = "更换失败：${e.message ?: "加密异常"}"
-                            } finally {
-                                oldChars.fill('\u0000')
-                                newChars.fill('\u0000')
-                                busy = false
-                            }
-                        }
+                        backupController.submitRekey(
+                            oldPassphrase = rekeyOldPassphrase.toCharArray(),
+                            newPassphrase = rekeyNewPassphrase.toCharArray()
+                        )
+                        rekeyOldPassphrase = ""
+                        rekeyNewPassphrase = ""
+                        rekeyNewPassphraseConfirm = ""
                     }
                 ) {
                     Text(if (rekeyCooldown > 0) "请等待 $rekeyCooldown 秒" else "生成新文件")
@@ -904,13 +773,10 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    rekeySourceText = null
+                    backupController.cancelRekey()
                     rekeyOldPassphrase = ""
                     rekeyNewPassphrase = ""
                     rekeyNewPassphraseConfirm = ""
-                    rekeyError = null
-                    rekeyFailures = 0
-                    rekeyCooldown = 0
                 }) { Text("取消") }
             }
         )
@@ -993,7 +859,7 @@ fun SettingsScreen(
     val payload = pending
     if (payload != null) {
         AlertDialog(
-            onDismissRequest = { pending = null },
+            onDismissRequest = { backupController.cancelRestore() },
             title = { Text("用备份替换当前数据？") },
             text = {
                 Text(
@@ -1002,87 +868,21 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    pending = null
-                    scope.launch {
-                        busy = true
-                        status = null
-                        failure = null
-                        runCatching { viewModel.restoreBackup(payload) }
-                            .onSuccess { status = "已恢复 $pendingCount 条记录。" }
-                            .onFailure { failure = "恢复失败：${it.message ?: "数据库写入异常"}" }
-                        busy = false
-                    }
-                }) { Text("恢复") }
+                TextButton(onClick = { backupController.confirmRestore() }) { Text("恢复") }
             },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { backupController.cancelRestore() }) { Text("取消") } }
         )
     }
 
     val message = failure
     if (message != null) {
         AlertDialog(
-            onDismissRequest = { failure = null },
+            onDismissRequest = { backupController.clearFailure() },
             title = { Text("操作失败") },
             text = { Text(message) },
-            confirmButton = { TextButton(onClick = { failure = null }) { Text("知道了") } }
+            confirmButton = { TextButton(onClick = { backupController.clearFailure() }) { Text("知道了") } }
         )
     }
-}
-
-private fun BackupError.message(): String = when (this) {
-    BackupError.NOT_JSON -> "文件不是有效的 JSON。"
-    BackupError.NOT_LIFETRACK_FILE -> "这不是「生活记」导出的备份文件。"
-    BackupError.UNSUPPORTED_VERSION -> "备份版本不受支持，请用相同或更新版本的应用恢复。"
-    BackupError.TOO_MANY_EVENTS -> "备份中的记录条数超出上限。"
-    BackupError.EVENT_COUNT_MISMATCH -> "备份声明的条数与实际内容不一致，文件可能被改动过。"
-    BackupError.DUPLICATE_EVENT_ID -> "备份中存在重复的记录 ID。"
-    BackupError.UNKNOWN_TYPE -> "备份中包含当前版本不认识的记录类型。"
-    BackupError.MISSING_BASE_TYPE -> "备份缺少内置的记录类型。"
-    BackupError.INVALID_ZONE -> "记录的时区标识无效。"
-    BackupError.INVALID_LOCAL_DATE -> "记录的本地日期格式无效。"
-    BackupError.LOCAL_DATE_MISMATCH -> "记录的本地日期与时间戳不一致。"
-    BackupError.INVALID_TIMESTAMP -> "记录的时间戳超出合理范围。"
-    BackupError.INVALID_BRISTOL -> "布里斯托类型超出 1–7。"
-    BackupError.INVALID_AMOUNT -> "排便量取值超出范围。"
-    BackupError.INVALID_EFFORT -> "费力程度取值超出范围。"
-    BackupError.INVALID_DURATION -> "排便用时不合法：应在 1–60 分钟，且结束时间不能早于开始时间。"
-    BackupError.UNSUPPORTED_DETAIL_TYPE -> "备份包含当前版本尚不支持的记录类型详情，请升级应用后再恢复。为避免丢失数据，已拒绝导入。"
-    BackupError.DETAIL_TYPE_MISMATCH -> "记录的详情类型与事件类型不一致。"
-    BackupError.INVALID_DETAIL_FIELD -> "记录的详情字段不合法或取值超出范围。"
-    BackupError.DETAIL_NOT_ALLOWED -> "备份中的详情字段与记录类型或备份版本不匹配。"
-    BackupError.WRONG_PASSPHRASE -> "口令错误，或备份文件已损坏、被改动过。请确认口令后重试；口令区分大小写和全半角。"
-    BackupError.INVALID_ENVELOPE -> "加密备份的结构不完整或已损坏，无法解密。"
-    BackupError.UNSUPPORTED_ENCRYPTION -> "备份使用了当前版本不支持的加密参数，请升级应用后再恢复。"
-    BackupError.EMPTY_PASSPHRASE -> "请输入备份口令。"
-    BackupError.BACKUP_TOO_LARGE -> "记录过多，加密后的备份会超过大小上限。"
-    BackupError.NOT_ENCRYPTED_BACKUP -> "这是未加密的备份，没有口令可以更换。"
-}
-
-private fun describeError(error: BackupError, detail: String?): String = buildString {
-    append(error.message())
-    // 只有「定位到某条记录」的细节才对用户有意义；算法名、payload 之类的技术细节留在日志里。
-    val technical = error == BackupError.INVALID_ENVELOPE ||
-        error == BackupError.UNSUPPORTED_ENCRYPTION ||
-        error == BackupError.UNSUPPORTED_VERSION
-    if (!technical) detail?.let { append("（记录 $it）") }
-}
-
-private fun BackupDecodeResult.Invalid.describe(): String = describeError(error, detail)
-
-private fun BackupReencryptResult.Invalid.describe(): String = describeError(error, detail)
-
-private fun BackupCrypto.Reason.exportMessage(): String = when (this) {
-    BackupCrypto.Reason.EMPTY_PASSPHRASE -> "口令不能为空。"
-    BackupCrypto.Reason.PLAINTEXT_TOO_LARGE ->
-        "记录过多，加密后的文件超过 ${BackupIo.MAX_BYTES / 1024 / 1024} MB 上限。"
-
-    BackupCrypto.Reason.UNAVAILABLE -> "当前设备不支持所需的加密算法。"
-    BackupCrypto.Reason.INVALID_ITERATIONS,
-    BackupCrypto.Reason.INVALID_SALT,
-    BackupCrypto.Reason.INVALID_IV,
-    BackupCrypto.Reason.CIPHERTEXT_TOO_SHORT,
-    BackupCrypto.Reason.DECRYPT_FAILED -> "加密失败，请重试。"
 }
 
 /** 「整理数据库」行的副标题：把状态翻成一句用户能读懂的话。 */

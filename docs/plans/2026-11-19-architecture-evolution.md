@@ -27,10 +27,10 @@
 **Files:** Create `feature/settings/backup/BackupController.kt`、对应单测；Modify `feature/settings/SettingsScreen.kt`、`MainViewModel.kt`
 **Interfaces:** Produces（Settings 页面消费）`BackupController.state: StateFlow<BackupUiState>` 与导出 / 恢复 / 换口令动作。
 
-- [ ] 把口令、确认、错误、冷却和 SAF 回调后的编排移出 Composable。
-- [ ] 保持备份文件格式、错误文案和危险动作确认不变。
-- [ ] 覆盖导出、恢复、换口令的成功与拒绝路径。
-- [ ] 跑单测、lint、构建；设置页做模拟器主路径走查。
+- [x] 把口令、确认、错误、冷却和 SAF 回调后的编排移出 Composable。
+- [x] 保持备份文件格式、错误文案和危险动作确认不变。
+- [x] 覆盖导出、恢复、换口令的成功与拒绝路径。
+- [x] 跑单测、lint、构建；设置页做模拟器主路径走查。
 
 ### Task 3: 拆分 `MainViewModel`
 

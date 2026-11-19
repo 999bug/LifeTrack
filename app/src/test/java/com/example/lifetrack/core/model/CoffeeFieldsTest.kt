@@ -2,6 +2,7 @@ package com.example.lifetrack.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,5 +44,33 @@ class CoffeeFieldsTest {
         assertEquals(listOf("coffee", "tea"), CoffeeFields.DRINKS)
         assertEquals(listOf("ml", "cup"), CoffeeFields.UNITS)
         assertEquals(listOf("yes", "low", "no"), CoffeeFields.CAFFEINE_LEVELS)
+    }
+
+    @Test
+    fun `new field validators hold their ranges`() {
+        assertTrue(CoffeeFields.isValidCalories("0"))
+        assertTrue(CoffeeFields.isValidCalories("120"))
+        assertTrue(CoffeeFields.isValidCalories("3000"))
+        listOf("3001", "-1", "abc", "").forEach { assertFalse(it, CoffeeFields.isValidCalories(it)) }
+        assertTrue(CoffeeFields.isValidVariety("橙C美式"))
+        assertFalse(CoffeeFields.isValidVariety(" "))
+        assertFalse(CoffeeFields.isValidVariety("x".repeat(CoffeeFields.MAX_VARIETY_LENGTH + 1)))
+    }
+
+    @Test
+    fun `cup sizes map to milliliters and labels`() {
+        assertEquals(350, CoffeeFields.SIZE_ML["medium"])
+        assertEquals(450, CoffeeFields.SIZE_ML["large"])
+        assertEquals(596, CoffeeFields.SIZE_ML["xlarge"])
+        assertEquals("超大杯", CoffeeFields.sizeLabel("xlarge"))
+        assertEquals("意式拼配", CoffeeFields.beansLabel("espresso"))
+        assertEquals("不另外加糖", CoffeeFields.sugarLabel("none"))
+    }
+
+    @Test
+    fun `preset varieties have default calories and custom ones do not`() {
+        assertEquals(95, CoffeeFields.defaultCalories("橙C美式"))
+        assertEquals(15, CoffeeFields.defaultCalories("经典美式"))
+        assertNull(CoffeeFields.defaultCalories("我的特调"))
     }
 }

@@ -48,9 +48,29 @@ class BackupCoffeeDetailTest {
 
     @Test
     fun `rejects an unknown coffee field`() {
-        val fields = validFields + ("sugar" to "yes")
+        // 用永远不会注册的键做负向样例（sugar 在 v0.7 已是合法字段）。
+        val fields = validFields + ("unknown_field" to "yes")
         val result = BackupCodec.decode(encode(fields), fixedNow)
         assertEquals(BackupError.INVALID_DETAIL_FIELD, (result as BackupDecodeResult.Invalid).error)
+    }
+
+    @Test
+    fun `accepts new coffee fields in backup round trip`() {
+        val fields = mapOf(
+            CoffeeFields.VARIETY to "小黄油美式",
+            CoffeeFields.SIZE to "large",
+            CoffeeFields.TEMPERATURE to "hot",
+            CoffeeFields.BEANS to "dark",
+            CoffeeFields.CONCENTRATION to "extra",
+            CoffeeFields.SUGAR to "less",
+            CoffeeFields.CREAM to "none",
+            CoffeeFields.AMOUNT to "450",
+            CoffeeFields.CALORIES to "150"
+        )
+        val result = BackupCodec.decode(encode(fields), fixedNow)
+        assertTrue(result is BackupDecodeResult.Success)
+        val record = (result as BackupDecodeResult.Success).payload.events.single()
+        assertEquals(RecordDetail.Generic(CoffeeFields.TYPE_CODE, fields), record.detail)
     }
 
     @Test

@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -34,6 +35,7 @@ import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
@@ -50,6 +52,7 @@ import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.sport.SportEditorDialog
 import com.example.lifetrack.feature.sport.SportScreen
 import com.example.lifetrack.feature.statistics.StatisticsScreen
+import com.example.lifetrack.feature.tea.TeaEditorDialog
 import com.example.lifetrack.feature.water.WaterEditorDialog
 
 private data class Destination(
@@ -82,6 +85,8 @@ fun LifeTrackApp(viewModel: MainViewModel) {
     var editingRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var detailRecord by remember { mutableStateOf<BackupRecord?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    val customCoffeeVarieties by viewModel.customCoffeeVarieties.collectAsStateWithLifecycle()
+    val customTeaVarieties by viewModel.customTeaVarieties.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.checkForUpdate(auto = true)
@@ -146,6 +151,7 @@ fun LifeTrackApp(viewModel: MainViewModel) {
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
+                    onTeaRecord = { openEditor(TeaFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
                     onOpenSport = { navController.navigate("sport") },
                     onOpenPeriod = { navController.navigate("cycle") },
@@ -208,6 +214,18 @@ fun LifeTrackApp(viewModel: MainViewModel) {
             )
             CoffeeFields.TYPE_CODE -> CoffeeEditorDialog(
                 record = editingRecord,
+                customVarieties = customCoffeeVarieties,
+                onAddVariety = viewModel::addCustomCoffeeVariety,
+                onDismiss = { editorVisible = false },
+                onSave = { draft ->
+                    viewModel.saveGenericRecord(editingRecord?.event?.id, draft)
+                    editorVisible = false
+                }
+            )
+            TeaFields.TYPE_CODE -> TeaEditorDialog(
+                record = editingRecord,
+                customVarieties = customTeaVarieties,
+                onAddVariety = viewModel::addCustomTeaVariety,
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
                     viewModel.saveGenericRecord(editingRecord?.event?.id, draft)

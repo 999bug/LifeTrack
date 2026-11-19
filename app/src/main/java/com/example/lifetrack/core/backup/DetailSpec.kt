@@ -4,6 +4,7 @@ import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 
 /**
@@ -45,17 +46,32 @@ object DetailSpecRegistry {
         ),
         CoffeeFields.TYPE_CODE to DetailSpec(
             typeCode = CoffeeFields.TYPE_CODE,
-            allowedFields = setOf(
-                CoffeeFields.DRINK,
-                CoffeeFields.AMOUNT,
-                CoffeeFields.UNIT,
-                CoffeeFields.CAFFEINE
-            ),
+            // 旧键 drinkType/unit/caffeine 保留在白名单：历史记录与旧备份仍要能解码；
+            // 品种名是动态值域，只用长度校验，不设枚举白名单。
+            allowedFields = CoffeeFields.ALL_KEYS,
             validators = mapOf(
-                CoffeeFields.DRINK to { it in CoffeeFields.DRINKS },
+                CoffeeFields.VARIETY to CoffeeFields::isValidVariety,
+                CoffeeFields.SIZE to { it in CoffeeFields.SIZES },
+                CoffeeFields.TEMPERATURE to { it in CoffeeFields.TEMPERATURES },
+                CoffeeFields.BEANS to { it in CoffeeFields.BEANS_VALUES },
+                CoffeeFields.CONCENTRATION to { it in CoffeeFields.CONCENTRATIONS },
+                CoffeeFields.SUGAR to { it in CoffeeFields.SUGARS },
+                CoffeeFields.CREAM to { it in CoffeeFields.CREAMS },
+                CoffeeFields.CALORIES to CoffeeFields::isValidCalories,
+                CoffeeFields.DRINK to { it in CoffeeFields.LEGACY_DRINKS },
                 CoffeeFields.AMOUNT to CoffeeFields::isValidAmount,
-                CoffeeFields.UNIT to { it in CoffeeFields.UNITS },
-                CoffeeFields.CAFFEINE to { it in CoffeeFields.CAFFEINE_LEVELS }
+                CoffeeFields.UNIT to { it in CoffeeFields.LEGACY_UNITS },
+                CoffeeFields.CAFFEINE to { it in CoffeeFields.LEGACY_CAFFEINE_LEVELS }
+            )
+        ),
+        TeaFields.TYPE_CODE to DetailSpec(
+            typeCode = TeaFields.TYPE_CODE,
+            allowedFields = TeaFields.ALL_KEYS,
+            validators = mapOf(
+                TeaFields.VARIETY to TeaFields::isValidVariety,
+                TeaFields.CUPS to TeaFields::isValidCups,
+                TeaFields.AMOUNT to TeaFields::isValidAmount,
+                TeaFields.CALORIES to TeaFields::isValidCalories
             )
         ),
         SportFields.TYPE_CODE to DetailSpec(

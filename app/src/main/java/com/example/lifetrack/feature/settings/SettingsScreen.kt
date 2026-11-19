@@ -4,11 +4,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,13 +30,17 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -73,6 +79,8 @@ import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
 import com.example.lifetrack.core.model.AppLockTimeout
+import com.example.lifetrack.core.model.CoffeeFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.security.BackupCrypto
 import com.example.lifetrack.core.security.PassphraseQuality
@@ -113,6 +121,8 @@ fun SettingsScreen(
     val appLockEnabled by viewModel.appLockEnabled.collectAsStateWithLifecycle()
     val appLockTimeout by viewModel.appLockTimeout.collectAsStateWithLifecycle()
     val compactState by viewModel.compactState.collectAsStateWithLifecycle()
+    val customCoffeeVarieties by viewModel.customCoffeeVarieties.collectAsStateWithLifecycle()
+    val customTeaVarieties by viewModel.customTeaVarieties.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -126,6 +136,7 @@ fun SettingsScreen(
     // 数据与备份默认收起；低频项不持久化展开态，下次进来仍是一行。
     var dataExpanded by remember { mutableStateOf(false) }
     var themeDialogVisible by remember { mutableStateOf(false) }
+    var varietiesDialogVisible by remember { mutableStateOf(false) }
     var timeoutDialogVisible by remember { mutableStateOf(false) }
     var appLockError by remember { mutableStateOf<String?>(null) }
     var licensesVisible by remember { mutableStateOf(false) }
@@ -340,6 +351,7 @@ fun SettingsScreen(
             trackTypes = trackTypes,
             themeMode = themeMode,
             onOpenModules = onOpenModules,
+            onOpenVarieties = { varietiesDialogVisible = true },
             onOpenTheme = { themeDialogVisible = true }
         )
 
@@ -481,6 +493,18 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { themeDialogVisible = false }) { Text("完成") }
             }
+        )
+    }
+
+    if (varietiesDialogVisible) {
+        DrinkVarietyDialog(
+            customCoffee = customCoffeeVarieties,
+            customTea = customTeaVarieties,
+            onAddCoffee = viewModel::addCustomCoffeeVariety,
+            onAddTea = viewModel::addCustomTeaVariety,
+            onRemoveCoffee = viewModel::removeCustomCoffeeVariety,
+            onRemoveTea = viewModel::removeCustomTeaVariety,
+            onDismiss = { varietiesDialogVisible = false }
         )
     }
 
@@ -1297,6 +1321,7 @@ private fun PrimarySection(
     trackTypes: List<TrackTypeEntity>,
     themeMode: ThemeMode,
     onOpenModules: () -> Unit,
+    onOpenVarieties: () -> Unit,
     onOpenTheme: () -> Unit
 ) {
     SettingsCard {
@@ -1313,11 +1338,147 @@ private fun PrimarySection(
         )
         SettingsDivider()
         SettingsRow(
+            title = "饮品品种",
+            icon = Icons.Filled.LocalCafe,
+            subtitle = "管理自定义的咖啡 / 茶品种",
+            onClick = onOpenVarieties,
+            trailing = { ChevronTrailing() }
+        )
+        SettingsDivider()
+        SettingsRow(
             title = "外观",
             icon = Icons.Filled.DarkMode,
             subtitle = themeMode.label,
             onClick = { onOpenTheme() },
             trailing = { ChevronTrailing() }
         )
+    }
+}
+
+/**
+ * 自定义饮品品种管理：咖啡与茶两组，各自可新增 / 删除自定义项。
+ * 预设品种由 CoffeeFields/TeaFields 固定、不可删；这里只管用户自己加的清单。
+ */
+@Composable
+private fun DrinkVarietyDialog(
+    customCoffee: List<String>,
+    customTea: List<String>,
+    onAddCoffee: (String) -> Unit,
+    onAddTea: (String) -> Unit,
+    onRemoveCoffee: (String) -> Unit,
+    onRemoveTea: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var coffeeInput by remember { mutableStateOf("") }
+    var teaInput by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("饮品品种") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "预设品种固定，不能删除；这里管理你自己添加的品种。添加后在记录咖啡 / 茶时可直接选用。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                VarietySection(
+                    heading = "咖啡品种",
+                    presets = CoffeeFields.PRESET_VARIETIES,
+                    customs = customCoffee,
+                    input = coffeeInput,
+                    maxLength = CoffeeFields.MAX_VARIETY_LENGTH,
+                    onInput = { coffeeInput = it },
+                    onAdd = {
+                        val name = coffeeInput.trim()
+                        if (name.isNotEmpty() && CoffeeFields.isValidVariety(name)) {
+                            onAddCoffee(name)
+                            coffeeInput = ""
+                        }
+                    },
+                    onRemove = onRemoveCoffee
+                )
+                VarietySection(
+                    heading = "茶品种",
+                    presets = TeaFields.PRESET_VARIETIES,
+                    customs = customTea,
+                    input = teaInput,
+                    maxLength = TeaFields.MAX_VARIETY_LENGTH,
+                    onInput = { teaInput = it },
+                    onAdd = {
+                        val name = teaInput.trim()
+                        if (name.isNotEmpty() && TeaFields.isValidVariety(name)) {
+                            onAddTea(name)
+                            teaInput = ""
+                        }
+                    },
+                    onRemove = onRemoveTea
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("完成") }
+        }
+    )
+}
+
+@Composable
+private fun VarietySection(
+    heading: String,
+    presets: List<String>,
+    customs: List<String>,
+    input: String,
+    maxLength: Int,
+    onInput: (String) -> Unit,
+    onAdd: () -> Unit,
+    onRemove: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(heading, style = MaterialTheme.typography.titleSmall)
+        Text(
+            "预设：${presets.joinToString("、")}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { onInput(it.take(maxLength)) },
+                modifier = Modifier.weight(1f),
+                label = { Text("新增品种") },
+                singleLine = true
+            )
+            TextButton(onClick = onAdd) { Text("添加") }
+        }
+        if (customs.isEmpty()) {
+            Text(
+                "还没有自定义品种",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                customs.forEach { name ->
+                    FilterChip(
+                        selected = false,
+                        onClick = { onRemove(name) },
+                        label = { Text("$name ×") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "删除 $name",
+                                modifier = Modifier.height(14.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
     }
 }

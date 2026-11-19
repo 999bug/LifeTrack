@@ -41,6 +41,7 @@ import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.record.RecordSummary
@@ -72,6 +73,7 @@ fun TodayScreen(
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
+    onTeaRecord: () -> Unit,
     onSportRecord: () -> Unit,
     onOpenSport: () -> Unit,
     onOpenPeriod: () -> Unit,
@@ -245,11 +247,11 @@ fun TodayScreen(
                                         val opensSubApp = type.code == SportFields.TYPE_CODE
                                         val record = moduleAction(
                                             type, onQuickRecord, onWaterQuick, onWaterRecord,
-                                            onCoffeeRecord, onSportRecord
+                                            onCoffeeRecord, onTeaRecord, onSportRecord
                                         )
                                         val detail = moduleDetail(
                                             type, onDetailedRecord, onWaterRecord,
-                                            onCoffeeRecord, onSportRecord
+                                            onCoffeeRecord, onTeaRecord, onSportRecord
                                         )
                                         ModuleCard(
                                             type = type,
@@ -391,6 +393,7 @@ private val TrackTypeEntity.isQuickAction: Boolean
 private fun moduleActionLabel(type: TrackTypeEntity, quickAction: Boolean): String = when {
     quickAction -> "详细"
     type.code == CoffeeFields.TYPE_CODE -> "记一杯"
+    type.code == TeaFields.TYPE_CODE -> "记一杯"
     type.code == SportFields.TYPE_CODE -> "记一次"
     else -> "记一条"
 }
@@ -401,11 +404,13 @@ private fun moduleAction(
     onWaterQuick: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
+    onTeaRecord: () -> Unit,
     onSportRecord: () -> Unit
 ): () -> Unit = when (type.code) {
     DEFAULT_POOP_TYPE.code -> onQuickRecord
     WaterFields.TYPE_CODE -> onWaterQuick
     CoffeeFields.TYPE_CODE -> onCoffeeRecord
+    TeaFields.TYPE_CODE -> onTeaRecord
     SportFields.TYPE_CODE -> onSportRecord
     else -> onWaterRecord
 }
@@ -415,11 +420,13 @@ private fun moduleDetail(
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
+    onTeaRecord: () -> Unit,
     onSportRecord: () -> Unit
 ): () -> Unit = when (type.code) {
     DEFAULT_POOP_TYPE.code -> onDetailedRecord
     WaterFields.TYPE_CODE -> onWaterRecord
     CoffeeFields.TYPE_CODE -> onCoffeeRecord
+    TeaFields.TYPE_CODE -> onTeaRecord
     SportFields.TYPE_CODE -> onSportRecord
     // 未知类型没有编辑器可用；「详细」只在快捷记录型卡片上出现，不会走到这里
     else -> onWaterRecord
@@ -435,12 +442,14 @@ private fun moduleSummary(records: List<BackupRecord>, type: TrackTypeEntity): S
     val amountKey = when (type.code) {
         WaterFields.TYPE_CODE -> WaterFields.AMOUNT
         CoffeeFields.TYPE_CODE -> CoffeeFields.AMOUNT
+        TeaFields.TYPE_CODE -> TeaFields.AMOUNT
         else -> return null
     }
     var total = 0
     records.forEach { record ->
         if (record.event.typeCode != type.code) return@forEach
         val fields = (record.detail as? RecordDetail.Generic)?.fields ?: return@forEach
+        // 只有饮水有可切换的单位；茶没有 unit 字段，默认就是 ml。
         val unit = fields[WaterFields.UNIT] ?: "ml"
         if (unit != "ml") return@forEach
         total += fields[amountKey]?.toIntOrNull() ?: 0

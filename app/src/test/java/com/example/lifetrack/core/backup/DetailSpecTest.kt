@@ -4,6 +4,7 @@ import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,9 +46,10 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `registry has builtin water coffee sport intimacy and menstruation specs and falls back to injected specs`() {
+    fun `registry has builtin water coffee tea sport intimacy and menstruation specs and falls back to injected specs`() {
         assertNotNull(DetailSpecRegistry.specFor(WaterFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE))
+        assertNotNull(DetailSpecRegistry.specFor(TeaFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(SportFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(IntimacyFields.TYPE_CODE))
         assertNotNull(DetailSpecRegistry.specFor(MenstruationFields.TYPE_CODE))
@@ -63,6 +65,7 @@ class DetailSpecTest {
         val expected = setOf(
             WaterFields.TYPE_CODE,
             CoffeeFields.TYPE_CODE,
+            TeaFields.TYPE_CODE,
             SportFields.TYPE_CODE,
             IntimacyFields.TYPE_CODE,
             MenstruationFields.TYPE_CODE
@@ -116,27 +119,43 @@ class DetailSpecTest {
     }
 
     @Test
-    fun `coffee spec enforces enums and amount range`() {
+    fun `coffee spec enforces new fields and keeps legacy keys`() {
         val spec = DetailSpecRegistry.specFor(CoffeeFields.TYPE_CODE)!!
-        assertEquals(
-            setOf(
-                CoffeeFields.DRINK,
-                CoffeeFields.AMOUNT,
-                CoffeeFields.UNIT,
-                CoffeeFields.CAFFEINE
-            ),
-            spec.allowedFields
-        )
+        assertEquals(CoffeeFields.ALL_KEYS, spec.allowedFields)
         assertTrue(spec.validators[CoffeeFields.AMOUNT]!!("300"))
         assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("0"))
         assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("2001"))
-        assertFalse(spec.validators[CoffeeFields.AMOUNT]!!("abc"))
+        // 新字段
+        assertTrue(spec.validators[CoffeeFields.VARIETY]!!("橙C美式"))
+        assertFalse(spec.validators[CoffeeFields.VARIETY]!!(""))
+        assertTrue(spec.validators[CoffeeFields.SIZE]!!("xlarge"))
+        assertFalse(spec.validators[CoffeeFields.SIZE]!!("mega"))
+        assertTrue(spec.validators[CoffeeFields.TEMPERATURE]!!("ice"))
+        assertTrue(spec.validators[CoffeeFields.BEANS]!!("dark"))
+        assertTrue(spec.validators[CoffeeFields.CONCENTRATION]!!("extra"))
+        assertTrue(spec.validators[CoffeeFields.SUGAR]!!("none"))
+        assertTrue(spec.validators[CoffeeFields.CREAM]!!("added"))
+        assertTrue(spec.validators[CoffeeFields.CALORIES]!!("120"))
+        assertFalse(spec.validators[CoffeeFields.CALORIES]!!("3001"))
+        // 旧键仍放行，历史记录与备份可解码
         assertTrue(spec.validators[CoffeeFields.DRINK]!!("tea"))
         assertFalse(spec.validators[CoffeeFields.DRINK]!!("juice"))
         assertTrue(spec.validators[CoffeeFields.CAFFEINE]!!("low"))
-        assertFalse(spec.validators[CoffeeFields.CAFFEINE]!!("high"))
         assertTrue(spec.validators[CoffeeFields.UNIT]!!("cup"))
-        assertFalse(spec.validators[CoffeeFields.UNIT]!!("litre"))
+    }
+
+    @Test
+    fun `tea spec enforces variety cups amount and calories`() {
+        val spec = DetailSpecRegistry.specFor(TeaFields.TYPE_CODE)!!
+        assertEquals(TeaFields.ALL_KEYS, spec.allowedFields)
+        assertTrue(spec.validators[TeaFields.VARIETY]!!("茉莉花茶"))
+        assertFalse(spec.validators[TeaFields.VARIETY]!!(" "))
+        assertTrue(spec.validators[TeaFields.CUPS]!!("2"))
+        assertFalse(spec.validators[TeaFields.CUPS]!!("0"))
+        assertTrue(spec.validators[TeaFields.AMOUNT]!!("300"))
+        assertFalse(spec.validators[TeaFields.AMOUNT]!!("0"))
+        assertTrue(spec.validators[TeaFields.CALORIES]!!("5"))
+        assertFalse(spec.validators[TeaFields.CALORIES]!!("3001"))
     }
 
     @Test

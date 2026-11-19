@@ -8,11 +8,15 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.lifetrack.core.model.AppLockTimeout
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.CycleCalculator
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private val Context.settingsDataStore by preferencesDataStore(name = "life_track_settings")
 
@@ -26,6 +30,8 @@ class SettingsRepository(private val context: Context) {
     private val cycleLengthDaysKey = intPreferencesKey("cycle_length_days")
     private val periodLengthDaysKey = intPreferencesKey("period_length_days")
     private val ongoingPeriodStartKey = stringPreferencesKey("ongoing_period_start")
+    private val customCoffeeVarietiesKey = stringPreferencesKey("custom_coffee_varieties")
+    private val customTeaVarietiesKey = stringPreferencesKey("custom_tea_varieties")
 
     val darkTheme: Flow<Boolean> = context.settingsDataStore.data.map { preferences ->
         preferences[darkThemeKey] ?: false
@@ -118,6 +124,73 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    // —— 自定义饮品品种清单 ——
+    // 只存用户自己加的品种；预设品种在 CoffeeFields/TeaFields 里固定，不入库。
+    // 不进备份（与 ongoingPeriodStart 同理，DataStore 设置默认不随备份走）。
+
+    val customCoffeeVarieties: Flow<List<String>> = context.settingsDataStore.data.map { prefs ->
+        decodeVarieties(prefs[customCoffeeVarietiesKey], CoffeeFields.MAX_VARIETY_LENGTH)
+    }
+
+    val customTeaVarieties: Flow<List<String>> = context.settingsDataStore.data.map { prefs ->
+        decodeVarieties(prefs[customTeaVarietiesKey], TeaFields.MAX_VARIETY_LENGTH)
+    }
+
+    /** 追加一个自定义咖啡品种；重复或非法输入被忽略。返回是否真的新增。 */
+    suspend fun addCustomCoffeeVariety(name: String): Boolean =
+        addVariety(customCoffeeVarietiesKey, name, CoffeeFields.MAX_VARIETY_LENGTH)
+
+    suspend fun addCustomTeaVariety(name: String): Boolean =
+        addVariety(customTeaVarietiesKey, name, TeaFields.MAX_VARIETY_LENGTH)
+
+    suspend fun removeCustomCoffeeVariety(name: String) =
+        removeVariety(customCoffeeVarietiesKey, name, CoffeeFields.MAX_VARIETY_LENGTH)
+
+    suspend fun removeCustomTeaVariety(name: String) =
+        removeVariety(customTeaVarietiesKey, name, TeaFields.MAX_VARIETY_LENGTH)
+
+    private suspend fun addVariety(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        name: String,
+        maxLength: Int
+    ): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed.length > maxLength) return false
+        var added = false
+        context.settingsDataStore.edit { prefs ->
+            val current = decodeVarieties(prefs[key], maxLength).toMutableList()
+            if (trimmed !in current) {
+                current += trimmed
+                prefs[key] = varietyJson.encodeToString(current)
+                added = true
+            }
+        }
+        return added
+    }
+
+    private suspend fun removeVariety(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        name: String,
+        maxLength: Int
+    ) {
+        context.settingsDataStore.edit { prefs ->
+            val current = decodeVarieties(prefs[key], maxLength).filterNot { it == name }
+            if (current.isEmpty()) prefs.remove(key)
+            else prefs[key] = varietyJson.encodeToString(current)
+        }
+    }
+
+    private fun decodeVarieties(raw: String?, maxLength: Int): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            varietyJson.decodeFromString<List<String>>(raw)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && it.length <= maxLength }
+                .distinct()
+                .take(MAX_CUSTOM_VARIETIES)
+        }.getOrDefault(emptyList())
+    }
+
     /** 上次成功查询更新的时间（epoch millis）；0 表示从未成功查过。 */
     suspend fun lastUpdateCheckAt(): Long =
         context.settingsDataStore.data.first()[lastUpdateCheckAtKey] ?: 0L
@@ -143,5 +216,7 @@ class SettingsRepository(private val context: Context) {
         const val DEFAULT_CYCLE_LENGTH_DAYS = 28
         const val DEFAULT_PERIOD_LENGTH_DAYS = 5
         val PERIOD_LENGTH_RANGE = 1..14
+        const val MAX_CUSTOM_VARIETIES = 50
+        private val varietyJson = Json { ignoreUnknownKeys = true }
     }
 }

@@ -84,7 +84,12 @@ class MainViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
-        viewModelScope.launch { repository.ensureDefaultTypes() }
+        viewModelScope.launch {
+            // 先补齐内置类型（含 tea），再把旧版 drinkType=tea 的记录迁到 tea 类型。
+            // 迁移幂等，没有旧记录时不写库；放在同一协程里保证顺序。
+            repository.ensureDefaultTypes()
+            repository.migrateLegacyTeaRecords()
+        }
         // 进行中的经期跨天自动延续：起点或日期一变，就把 [起点..昨天] 里缺的日子补进库。
         // 用「昨天」而不是「今天」，是为了不提前写还没过完的那一天，点「走了」时也不会留下多余记录。
         viewModelScope.launch {
@@ -288,6 +293,28 @@ class MainViewModel(
 
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.LIGHT)
+
+    /** 用户自定义的咖啡 / 茶品种（预设品种另在 CoffeeFields/TeaFields 里固定）。 */
+    val customCoffeeVarieties: StateFlow<List<String>> = settingsRepository.customCoffeeVarieties
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val customTeaVarieties: StateFlow<List<String>> = settingsRepository.customTeaVarieties
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addCustomCoffeeVariety(name: String) {
+        viewModelScope.launch { settingsRepository.addCustomCoffeeVariety(name) }
+    }
+
+    fun addCustomTeaVariety(name: String) {
+        viewModelScope.launch { settingsRepository.addCustomTeaVariety(name) }
+    }
+
+    fun removeCustomCoffeeVariety(name: String) {
+        viewModelScope.launch { settingsRepository.removeCustomCoffeeVariety(name) }
+    }
+
+    fun removeCustomTeaVariety(name: String) {
+        viewModelScope.launch { settingsRepository.removeCustomTeaVariety(name) }
+    }
 
     /** null 表示设置尚未从 DataStore 读出；此时不能先渲染正文，避免锁屏前闪一下内容。 */
     val appLockEnabled: StateFlow<Boolean?> = settingsRepository.appLockEnabled

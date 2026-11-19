@@ -77,7 +77,7 @@ class RecordDetailPresentationTest {
     }
 
     @Test
-    fun `coffee detail shows drink amount unit and caffeine`() {
+    fun `legacy coffee detail still shows old drink unit and caffeine`() {
         val view = generic(
             "coffee",
             mapOf(
@@ -88,7 +88,43 @@ class RecordDetailPresentationTest {
             )
         ).toDetailView()
 
-        assertEquals(listOf("茶", "250", "ml", "低因"), values(view.sections[1]))
+        // 旧记录没有 variety：仍展示旧字段，不让历史数据变成一片「未记录」。
+        assertEquals(listOf("茶", "250ml", "未记录", "ml", "低因"), values(view.sections[1]))
+    }
+
+    @Test
+    fun `new coffee detail shows variety size temperature beans sugar and calories`() {
+        val view = generic(
+            "coffee",
+            mapOf(
+                "variety" to "橙C美式",
+                "cupSize" to "xlarge",
+                "temperature" to "ice",
+                "beans" to "espresso",
+                "concentration" to "extra",
+                "sugar" to "none",
+                "cream" to "none",
+                "amountMl" to "596",
+                "calories" to "95"
+            )
+        ).toDetailView()
+
+        assertEquals("咖啡 · 08:30", view.title)
+        assertEquals(
+            listOf("橙C美式", "超大杯", "冰", "意式拼配", "加浓1份浓缩", "不另外加糖", "无奶油", "596ml", "95 大卡"),
+            values(view.sections[1])
+        )
+    }
+
+    @Test
+    fun `tea detail shows variety cups amount and calories`() {
+        val view = generic(
+            "tea",
+            mapOf("teaVariety" to "茉莉花茶", "cups" to "2", "amountMl" to "600", "calories" to "10")
+        ).toDetailView()
+
+        assertEquals("茶 · 08:30", view.title)
+        assertEquals(listOf("茉莉花茶", "2 杯", "600ml", "10 大卡"), values(view.sections[1]))
     }
 
     @Test

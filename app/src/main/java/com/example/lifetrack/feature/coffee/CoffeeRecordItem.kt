@@ -34,10 +34,21 @@ fun CoffeeRecordItem(
     onDelete: () -> Unit
 ) {
     val fields = (record.detail as? RecordDetail.Generic)?.fields.orEmpty()
-    val drink = CoffeeFields.drinkLabel(fields[CoffeeFields.DRINK].orEmpty())
+    val variety = fields[CoffeeFields.VARIETY]
     val amount = fields[CoffeeFields.AMOUNT]
-    val unit = CoffeeFields.unitLabel(fields[CoffeeFields.UNIT].orEmpty())
-    val caffeine = CoffeeFields.caffeineLabel(fields[CoffeeFields.CAFFEINE].orEmpty())
+    val title = variety ?: CoffeeFields.drinkLabel(fields[CoffeeFields.DRINK].orEmpty()).let {
+        if (it.isBlank()) "咖啡" else "旧咖啡记录"
+    }
+    val summary = buildList {
+        fields[CoffeeFields.SIZE]?.let { add(CoffeeFields.sizeLabel(it)) }
+        fields[CoffeeFields.TEMPERATURE]?.let { add(CoffeeFields.temperatureLabel(it)) }
+        amount?.let { add("${it}ml") }
+        fields[CoffeeFields.BEANS]?.let { add(CoffeeFields.beansLabel(it)) }
+        fields[CoffeeFields.SUGAR]?.let { add(CoffeeFields.sugarLabel(it)) }
+        fields[CoffeeFields.CALORIES]?.let { add("$it 大卡") }
+        if (record.event.note.isNotBlank()) add(record.event.note)
+    }.joinToString(" · ")
+
     val timeLabel = runCatching {
         Instant.ofEpochMilli(record.event.occurredAtEpochMillis)
             .atZone(ZoneId.of(record.event.zoneId))
@@ -56,25 +67,20 @@ fun CoffeeRecordItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(timeLabel, style = MaterialTheme.typography.titleMedium)
-                    Text(drink, color = MaterialTheme.colorScheme.primary)
+                    Text(title, color = MaterialTheme.colorScheme.primary)
                 }
-                val summary = buildList {
-                    amount?.let { add("$it $unit") }
-                    if (fields.containsKey(CoffeeFields.CAFFEINE)) add(caffeine)
-                    if (record.event.note.isNotBlank()) add(record.event.note)
-                }.joinToString(" · ").ifBlank { "尚未填写详情" }
                 Text(
-                    summary,
+                    summary.ifBlank { "尚未填写详情" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Row {
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = "编辑咖啡 / 茶记录")
+                    Icon(Icons.Filled.Edit, contentDescription = "编辑咖啡记录")
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.DeleteOutline, contentDescription = "删除咖啡 / 茶记录")
+                    Icon(Icons.Filled.DeleteOutline, contentDescription = "删除咖啡记录")
                 }
             }
         }

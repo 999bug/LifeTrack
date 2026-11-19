@@ -91,6 +91,7 @@ private fun BackupRecord.detailFields(): List<DetailField> = when (event.typeCod
     DEFAULT_POOP_TYPE.code -> poopFields(detail as? RecordDetail.Poop, event.zoneId)
     WaterFields.TYPE_CODE -> waterFields(genericFields())
     CoffeeFields.TYPE_CODE -> coffeeFields(genericFields())
+    TeaFields.TYPE_CODE -> teaFields(genericFields())
     SportFields.TYPE_CODE -> sportFields(genericFields())
     IntimacyFields.TYPE_CODE -> intimacyFields(genericFields())
     MenstruationFields.TYPE_CODE -> menstruationFields(genericFields())
@@ -124,11 +125,38 @@ private fun waterFields(fields: Map<String, String>): List<DetailField> = listOf
     field("单位", fields[WaterFields.UNIT]?.let(WaterFields::unitLabel))
 )
 
-private fun coffeeFields(fields: Map<String, String>): List<DetailField> = listOf(
-    field("饮品", fields[CoffeeFields.DRINK]?.let(CoffeeFields::drinkLabel)),
-    field("数量", fields[CoffeeFields.AMOUNT]),
-    field("单位", fields[CoffeeFields.UNIT]?.let(CoffeeFields::unitLabel)),
-    field("咖啡因", fields[CoffeeFields.CAFFEINE]?.let(CoffeeFields::caffeineLabel))
+/**
+ * 咖啡详情：新字段优先；旧记录没有 variety 时退回展示旧「饮品 / 咖啡因」，
+ * 不让历史数据在详情弹层里变成一片「未记录」。
+ */
+private fun coffeeFields(fields: Map<String, String>): List<DetailField> {
+    val isLegacy = fields[CoffeeFields.VARIETY] == null
+    return buildList {
+        if (isLegacy) {
+            add(field("饮品", fields[CoffeeFields.DRINK]?.let(CoffeeFields::drinkLabel)))
+        } else {
+            add(field("品种", fields[CoffeeFields.VARIETY]))
+            add(field("杯型", fields[CoffeeFields.SIZE]?.let(CoffeeFields::sizeLabel)))
+            add(field("温度", fields[CoffeeFields.TEMPERATURE]?.let(CoffeeFields::temperatureLabel)))
+            add(field("咖啡豆", fields[CoffeeFields.BEANS]?.let(CoffeeFields::beansLabel)))
+            add(field("浓度", fields[CoffeeFields.CONCENTRATION]?.let(CoffeeFields::concentrationLabel)))
+            add(field("糖度", fields[CoffeeFields.SUGAR]?.let(CoffeeFields::sugarLabel)))
+            add(field("奶油", fields[CoffeeFields.CREAM]?.let(CoffeeFields::creamLabel)))
+        }
+        add(field("份量", fields[CoffeeFields.AMOUNT]?.let { "${it}ml" }))
+        add(field("热量", fields[CoffeeFields.CALORIES]?.let { "$it 大卡" }))
+        if (isLegacy) {
+            add(field("单位", fields[CoffeeFields.UNIT]?.let(CoffeeFields::unitLabel)))
+            add(field("咖啡因", fields[CoffeeFields.CAFFEINE]?.let(CoffeeFields::caffeineLabel)))
+        }
+    }
+}
+
+private fun teaFields(fields: Map<String, String>): List<DetailField> = listOf(
+    field("茶种", fields[TeaFields.VARIETY]),
+    field("杯数", fields[TeaFields.CUPS]?.let { "$it 杯" }),
+    field("毫升", fields[TeaFields.AMOUNT]?.let { "${it}ml" }),
+    field("热量", fields[TeaFields.CALORIES]?.let { "$it 大卡" })
 )
 
 private fun sportFields(fields: Map<String, String>): List<DetailField> = listOf(

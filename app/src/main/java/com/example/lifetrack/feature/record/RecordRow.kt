@@ -24,6 +24,7 @@ import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.feature.coffee.CoffeeRecordItem
@@ -31,6 +32,7 @@ import com.example.lifetrack.feature.intimacy.IntimacyRecordItem
 import com.example.lifetrack.feature.menstruation.MenstruationRecordItem
 import com.example.lifetrack.feature.poop.PoopRecordItem
 import com.example.lifetrack.feature.sport.SportRecordItem
+import com.example.lifetrack.feature.tea.TeaRecordItem
 import com.example.lifetrack.feature.water.WaterRecordItem
 import java.time.Instant
 import java.time.ZoneId
@@ -68,6 +70,12 @@ fun RecordRow(
             onDelete = onDelete
         )
         CoffeeFields.TYPE_CODE -> CoffeeRecordItem(
+            record = record,
+            onShowDetail = onShowDetail,
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
+        TeaFields.TYPE_CODE -> TeaRecordItem(
             record = record,
             onShowDetail = onShowDetail,
             onEdit = onEdit,

@@ -17,8 +17,11 @@ import com.example.lifetrack.core.database.model.PoopRecordRelation
 import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.RecordDetailCodec
 import com.example.lifetrack.core.model.RecordTimeMapper
+import com.example.lifetrack.core.model.TeaFields
+import com.example.lifetrack.core.model.TeaMigration
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.core.model.toRecordDetail
 import com.example.lifetrack.domain.model.PoopRecordDraft
@@ -78,6 +81,38 @@ class RoomTrackRepository(
 
     override suspend fun ensureDefaultTypes() {
         database.trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)
+    }
+
+    override suspend fun migrateLegacyTeaRecords(): Int {
+        // 逐条扫描所有带详情的记录，只挑出 drinkType=tea 的旧 coffee 记录。
+        // 用 getAllRecords（已带 generic 详情）而非新增 SQL，避免 payload 的 JSON 解析下推到 SQLite。
+        val legacy = dao.getAllRecords().mapNotNull { row ->
+            val generic = row.generic ?: return@mapNotNull null
+            if (row.event.typeCode != CoffeeFields.TYPE_CODE || generic.typeCode != CoffeeFields.TYPE_CODE) {
+                return@mapNotNull null
+            }
+            val fields = RecordDetailCodec.decode(generic.payload) ?: return@mapNotNull null
+            val converted = TeaMigration.convertLegacyTea(fields) ?: return@mapNotNull null
+            Triple(row.event.copy(typeCode = TeaFields.TYPE_CODE), converted, row.event.id)
+        }
+        if (legacy.isEmpty()) return 0
+        database.withTransaction {
+            // tea 父行必须先存在，track_event.typeCode 有 RESTRICT 外键指向它。
+            database.trackTypeDao().insertIgnore(
+                DEFAULT_TYPES.first { it.code == TeaFields.TYPE_CODE }
+            )
+            legacy.forEach { (event, fields, eventId) ->
+                dao.updateEvent(event)
+                dao.putEventDetail(
+                    com.example.lifetrack.core.database.entity.EventDetailEntity(
+                        eventId = eventId,
+                        typeCode = TeaFields.TYPE_CODE,
+                        payload = RecordDetailCodec.encode(fields)
+                    )
+                )
+            }
+        }
+        return legacy.size
     }
 
     override suspend fun setTypeEnabled(code: String, enabled: Boolean) {
@@ -183,9 +218,13 @@ class RoomTrackRepository(
     )
 
     override suspend fun restoreBackup(payload: BackupPayload) {
+        // 旧备份把茶记在 coffee 类型里（drinkType=tea），恢复时按 v0.7 口径就地转成 tea，
+        // 保证「备份恢复也兼容」。事件与详情一起转，避免两边 typeCode 不一致。
+        val restoredEvents = ArrayList<com.example.lifetrack.core.database.entity.TrackEventEntity>()
         val poopDetails = ArrayList<PoopDetailEntity>()
         val genericDetails = ArrayList<EventDetailEntity>()
         payload.events.forEach { record ->
+            var event = record.event
             when (val detail = record.detail) {
                 null -> Unit
                 is RecordDetail.Poop -> poopDetails += detail.toEntity(record.event.id)
@@ -193,13 +232,23 @@ class RoomTrackRepository(
                     require(detail.typeCode == record.event.typeCode) {
                         "详情类型与事件类型不一致：${detail.typeCode}/${record.event.typeCode}"
                     }
+                    var fields = detail.fields
+                    var typeCode = detail.typeCode
+                    if (typeCode == CoffeeFields.TYPE_CODE) {
+                        TeaMigration.convertLegacyTea(fields)?.let { converted ->
+                            fields = converted
+                            typeCode = TeaFields.TYPE_CODE
+                            event = event.copy(typeCode = TeaFields.TYPE_CODE)
+                        }
+                    }
                     genericDetails += EventDetailEntity(
                         eventId = record.event.id,
-                        typeCode = detail.typeCode,
-                        payload = RecordDetailCodec.encode(detail.fields)
+                        typeCode = typeCode,
+                        payload = RecordDetailCodec.encode(fields)
                     )
                 }
             }
+            restoredEvents += event
         }
         database.withTransaction {
             // 先删事件（两类详情随外键级联），再重建类型，顺序反了会触发外键约束
@@ -209,8 +258,14 @@ class RoomTrackRepository(
             DEFAULT_TYPES.forEach { default ->
                 if (types.none { it.code == default.code }) types += default
             }
-            database.trackTypeDao().insertAll(types)
-            dao.insertEvents(payload.events.map { it.event })
+            // 老备份的 coffee 类型名可能还是「咖啡 / 茶」；恢复后它只存咖啡，统一改名。
+            val renamed = types.map {
+                if (it.code == CoffeeFields.TYPE_CODE) {
+                    it.copy(name = DEFAULT_TYPES.first { d -> d.code == CoffeeFields.TYPE_CODE }.name)
+                } else it
+            }
+            database.trackTypeDao().insertAll(renamed)
+            dao.insertEvents(restoredEvents)
             dao.putPoopDetails(poopDetails)
             dao.putEventDetails(genericDetails)
         }

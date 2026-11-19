@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Loop
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 
 /**
@@ -63,6 +65,7 @@ object LifeTrackTokens {
         private val lightPoop = Color(0xFF8A6A4B)
         private val lightWater = Color(0xFF3D7391)
         private val lightCoffee = Color(0xFF9A7134)
+        private val lightTea = Color(0xFF6E8B4E)
         private val lightSport = Color(0xFF4C7A57)
         private val lightIntimacy = Color(0xFF8A5F72)
         private val lightMenstruation = Color(0xFFA35B52)
@@ -70,6 +73,7 @@ object LifeTrackTokens {
         private val darkPoop = Color(0xFFC9A382)
         private val darkWater = Color(0xFF8FC0D8)
         private val darkCoffee = Color(0xFFD9B173)
+        private val darkTea = Color(0xFFB7D09A)
         private val darkSport = Color(0xFF9CC7A6)
         private val darkIntimacy = Color(0xFFC99BAE)
         private val darkMenstruation = Color(0xFFE0A79B)
@@ -81,6 +85,7 @@ object LifeTrackTokens {
             DEFAULT_POOP_TYPE.code -> lightPoop
             WaterFields.TYPE_CODE -> lightWater
             CoffeeFields.TYPE_CODE -> lightCoffee
+            TeaFields.TYPE_CODE -> lightTea
             SportFields.TYPE_CODE -> lightSport
             IntimacyFields.TYPE_CODE -> lightIntimacy
             MenstruationFields.TYPE_CODE -> lightMenstruation
@@ -91,6 +96,7 @@ object LifeTrackTokens {
             DEFAULT_POOP_TYPE.code -> darkPoop
             WaterFields.TYPE_CODE -> darkWater
             CoffeeFields.TYPE_CODE -> darkCoffee
+            TeaFields.TYPE_CODE -> darkTea
             SportFields.TYPE_CODE -> darkSport
             IntimacyFields.TYPE_CODE -> darkIntimacy
             MenstruationFields.TYPE_CODE -> darkMenstruation
@@ -111,6 +117,7 @@ object LifeTrackTokens {
             DEFAULT_POOP_TYPE.code -> Icons.Filled.Loop
             WaterFields.TYPE_CODE -> Icons.Filled.WaterDrop
             CoffeeFields.TYPE_CODE -> Icons.Filled.LocalCafe
+            TeaFields.TYPE_CODE -> Icons.Filled.Spa
             SportFields.TYPE_CODE -> Icons.Filled.DirectionsRun
             IntimacyFields.TYPE_CODE -> Icons.Filled.Favorite
             MenstruationFields.TYPE_CODE -> Icons.Filled.Bloodtype

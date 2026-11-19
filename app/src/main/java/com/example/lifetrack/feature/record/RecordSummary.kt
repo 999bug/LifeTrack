@@ -8,6 +8,7 @@ import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
+import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.security.SensitiveTypes
 import java.time.Instant
@@ -65,12 +66,23 @@ object RecordSummary {
 
             CoffeeFields.TYPE_CODE -> {
                 val fields = genericFields(record)
-                val amount = fields[CoffeeFields.AMOUNT]
-                val unit = CoffeeFields.unitLabel(fields[CoffeeFields.UNIT].orEmpty())
                 buildList {
-                    fields[CoffeeFields.DRINK]?.let { add(CoffeeFields.drinkLabel(it)) }
-                    if (amount != null) add("$amount $unit")
-                    fields[CoffeeFields.CAFFEINE]?.let { add(CoffeeFields.caffeineLabel(it)) }
+                    fields[CoffeeFields.VARIETY]?.let { add(it) }
+                        ?: fields[CoffeeFields.DRINK]?.let { add(CoffeeFields.drinkLabel(it)) }
+                    fields[CoffeeFields.SIZE]?.let { add(CoffeeFields.sizeLabel(it)) }
+                    fields[CoffeeFields.AMOUNT]?.let { add("${it}ml") }
+                    fields[CoffeeFields.CALORIES]?.let { add("$it 大卡") }
+                    if (note.isNotBlank()) add(note)
+                }.joinToString(" · ").ifBlank { "尚未填写详情" }
+            }
+
+            TeaFields.TYPE_CODE -> {
+                val fields = genericFields(record)
+                buildList {
+                    fields[TeaFields.VARIETY]?.let { add(it) }
+                    fields[TeaFields.CUPS]?.let { add("${it} 杯") }
+                    fields[TeaFields.AMOUNT]?.let { add("${it}ml") }
+                    fields[TeaFields.CALORIES]?.let { add("$it 大卡") }
                     if (note.isNotBlank()) add(note)
                 }.joinToString(" · ").ifBlank { "尚未填写详情" }
             }
@@ -98,7 +110,8 @@ object RecordSummary {
     private val DEFAULT_NAMES = mapOf(
         "poop" to "排便",
         WaterFields.TYPE_CODE to "饮水",
-        CoffeeFields.TYPE_CODE to "咖啡 / 茶",
+        CoffeeFields.TYPE_CODE to "咖啡",
+        TeaFields.TYPE_CODE to "茶",
         SportFields.TYPE_CODE to "运动",
         IntimacyFields.TYPE_CODE to "亲密关系",
         MenstruationFields.TYPE_CODE to "月经"

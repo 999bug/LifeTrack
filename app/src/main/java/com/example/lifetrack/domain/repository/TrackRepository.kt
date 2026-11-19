@@ -43,6 +43,14 @@ interface TrackRepository {
 
     /** 首次进入应用时补齐内置类型，已存在的不会被覆盖（保留用户的启用/排序设置）。 */
     suspend fun ensureDefaultTypes()
+
+    /**
+     * v0.7 类型拆分的一次性数据修正：把旧版记在 coffee 类型里、drinkType=tea 的
+     * 记录迁到 tea 类型。幂等——没有旧茶记录时不做任何写入，重复调用安全。
+     * 返回本次迁移的记录条数（0 表示无需迁移），供调用方记录日志。
+     */
+    suspend fun migrateLegacyTeaRecords(): Int
+
     suspend fun setTypeEnabled(code: String, enabled: Boolean)
     suspend fun reorderTypes(types: List<TrackTypeEntity>)
 

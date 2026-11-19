@@ -80,11 +80,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun StatisticsScreen(viewModel: MainViewModel) {
     val statsByPeriod by viewModel.statistics.collectAsStateWithLifecycle()
+    val today by viewModel.today.collectAsStateWithLifecycle()
     val statsScope by viewModel.statsScope.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { StatsPeriod.entries.size })
     val scope = rememberCoroutineScope()
-    val today = remember { LocalDate.now() }
 
     val period = StatsPeriod.entries[pagerState.currentPage]
     val current = statsByPeriod[period]

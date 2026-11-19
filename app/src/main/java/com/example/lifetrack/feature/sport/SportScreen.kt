@@ -43,8 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.feature.home.MainViewModel
-import java.time.LocalDate
-import java.time.ZoneId
 
 /** 列表最多一次画 30 条，再多引导去「历史」页；避免长列表把首屏滚动深度拖到几屏之外。 */
 private const val VISIBLE_LIMIT = 30
@@ -65,10 +63,10 @@ fun SportScreen(
     onDelete: (String) -> Unit
 ) {
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val today by viewModel.today.collectAsStateWithLifecycle()
     val records by viewModel.sportRecords.collectAsStateWithLifecycle()
     val enabled = types.any { it.code == SportFields.TYPE_CODE && it.enabled }
 
-    val today = LocalDate.now(ZoneId.systemDefault())
     val sessions = remember(records) { SportStats.sessions(records) }
     val week = remember(sessions, today) { SportStats.week(sessions, today) }
     val brief = remember(sessions, today) { SportStats.brief(sessions, today) }

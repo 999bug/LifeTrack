@@ -34,6 +34,7 @@ import com.example.lifetrack.core.model.PeriodStartEdit
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.feature.sport.SportStats
 import com.example.lifetrack.core.security.AppLockPolicy
+import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
@@ -44,6 +45,8 @@ import com.example.lifetrack.feature.statistics.observeStatistics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -62,6 +65,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -75,15 +79,26 @@ private const val QUICK_WATER_AMOUNT_ML = 250
 class MainViewModel(
     private val repository: TrackRepository,
     private val settingsRepository: SettingsRepository,
-    private val updateRepository: UpdateRepository
+    private val updateRepository: UpdateRepository,
+    clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
-    private val todayDate = MutableStateFlow(LocalDate.now(ZoneId.systemDefault()))
+    private val todaySource = TodaySource(clock)
+
+    /** 应用内唯一的业务日期；页面不得再自行调用 LocalDate.now()。 */
+    val today: StateFlow<LocalDate> = todaySource.today
 
     /** 记录项目（启用状态 + 排序）。首次进入时补齐内置类型，之后由 Room Flow 驱动。 */
     val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
+        viewModelScope.launch {
+            // 跨午夜时主动刷新业务日期，避免前台长时间停留后继续查询昨天。
+            while (isActive) {
+                delay(todaySource.millisUntilNextDay())
+                refreshToday()
+            }
+        }
         viewModelScope.launch {
             // 先补齐内置类型（含 tea），再把旧版 drinkType=tea 的记录迁到 tea 类型。
             // 迁移幂等，没有旧记录时不写库；放在同一协程里保证顺序。
@@ -95,13 +110,13 @@ class MainViewModel(
         viewModelScope.launch {
             combine(
                 settingsRepository.ongoingPeriodStart,
-                todayDate
+                today
             ) { startIso, today -> startIso to today }
                 .collect { (startIso, today) -> syncOngoingPeriod(startIso, today) }
         }
     }
 
-    val todayRecords: StateFlow<List<BackupRecord>> = todayDate
+    val todayRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { repository.observeRecordsForDate(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -112,7 +127,7 @@ class MainViewModel(
     val historyQuery: StateFlow<HistoryQuery> = combine(
         historyFilter,
         historyExtraPages,
-        todayDate
+        today
     ) { filter, extraPages, today ->
         if (filter != null) {
             HistoryQuery(filter.start, filter.end, filtered = true)
@@ -140,7 +155,7 @@ class MainViewModel(
      * 两个查询合并成一次渲染，避免「有次数但没图标」或反过来的中间态。
      * 计数口径为全部类型，与历史列表保持一致。
      */
-    val calendar: StateFlow<CalendarMonth> = combine(todayDate, calendarOffset) { today, offset ->
+    val calendar: StateFlow<CalendarMonth> = combine(today, calendarOffset) { today, offset ->
         CalendarMonth.of(today, offset)
     }.flatMapLatest { month ->
         combine(
@@ -154,7 +169,7 @@ class MainViewModel(
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        CalendarMonth.of(LocalDate.now(ZoneId.systemDefault()), 0)
+        CalendarMonth.of(todaySource.currentDate(), 0)
     )
 
     /** 月历点开的日期；null 表示日期详情弹层未打开。 */
@@ -173,7 +188,7 @@ class MainViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 经期子应用：宽区间取月经记录，供周期推算、日历染色与简报；派生数据一律不落库。 */
-    val periodRecords: StateFlow<List<BackupRecord>> = todayDate
+    val periodRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { today ->
             repository.observeRecordsInRange(
                 today.minusYears(3).toString(),
@@ -187,7 +202,7 @@ class MainViewModel(
      * 亲密关系（重构后收进经期子应用）：取数区间与 [periodRecords] 对齐，
      * 供选中日的记录列表与「上次」措施标记使用；记录本身仍是独立事件，不并进月经详情。
      */
-    val intimacyRecords: StateFlow<List<BackupRecord>> = todayDate
+    val intimacyRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { today ->
             repository.observeRecordsInRange(
                 today.minusYears(3).toString(),
@@ -198,7 +213,7 @@ class MainViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 运动子应用：取数窗口与 [SportStats] 一致，供本周节奏、三类占比与简报派生；结果不落库。 */
-    val sportRecords: StateFlow<List<BackupRecord>> = todayDate
+    val sportRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { today ->
             repository.observeRecordsInRange(
                 SportStats.windowStart(today).toString(),
@@ -238,7 +253,7 @@ class MainViewModel(
      */
     val cycleSnapshot: StateFlow<CycleSnapshot> = combine(
         periodRecords,
-        todayDate,
+        today,
         cycleLengthDays,
         periodLengthDays,
         ongoingPeriodStart
@@ -252,7 +267,7 @@ class MainViewModel(
             SharingStarted.WhileSubscribed(5_000),
             CycleCalculator.calculate(
                 emptySet(),
-                LocalDate.now(ZoneId.systemDefault()),
+                todaySource.currentDate(),
                 SettingsRepository.DEFAULT_CYCLE_LENGTH_DAYS,
                 SettingsRepository.DEFAULT_PERIOD_LENGTH_DAYS
             )
@@ -280,7 +295,7 @@ class MainViewModel(
      * 类型筛选为空表示全部类型；形态分布只在排便口径下查询，避免与其他类型的总数串口径。
      */
     val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> =
-        observeStatistics(repository, todayDate, statsOffsets, statsTypeFilter)
+        observeStatistics(repository, today, statsOffsets, statsTypeFilter)
             // 这里对 4 个周期做全窗口聚合（StatsAggregator.build），不加 flowOn 时
             // 它跑在 stateIn 的收集上下文，也就是 viewModelScope 默认的 Main；
             // 每写入一条记录 Room 都会重发一次，数据攒到几千条就会在主线程掉帧。
@@ -288,7 +303,7 @@ class MainViewModel(
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
-                emptyStatistics(todayDate.value)
+                emptyStatistics(today.value)
             )
 
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
@@ -359,7 +374,7 @@ class MainViewModel(
     }
 
     fun refreshToday() {
-        todayDate.value = LocalDate.now(ZoneId.systemDefault())
+        todaySource.refresh()
     }
 
     fun shiftStatistics(period: StatsPeriod, steps: Int) {
@@ -627,7 +642,7 @@ class MainViewModel(
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val today = LocalDate.now(ZoneId.systemDefault())
+                    val today = todaySource.currentDate()
                     val existing = repository.observeRecordsInRange(
                         date.toString(), date.toString(), MenstruationFields.TYPE_CODE
                     ).first().firstOrNull()
@@ -677,7 +692,7 @@ class MainViewModel(
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val today = LocalDate.now(ZoneId.systemDefault())
+                    val today = todaySource.currentDate()
                     val previousOngoingStart = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
                     if (previousOngoingStart != null) {
                         if (date.isBefore(previousOngoingStart)) {
@@ -771,7 +786,7 @@ class MainViewModel(
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val today = LocalDate.now(ZoneId.systemDefault())
+                    val today = todaySource.currentDate()
                     if (date.isAfter(today)) return@withContext "开始日期不能晚于今天"
                     val previousOngoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
                     val records = repository.observeRecordsInRange(
@@ -837,7 +852,7 @@ class MainViewModel(
         viewModelScope.launch {
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val today = LocalDate.now(ZoneId.systemDefault())
+                    val today = todaySource.currentDate()
                     if (date.isAfter(today)) return@withContext "结束日期不能晚于今天"
                     val previousOngoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
                     val records = repository.observeRecordsInRange(
@@ -935,8 +950,9 @@ class MainViewModel(
         }
     }
 
-    /** 由 Activity 的 ON_START 调用：按超时策略决定是否重新上锁。 */
+    /** 由 Activity 的 ON_START 调用：先校正业务日期，再按超时策略决定是否重新上锁。 */
     fun onAppForegrounded() {
+        refreshToday()
         // 设置还没读出来时不要解锁：null 不等于「已关闭」。
         val enabled = appLockEnabled.value ?: return
         if (!enabled) {
@@ -958,7 +974,7 @@ class MainViewModel(
     }
 
     private fun initialHistoryQuery(): HistoryQuery {
-        val today = LocalDate.now(ZoneId.systemDefault())
+        val today = todaySource.currentDate()
         return HistoryQuery(today.minusDays(29), today, filtered = false)
     }
 

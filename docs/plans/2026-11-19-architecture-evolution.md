@@ -17,10 +17,10 @@
 **Files:** Create `core/time/TodaySource.kt`、`test/.../TodaySourceTest.kt`；Modify `feature/home/MainViewModel.kt`、`feature/home/TodayScreen.kt`、`feature/history/HistoryScreen.kt`、`feature/statistics/StatisticsScreen.kt`、`feature/menstruation/PeriodScreen.kt`、`feature/sport/SportScreen.kt`、`docs/PROGRESS.md`
 **Interfaces:** Produces（后续 ViewModel 拆分消费）`TodaySource.today: StateFlow<LocalDate>`、`TodaySource.refresh()`、`TodaySource.millisUntilNextDay()`
 
-- [ ] 用可注入 `Clock` 的 `TodaySource` 替换 `MainViewModel` 内部可变日期。
-- [ ] `ON_START` 和跨午夜时刷新；首页、历史、统计、经期、运动统一消费 `viewModel.today`。
-- [ ] 覆盖跨午夜刷新和下一日等待时长单测。
-- [ ] 跑 `:app:testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug`。
+- [x] 用可注入 `Clock` 的 `TodaySource` 替换 `MainViewModel` 内部可变日期。
+- [x] `ON_START` 和跨午夜时刷新；首页、历史、统计、经期、运动统一消费 `viewModel.today`。
+- [x] 覆盖跨午夜刷新和下一日等待时长单测。
+- [x] 跑 `:app:testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug`。
 
 ### Task 2: 抽出备份状态机
 

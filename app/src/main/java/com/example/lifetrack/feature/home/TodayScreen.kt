@@ -45,7 +45,6 @@ import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
 import com.example.lifetrack.feature.record.RecordSummary
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -84,6 +83,7 @@ fun TodayScreen(
     onEndPoop: (BackupRecord) -> Unit
 ) {
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
+    val today by viewModel.today.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
     val snapshot by viewModel.cycleSnapshot.collectAsStateWithLifecycle()
     val ongoingStart by viewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
@@ -104,7 +104,6 @@ fun TodayScreen(
     val columns = moduleColumns(fontScale)
     val cardHeight = if (fontScale > 1.3f) 176.dp else 128.dp
 
-    val today = LocalDate.now()
     val lastTime = records.firstOrNull()?.let { RecordSummary.time(it) }
     val subtitle = buildString {
         append("已记录 ${records.size} 次")

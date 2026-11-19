@@ -68,6 +68,7 @@ fun HistoryScreen(
     onDelete: (String) -> Unit
 ) {
     val records by viewModel.historyRecords.collectAsStateWithLifecycle()
+    val today by viewModel.today.collectAsStateWithLifecycle()
     val query by viewModel.historyQuery.collectAsStateWithLifecycle()
     val calendar by viewModel.calendar.collectAsStateWithLifecycle()
     val dayDetail by viewModel.dayDetail.collectAsStateWithLifecycle()
@@ -76,7 +77,6 @@ fun HistoryScreen(
     val typeNames = remember(trackTypes) { trackTypes.associate { it.code to it.name } }
     var showRangePicker by remember { mutableStateOf(false) }
     var calendarMode by remember { mutableStateOf(false) }
-    val today = remember { LocalDate.now() }
     val colors = rememberStatsColors()
 
     // 分组在重组期执行，不 remember 的话每次重组都会重新 groupBy + 建 TreeMap。

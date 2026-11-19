@@ -72,7 +72,6 @@ import com.example.lifetrack.feature.statistics.CardShape
 import com.example.lifetrack.feature.statistics.rememberStatsColors
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -97,6 +96,7 @@ fun PeriodScreen(
     onBack: () -> Unit
 ) {
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()
+    val today by viewModel.today.collectAsStateWithLifecycle()
     val enabled = types.any { it.code == MenstruationFields.TYPE_CODE && it.enabled }
     val periodRecords by viewModel.periodRecords.collectAsStateWithLifecycle()
     val snapshot by viewModel.cycleSnapshot.collectAsStateWithLifecycle()
@@ -104,7 +104,6 @@ fun PeriodScreen(
     val cycleDays by viewModel.cycleLengthDays.collectAsStateWithLifecycle()
     val periodDays by viewModel.periodLengthDays.collectAsStateWithLifecycle()
 
-    val today = LocalDate.now(ZoneId.systemDefault())
     val moduleColor = LifeTrackTokens.ModuleColors.of(MenstruationFields.TYPE_CODE)
     val colors = rememberStatsColors()
     val stacked = LocalDensity.current.fontScale > 1.3f

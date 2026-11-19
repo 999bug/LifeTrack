@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-type="normal">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>运动 · LifeTrack 高保真原型</title>
+<style>
+  /* 设计令牌：森林绿负责产品骨架，青绿只负责运动模块识别 */
+  :root {
+    --canvas: #e8eee8;
+    --bg: #f4f7f2;
+    --surface: #fdfefc;
+    --surface-raised: #ffffff;
+    --surface-2: #edf2ec;
+    --surface-3: #e4ebe3;
+    --border: #dce5db;
+    --border-strong: #c6d3c7;
+    --text: #18221b;
+    --text-2: #526157;
+    --text-3: #68766b;
+    --primary: #33604a;
+    --primary-hover: #294d3c;
+    --on-primary: #ffffff;
+    --primary-soft: #dceadf;
+    --sport: #12796f;
+    --sport-strong: #0b5f58;
+    --sport-soft: #d7f2ec;
+    --sport-soft-2: #ecf9f6;
+    --sport-line: #3aa99c;
+    --hero: #123e3a;
+    --hero-2: #205b55;
+    --on-hero: #f1fbf7;
+    --error: #b42318;
+    --error-soft: #fdecea;
+    --warning-soft: #f4ead7;
+    --shadow: 0 1px 2px rgba(23, 34, 26, .04), 0 18px 42px -30px rgba(23, 34, 26, .5);
+    --shadow-hero: 0 26px 70px -40px rgba(18, 62, 58, .85);
+    --type-scale: 1;
+    --radius-card: 22px;
+    --radius-small: 14px;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --font-number: "Avenir Next", "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  }
+
+  html[data-theme="dark"] {
+    --canvas: #080d0a;
+    --bg: #101713;
+    --surface: #18211c;
+    --surface-raised: #1b251f;
+    --surface-2: #202b24;
+    --surface-3: #27332b;
+    --border: #304038;
+    --border-strong: #405247;
+    --text: #ecf3ee;
+    --text-2: #b4c2b8;
+    --text-3: #8d9e92;
+    --primary: #a9d8b4;
+    --primary-hover: #c0e8c9;
+    --on-primary: #0e1510;
+    --primary-soft: #263a2d;
+    --sport: #73d5c2;
+    --sport-strong: #a5e9dd;
+    --sport-soft: #1d3a35;
+    --sport-soft-2: #213a36;
+    --sport-line: #58bfae;
+    --hero: #0d322f;
+    --hero-2: #174a45;
+    --on-hero: #e7faf5;
+    --error: #ff8b82;
+    --error-soft: #3b211f;
+    --warning-soft: #392f20;
+    --shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 20px 50px -34px rgba(0, 0, 0, .95);
+    --shadow-hero: 0 30px 76px -42px rgba(0, 0, 0, .95);
+  }
+
+  html[data-type="large"] {
+    --type-scale: 2;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { min-width: 320px; background: var(--canvas); }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background:
+      radial-gradient(circle at 7% 6%, rgba(18, 121, 111, .08), transparent 24rem),
+      linear-gradient(180deg, var(--canvas), var(--bg) 26rem);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: calc(15px * var(--type-scale));
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button, input { font: inherit; }
+  button { color: inherit; }
+  button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+  button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 3px solid var(--focus, var(--sport));
+    outline-offset: 3px;
+  }
+  button:disabled { cursor: not-allowed; }
+  svg { display: block; }
+  .icon { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .skip-link {
+    position: fixed; z-index: 100; top: 10px; left: 10px; transform: translateY(-150%);
+    padding: 10px 14px; border-radius: 10px; background: var(--primary); color: var(--on-primary);
+    text-decoration: none;
+  }
+  .skip-link:focus { transform: none; }
+
+  .prototype-strip {
+    width: min(100% - 32px, 1240px);
+    margin: 0 auto;
+    padding: 18px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--text-2);
+    font-size: calc(12px * var(--type-scale));
+  }
+  .prototype-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; letter-spacing: .02em; }
+  .prototype-label::before {
+    content: ""; width: 7px; height: 7px; border-radius: 99px; background: var(--sport);
+    box-shadow: 0 0 0 4px var(--sport-soft);
+  }
+  .prototype-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .prototype-button {
+    min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px;
+    background: var(--surface); color: var(--text-2); cursor: pointer;
+    font-size: calc(12px * var(--type-scale)); font-weight: 650; line-height: 1.25;
+    box-shadow: 0 1px 1px rgba(23, 34, 26, .03);
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
+  }
+  .prototype-button:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .prototype-button:active { transform: scale(.98); }
+  .prototype-button[aria-pressed="true"] { background: var(--sport-soft); border-color: var(--sport); color: var(--sport-strong); }
+
+  .app-shell {
+    width: min(100% - 32px, 1240px);
+    margin: 0 auto;
+    padding: 26px 0 178px;
+  }
+  .app-header {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; flex-wrap: wrap;
+    margin-bottom: 22px;
+  }
+  .brand-lockup { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .brand-mark {
+    flex: 0 0 auto; width: 54px; height: 54px; border-radius: 18px;
+    display: grid; place-items: center; color: var(--on-primary);
+    background:
+      radial-gradient(circle at 78% 18%, rgba(255,255,255,.2), transparent 30%),
+      linear-gradient(145deg, var(--primary), #1e4a3a);
+    box-shadow: 0 12px 22px -16px rgba(51, 96, 74, .9), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .brand-mark svg { width: 28px; height: 28px; }
+  .brand-copy { min-width: 0; }
+  .eyebrow {
+    margin: 0 0 3px; color: var(--text-3); font-size: calc(11px * var(--type-scale));
+    font-weight: 750; letter-spacing: .13em; line-height: 1.35; text-transform: uppercase;
+  }
+  .brand-copy h1 {
+    margin: 0; color: var(--text); font-size: calc(32px * var(--type-scale));
+    font-weight: 720; letter-spacing: -.045em; line-height: 1.08;
+  }
+  .header-note {
+    max-width: 36rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    color: var(--text-2); font-size: calc(12.5px * var(--type-scale)); line-height: 1.5;
+  }
+  .week-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+    color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .week-pill .live-dot { width: 7px; height: 7px; border-radius: 99px; background: var(--sport); box-shadow: 0 0 0 3px var(--sport-soft); }
+  .header-caption { max-width: 30rem; color: var(--text-3); }
+
+  .hero-card {
+    position: relative; isolation: isolate; overflow: hidden;
+    border-radius: 30px; padding: clamp(20px, 3vw, 32px);
+    color: var(--on-hero); background:
+      radial-gradient(circle at 12% 0%, rgba(113, 225, 205, .24), transparent 36%),
+      linear-gradient(135deg, var(--hero), var(--hero-2));
+    box-shadow: var(--shadow-hero);
+  }
+  .hero-art { position: absolute; z-index: -1; inset: 0; pointer-events: none; opacity: .52; }
+  .hero-art svg { width: 100%; height: 100%; }
+  .hero-art path { fill: none; stroke: rgba(198, 247, 236, .25); stroke-width: 1.2; }
+  .hero-art .hero-glow { fill: rgba(137, 241, 218, .08); stroke: none; }
+  .hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .hero-kicker {
+    display: inline-flex; align-items: center; gap: 8px; color: rgba(241, 251, 247, .68);
+    font-size: calc(11px * var(--type-scale)); font-weight: 750; letter-spacing: .14em; line-height: 1.4;
+  }
+  .hero-kicker::before { content: ""; width: 22px; height: 1px; background: rgba(241, 251, 247, .38); }
+  .hero-title { margin: 6px 0 0; font-size: calc(23px * var(--type-scale)); font-weight: 700; letter-spacing: -.025em; line-height: 1.2; }
+  .hero-status {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 999px;
+    border: 1px solid rgba(241, 251, 247, .18); background: rgba(241, 251, 247, .09);
+    color: rgba(241, 251, 247, .86); font-size: calc(12px * var(--type-scale)); font-weight: 650;
+    line-height: 1.3;
+  }
+  .hero-status .pulse { width: 7px; height: 7px; border-radius: 99px; background: #8ff0d9; box-shadow: 0 0 0 4px rgba(143, 240, 217, .12); }
+  .hero-grid {
+    display: grid; grid-template-columns: minmax(210px, .78fr) minmax(0, 1.22fr);
+    gap: clamp(22px, 4vw, 52px); align-items: end; margin-top: 26px;
+  }
+  .hero-stat-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+  .hero-total {
+    font-family: var(--font-number); font-size: calc(64px * var(--type-scale)); font-weight: 720;
+    line-height: .9; letter-spacing: -.065em; font-variant-numeric: tabular-nums;
+  }
+  .hero-unit { padding-bottom: .28em; color: rgba(241, 251, 247, .7); font-size: calc(14px * var(--type-scale)); font-weight: 650; }
+  .hero-caption { margin: 12px 0 0; color: rgba(241, 251, 247, .68); font-size: calc(12.5px * var(--type-scale)); line-height: 1.65; }
+  .hero-caption strong { color: var(--on-hero); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hero-metrics {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
+    margin-top: 20px; border-top: 1px solid rgba(241, 251, 247, .14); padding-top: 15px;
+  }
+  .hero-metric { min-width: 0; padding-right: 12px; }
+  .hero-metric + .hero-metric { border-left: 1px solid rgba(241, 251, 247, .14); padding-left: 12px; }
+  .hero-metric strong { display: block; font-family: var(--font-number); font-size: calc(20px * var(--type-scale)); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .hero-metric span { display: block; margin-top: 3px; color: rgba(241, 251, 247, .58); font-size: calc(10.5px * var(--type-scale)); line-height: 1.4; }
+  .chart-wrap { min-width: 0; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+  .chart-title { color: rgba(241, 251, 247, .7); font-size: calc(11px * var(--type-scale)); font-weight: 700; letter-spacing: .08em; }
+  .chart-legend { color: rgba(241, 251, 247, .55); font-size: calc(10.5px * var(--type-scale)); }
+  .week-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: clamp(5px, 1vw, 12px); align-items: end; min-height: 122px; }
+  .day-col { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .day-value { min-height: 1.5em; color: rgba(241, 251, 247, .68); font-size: calc(9.5px * var(--type-scale)); line-height: 1.4; font-variant-numeric: tabular-nums; }
+  .bar-track { width: 100%; height: 82px; display: flex; align-items: flex-end; border-radius: 999px 999px 6px 6px; background: rgba(241, 251, 247, .08); overflow: hidden; }
+  .bar-fill { width: 100%; min-height: 5px; border-radius: 999px 999px 5px 5px; background: linear-gradient(180deg, #a9f1df, #56c8b5); box-shadow: 0 0 20px rgba(104, 222, 198, .22); transition: height .38s cubic-bezier(.2,.7,.3,1); }
+  .day-col.is-today .bar-track { box-shadow: 0 0 0 1px rgba(169, 241, 223, .42); }
+  .day-col.is-today .bar-fill { background: linear-gradient(180deg, #ffffff, #8ff0d9); }
+  .day-col.is-future { opacity: .44; }
+  .day-label { color: rgba(241, 251, 247, .5); font-size: calc(10.5px * var(--type-scale)); line-height: 1.4; }
+  .day-col.is-today .day-label { color: var(--on-hero); font-weight: 700; }
+  .hero-legend { display: flex; gap: 14px 18px; flex-wrap: wrap; margin-top: 15px; color: rgba(241, 251, 247, .62); font-size: calc(11px * var(--type-scale)); }
+  .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 99px; background: #8ff0d9; }
+  .legend-dot.run { background: #a9f1df; }
+  .legend-dot.ride { background: rgba(241, 251, 247, .28); }
+
+  .content-grid {
+    display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(340px, .82fr);
+    gap: 18px; align-items: start; margin-top: 18px;
+  }
+  .stack { display: grid; gap: 18px; min-width: 0; }
+  .card {
+    min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-card);
+    background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card-body { padding: clamp(18px, 2.5vw, 25px); }
+  .section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 17px; }
+  .section-kicker { margin: 0 0 3px; color: var(--sport); font-size: calc(10.5px * var(--type-scale)); font-weight: 800; letter-spacing: .12em; line-height: 1.4; text-transform: uppercase; }
+  .section-title { margin: 0; font-size: calc(19px * var(--type-scale)); font-weight: 710; letter-spacing: -.025em; line-height: 1.3; }
+  .section-sub { margin: 5px 0 0; color: var(--text-3); font-size: calc(12px * var(--type-scale)); line-height: 1.6; }
+  .section-note { color: var(--text-3); font-size: calc(11.5px * var(--type-scale)); line-height: 1.45; white-space: nowrap; }
+
+  .sport-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .sport-option {
+    min-width: 0; min-height: 118px; padding: 14px 12px; border: 1px solid var(--border);
+    border-radius: 17px; background: var(--surface-2); text-align: left; cursor: pointer;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .sport-option:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .sport-option:active { transform: scale(.985); }
+  .sport-option[aria-pressed="true"] {
+    border-color: var(--sport); background: var(--sport-soft-2);
+    box-shadow: inset 0 0 0 1px var(--sport), 0 12px 26px -24px rgba(18, 121, 111, .7);
+  }
+  .sport-icon-box {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+    background: var(--surface); color: var(--sport-strong); border: 1px solid var(--border);
+  }
+  .sport-option[aria-pressed="true"] .sport-icon-box { background: var(--sport); border-color: var(--sport); color: var(--on-hero); }
+  .sport-icon-box .icon { width: 21px; height: 21px; }
+  .sport-copy { min-width: 0; }
+  .sport-name { display: block; font-size: calc(14px * var(--type-scale)); font-weight: 750; line-height: 1.25; }
+  .sport-meta { display: block; margin-top: 5px; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.45; }
+  .sport-option[aria-pressed="true"] .sport-meta { color: var(--sport-strong); }
+
+  .entry-card { position: relative; }
+  .entry-card::after {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image: radial-gradient(circle, rgba(18, 121, 111, .1) .7px, transparent .8px);
+    background-size: 16px 16px; opacity: .3; mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 82%, transparent);
+  }
+  .entry-card > * { position: relative; z-index: 1; }
+  .ticket-label {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+    font-size: calc(10.5px * var(--type-scale)); font-weight: 700; white-space: nowrap; line-height: 1.3;
+  }
+  .ticket-label .ticket-dot { width: 6px; height: 6px; border-radius: 99px; background: var(--sport); }
+
+  .duration-block { margin-top: 22px; padding-top: 20px; border-top: 1px dashed var(--border-strong); }
+  .field-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .field-label { color: var(--text-2); font-size: calc(12px * var(--type-scale)); font-weight: 750; letter-spacing: .025em; }
+  .field-hint { color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.45; }
+  .duration-control { display: flex; align-items: stretch; gap: 8px; }
+  .round-step {
+    flex: 0 0 46px; min-height: 46px; border: 1px solid var(--border); border-radius: 14px;
+    background: var(--surface-2); color: var(--text-2); cursor: pointer; display: grid; place-items: center;
+    transition: background .16s ease, border-color .16s ease, transform .16s ease;
+  }
+  .round-step:hover { background: var(--surface-3); border-color: var(--border-strong); }
+  .round-step:active { transform: scale(.96); }
+  .round-step .icon { width: 17px; height: 17px; }
+  .duration-field {
+    flex: 1; min-width: 0; min-height: 68px; display: flex; align-items: baseline; justify-content: center; gap: 7px;
+    border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface-raised); padding: 8px 12px;
+  }
+  .duration-field:focus-within { border-color: var(--sport); box-shadow: 0 0 0 3px var(--sport-soft); }
+  .duration-field input {
+    width: min(5.5ch, 42vw); min-width: 0; border: 0; outline: 0; padding: 0;
+    background: transparent; color: var(--text); font-family: var(--font-number);
+    font-size: calc(35px * var(--type-scale)); font-weight: 720; line-height: 1; letter-spacing: -.04em;
+    text-align: right; font-variant-numeric: tabular-nums; appearance: textfield;
+  }
+  .duration-field input::-webkit-inner-spin-button, .duration-field input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  .duration-field .unit { color: var(--text-3); font-size: calc(12px * var(--type-scale)); font-weight: 650; white-space: nowrap; }
+  .duration-readout { min-height: 1.5em; margin: 7px 2px 0; color: var(--sport-strong); font-size: calc(11px * var(--type-scale)); font-weight: 650; text-align: right; }
+  .range-wrap { margin-top: 12px; }
+  input[type="range"] {
+    width: 100%; height: 26px; margin: 0; background: transparent; cursor: pointer; accent-color: var(--sport);
+  }
+  input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 99px; background: var(--surface-3); }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 99px;
+    border: 3px solid var(--surface); background: var(--sport); box-shadow: 0 0 0 1px var(--sport), 0 2px 7px rgba(18, 121, 111, .3);
+  }
+  input[type="range"]::-moz-range-track { height: 6px; border-radius: 99px; background: var(--surface-3); }
+  input[type="range"]::-moz-range-thumb { width: 15px; height: 15px; border: 3px solid var(--surface); border-radius: 99px; background: var(--sport); }
+  .presets { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+  .preset {
+    min-height: 34px; padding: 6px 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface-2); color: var(--text-2); cursor: pointer;
+    font-size: calc(11px * var(--type-scale)); font-weight: 650; line-height: 1.2;
+    transition: background .16s ease, color .16s ease, border-color .16s ease;
+  }
+  .preset:hover, .preset[aria-pressed="true"] { background: var(--sport-soft); color: var(--sport-strong); border-color: var(--sport); }
+  .field-error {
+    display: flex; align-items: flex-start; gap: 8px; margin: 11px 0 0;
+    padding: 9px 11px; border-radius: 11px; background: var(--error-soft); color: var(--error);
+    font-size: calc(11px * var(--type-scale)); line-height: 1.5;
+  }
+  .field-error[hidden] { display: none; }
+  .field-error .icon { flex: 0 0 auto; margin-top: 2px; }
+
+  .intensity-block { margin-top: 22px; padding-top: 20px; border-top: 1px dashed var(--border-strong); }
+  .intensity-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .intensity-option {
+    min-width: 0; min-height: 67px; padding: 10px 8px; border: 1px solid var(--border); border-radius: 14px;
+    background: var(--surface-2); color: var(--text-2); cursor: pointer; text-align: left;
+    transition: background .16s ease, border-color .16s ease, color .16s ease;
+  }
+  .intensity-option:hover { border-color: var(--border-strong); }
+  .intensity-option[aria-checked="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--text); box-shadow: inset 0 0 0 1px var(--primary); }
+  .intensity-name { display: block; font-size: calc(12px * var(--type-scale)); font-weight: 750; line-height: 1.3; }
+  .intensity-desc { display: block; margin-top: 4px; color: var(--text-3); font-size: calc(10px * var(--type-scale)); line-height: 1.35; }
+  .intensity-option[aria-checked="true"] .intensity-desc { color: var(--text-2); }
+  .form-note { margin: 18px 0 0; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.7; }
+
+  .recent-card { min-width: 0; }
+  .filter-row { display: flex; gap: 7px; flex-wrap: wrap; margin: -2px 0 15px; }
+  .filter-chip {
+    min-height: 33px; padding: 6px 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: transparent; color: var(--text-2); cursor: pointer; font-size: calc(10.5px * var(--type-scale));
+    font-weight: 650; line-height: 1.25;
+  }
+  .filter-chip:hover { background: var(--surface-2); }
+  .filter-chip[aria-pressed="true"] { background: var(--sport); border-color: var(--sport); color: var(--on-hero); }
+  .record-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .record-item {
+    min-width: 0; display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 12px;
+    align-items: center; padding: 13px 0; border-top: 1px solid var(--border);
+  }
+  .record-item:first-child { border-top: 0; }
+  .record-date { min-width: 0; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.45; font-variant-numeric: tabular-nums; }
+  .record-date strong { display: block; color: var(--text-2); font-size: calc(11px * var(--type-scale)); font-weight: 700; }
+  .record-main { min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .record-icon {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+    background: var(--sport-soft); color: var(--sport-strong);
+  }
+  .record-icon .icon { width: 19px; height: 19px; }
+  .record-copy { min-width: 0; }
+  .record-title { display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; }
+  .record-title strong { font-size: calc(12.5px * var(--type-scale)); line-height: 1.35; }
+  .intensity-badge { display: inline-flex; align-items: center; gap: 5px; color: var(--text-3); font-size: calc(9.5px * var(--type-scale)); line-height: 1.3; white-space: nowrap; }
+  .intensity-badge::before { content: ""; width: 5px; height: 5px; border-radius: 99px; background: var(--sport-line); }
+  .record-sub { margin-top: 3px; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.45; overflow-wrap: anywhere; }
+  .record-duration { color: var(--text-2); font-family: var(--font-number); font-size: calc(12px * var(--type-scale)); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.35; }
+  .empty-state {
+    padding: 34px 18px; border: 1px dashed var(--border-strong); border-radius: 16px;
+    text-align: center; color: var(--text-3); font-size: calc(12px * var(--type-scale)); line-height: 1.7;
+  }
+  .recent-footer { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.55; }
+  .recent-footer strong { color: var(--sport-strong); font-weight: 700; }
+
+  .insight-strip {
+    display: flex; gap: 11px; align-items: flex-start; padding: 14px 16px;
+    border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  }
+  .insight-icon { flex: 0 0 auto; width: 31px; height: 31px; border-radius: 10px; display: grid; place-items: center; background: var(--sport-soft); color: var(--sport-strong); }
+  .insight-icon .icon { width: 17px; height: 17px; }
+  .insight-copy { min-width: 0; }
+  .insight-copy strong { display: block; font-size: calc(11.5px * var(--type-scale)); line-height: 1.4; }
+  .insight-copy span { display: block; margin-top: 2px; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.6; }
+
+  .page-foot { margin: 18px 2px 0; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.7; }
+
+  .save-dock {
+    position: fixed; z-index: 50; left: 50%; bottom: 16px; transform: translateX(-50%);
+    width: min(calc(100% - 32px), 1160px); padding: 11px;
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--border-strong); border-radius: 20px;
+    background: var(--surface); box-shadow: 0 18px 58px -26px rgba(23, 34, 26, .56), 0 2px 6px rgba(23, 34, 26, .05);
+  }
+  .save-copy { min-width: 0; flex: 1; padding-left: 5px; }
+  .save-copy strong { display: block; color: var(--text); font-size: calc(12.5px * var(--type-scale)); font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+  .save-copy span { display: block; margin-top: 3px; color: var(--text-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.45; overflow-wrap: anywhere; }
+  .save-button {
+    flex: 0 0 auto; min-height: 50px; padding: 11px 18px; border: 0; border-radius: 14px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--primary); color: var(--on-primary); cursor: pointer;
+    font-size: calc(12.5px * var(--type-scale)); font-weight: 750; line-height: 1.25;
+    box-shadow: 0 8px 18px -12px rgba(51, 96, 74, .8);
+    transition: background .16s ease, transform .16s ease, opacity .16s ease;
+  }
+  .save-button:hover:not(:disabled) { background: var(--primary-hover); }
+  .save-button:active:not(:disabled) { transform: scale(.985); }
+  .save-button:disabled { opacity: .42; box-shadow: none; }
+  .save-button .icon { width: 17px; height: 17px; }
+
+  .toast {
+    position: fixed; z-index: 70; top: 16px; left: 50%; transform: translate(-50%, -20px);
+    width: min(calc(100% - 32px), 520px); padding: 12px 15px; border-radius: 14px;
+    display: flex; align-items: center; gap: 9px;
+    background: var(--primary); color: var(--on-primary); box-shadow: 0 16px 34px -18px rgba(23, 34, 26, .7);
+    font-size: calc(12px * var(--type-scale)); font-weight: 650; line-height: 1.45;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+  .toast .icon { flex: 0 0 auto; }
+
+  @media (max-width: 980px) {
+    .content-grid { grid-template-columns: minmax(0, 1fr); }
+    .hero-grid { grid-template-columns: minmax(190px, .8fr) minmax(0, 1.2fr); gap: 24px; }
+    .recent-card { order: 2; }
+  }
+  @media (max-width: 720px) {
+    .prototype-strip { padding-top: 14px; }
+    .app-shell { padding-top: 20px; }
+    .app-header { align-items: flex-start; }
+    .header-note { width: 100%; }
+    .hero-card { border-radius: 24px; }
+    .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .hero-total { font-size: calc(56px * var(--type-scale)); }
+    .week-chart { min-height: 108px; }
+    .bar-track { height: 70px; }
+    .content-grid { margin-top: 14px; }
+    .stack { gap: 14px; }
+    .save-dock { bottom: 8px; width: calc(100% - 16px); }
+  }
+  @media (max-width: 520px) {
+    .prototype-strip, .app-shell { width: min(100% - 24px, 1240px); }
+    .prototype-actions { width: 100%; justify-content: space-between; }
+    .prototype-button { flex: 1; }
+    .brand-mark { width: 48px; height: 48px; border-radius: 16px; }
+    .brand-copy h1 { font-size: calc(29px * var(--type-scale)); }
+    .header-caption { display: none; }
+    .week-pill { padding: 6px 9px; }
+    .hero-card { padding: 18px; border-radius: 22px; }
+    .hero-head { align-items: flex-start; }
+    .hero-title { font-size: calc(21px * var(--type-scale)); }
+    .hero-metrics { margin-top: 17px; }
+    .hero-metric { padding-right: 8px; }
+    .hero-metric + .hero-metric { padding-left: 8px; }
+    .card-body { padding: 17px; }
+    .section-head { margin-bottom: 14px; }
+    .sport-picker { gap: 7px; }
+    .sport-option { min-height: 111px; padding: 11px 9px; gap: 8px; }
+    .sport-icon-box { width: 32px; height: 32px; border-radius: 10px; }
+    .sport-meta { font-size: calc(9.5px * var(--type-scale)); }
+    .duration-control { gap: 6px; }
+    .round-step { flex-basis: 42px; min-height: 42px; border-radius: 12px; }
+    .duration-field { min-height: 62px; border-radius: 14px; padding: 7px 9px; }
+    .duration-field input { font-size: calc(31px * var(--type-scale)); }
+    .intensity-option { padding: 9px 7px; }
+    .record-item { grid-template-columns: 50px minmax(0, 1fr) auto; gap: 8px; }
+    .record-main { gap: 8px; }
+    .record-icon { width: 31px; height: 31px; border-radius: 10px; }
+    .record-duration { font-size: calc(11px * var(--type-scale)); }
+    .save-dock { border-radius: 17px; padding: 9px; gap: 9px; }
+    .save-button { min-height: 46px; padding: 9px 13px; }
+  }
+  html[data-type="large"] .sport-picker,
+  html[data-type="large"] .intensity-options,
+  html[data-type="large"] .hero-grid,
+  html[data-type="large"] .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-type="large"] .sport-option { min-height: 0; flex-direction: row; align-items: center; }
+  html[data-type="large"] .sport-copy { flex: 1; }
+  html[data-type="large"] .sport-option::after { content: "选择"; color: var(--text-3); font-size: calc(10px * var(--type-scale)); }
+  html[data-type="large"] .sport-option[aria-pressed="true"]::after { content: "已选"; color: var(--sport-strong); }
+  html[data-type="large"] .hero-metrics { grid-template-columns: minmax(0, 1fr); }
+  html[data-type="large"] .hero-metric { padding: 9px 0; }
+  html[data-type="large"] .hero-metric + .hero-metric { border-left: 0; border-top: 1px solid rgba(241, 251, 247, .14); padding-left: 0; }
+  html[data-type="large"] .day-col { gap: 4px; }
+  html[data-type="large"] .day-value { min-height: 1.3em; }
+  html[data-type="large"] .record-item { grid-template-columns: minmax(0, 1fr) auto; }
+  html[data-type="large"] .record-date { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 7px; }
+  html[data-type="large"] .record-date strong { display: inline; }
+  html[data-type="large"] .save-dock { flex-wrap: wrap; }
+  html[data-type="large"] .save-copy { flex-basis: 100%; }
+  html[data-type="large"] .save-button { width: 100%; }
+  html[data-type="large"] .hero-total { font-size: calc(52px * var(--type-scale)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  }
+</style>
+</head><body>
+<a class="skip-link" href="#sport-main">跳到主要内容</a>
+
+<!-- 图标全部内联，不依赖网络资源 -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="i-trail" viewBox="0 0 24 24">
+    <path d="M5 19c2.4-4.6 4.4-6.8 6.5-6.8 2.8 0 2.1 3.7 4.5 3.7 1.2 0 2.2-.9 3-2.9"/>
+    <path d="M4 6.5c2.7-1.7 4.9-2 6.7-.9 1.8 1.1 2.8 3.4 4.7 3.4 1.2 0 2.4-.7 3.6-2"/>
+    <circle cx="5" cy="19" r="1.2"/><circle cx="19" cy="13" r="1.2"/>
+  </symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/><path d="M9 12h10"/></symbol>
+  <symbol id="i-yoga" viewBox="0 0 24 24">
+    <circle cx="12" cy="5" r="2.2"/><path d="M12 8.5v5.2"/><path d="m7 11 5 2 5-2"/><path d="m8.5 20 3.5-6.3 3.5 6.3"/><path d="M4 20h5"/><path d="M15 20h5"/>
+  </symbol>
+  <symbol id="i-ride" viewBox="0 0 24 24">
+    <circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17h4.2L12 8h3l3.5 9"/><path d="M10.5 11h5"/><path d="M12 8l2.3-3H17"/>
+  </symbol>
+  <symbol id="i-run" viewBox="0 0 24 24">
+    <circle cx="15.5" cy="4.8" r="2"/><path d="m9.8 20 2.4-5.2 3-2.3-1.2-4.1-3.7 1.7-2 3"/><path d="m13.2 12.5 3 2.6 2.5 4.9"/><path d="M9.3 10.1 5.2 12"/><path d="m12.7 5.7 2.4 2.7 2.8.8"/>
+  </symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15.3A8.3 8.3 0 0 1 8.7 4 8.3 8.3 0 1 0 20 15.3Z"/></symbol>
+  <symbol id="i-font" viewBox="0 0 24 24"><path d="M4 19 9.2 5h2.1L16.5 19"/><path d="M6.1 14h8.3"/><path d="M18 11v8"/><path d="M15 14h6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.3 4.2L19 7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2 2.7 18a2 2 0 0 0 1.8 3h15a2 2 0 0 0 1.8-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3Z"/><path d="m19 16 .7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></symbol>
+</svg>
+
+<div class="prototype-strip">
+  <span class="prototype-label">运动模块 · 高保真交互原型</span>
+  <div class="prototype-actions" aria-label="原型显示控制">
+    <button class="prototype-button" id="typeToggle" type="button" aria-pressed="false">
+      <svg class="icon" aria-hidden="true"><use href="#i-font"></use></svg>
+      <span id="typeToggleLabel">字号 100%</span>
+    </button>
+    <button class="prototype-button" id="themeToggle" type="button" aria-pressed="false">
+      <svg class="icon" id="themeIcon" aria-hidden="true"><use href="#i-moon"></use></svg>
+      <span id="themeToggleLabel">深色</span>
+    </button>
+  </div>
+</div>
+
+<div class="app-shell">
+  <header class="app-header">
+    <div class="brand-lockup">
+      <div class="brand-mark" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" style="width:28px;height:28px"><use href="#i-trail"></use></svg>
+      </div>
+      <div class="brand-copy">
+        <p class="eyebrow">LifeTrack · 今天</p>
+        <h1>运动</h1>
+      </div>
+    </div>
+    <div class="header-note">
+      <span class="week-pill"><span class="live-dot" aria-hidden="true"></span>本周 11/16—11/22</span>
+      <span class="header-caption">不追配速，只留下身体真实走过的节奏。</span>
+    </div>
+  </header>
+
+  <main id="sport-main">
+    <section class="hero-card" aria-labelledby="week-title">
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 1100 420" preserveAspectRatio="none">
+          <circle class="hero-glow" cx="920" cy="35" r="260"></circle>
+          <path d="M-20 286C138 207 220 319 351 251s223-127 354-38 224 83 423-15"></path>
+          <path d="M-10 330c178-106 259 32 389-44s219-128 351-47 220 93 402 7"></path>
+          <path d="M70 390c76-84 166-101 250-47s177 79 269 17 211-66 318 12 187 38 258-13"></path>
+          <path d="M208 90c47 34 69 72 68 116s24 75 72 94"></path>
+        </svg>
+      </div>
+
+      <div class="hero-head">
+        <div>
+          <div class="hero-kicker">THIS WEEK · 第 47 周</div>
+          <h2 class="hero-title" id="week-title">本周节奏</h2>
+        </div>
+        <span class="hero-status" id="gapStatus"><span class="pulse" aria-hidden="true"></span>今天动过</span>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <div class="hero-stat-row">
+            <strong class="hero-total" id="weekMinutes">80</strong>
+            <span class="hero-unit">分钟</span>
+          </div>
+          <p class="hero-caption">一共 <strong id="weekCount">2</strong> 次，分布在 <strong id="weekDays">2</strong> 天</p>
+          <div class="hero-metrics" aria-label="本周补充摘要">
+            <div class="hero-metric"><strong id="weekAverage">40</strong><span>平均每次 / 分钟</span></div>
+            <div class="hero-metric"><strong id="weekTopSport">瑜伽</strong><span>本周最常见</span></div>
+            <div class="hero-metric"><strong id="weekLast">今天</strong><span>最近一次</span></div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-head">
+            <span class="chart-title">7 天运动轨迹</span>
+            <span class="chart-legend">柱高 = 分钟数</span>
+          </div>
+          <div class="week-chart" id="weekChart" role="img" aria-label="本周运动分钟数图表"></div>
+          <div class="hero-legend" id="weekLegend" aria-label="本周运动类型图例"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="content-grid">
+      <div class="stack">
+        <section class="card" aria-labelledby="sport-picker-title">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">01 · 选择类型</p>
+                <h2 class="section-title" id="sport-picker-title">今天想怎么动？</h2>
+                <p class="section-sub">只记录瑜伽、骑行、跑步。旧类型仍保留在历史记录里。</p>
+              </div>
+              <span class="section-note">点击切换</span>
+            </div>
+            <div class="sport-picker" id="sportPicker" role="group" aria-label="运动类型"></div>
+          </div>
+        </section>
+
+        <section class="card entry-card" aria-labelledby="entry-title">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">02 · 这次怎么动</p>
+                <h2 class="section-title" id="entry-title">记下这次运动</h2>
+                <p class="section-sub">时长按分钟累计，强度只用于回看，不推算热量或配速。</p>
+              </div>
+              <span class="ticket-label"><span class="ticket-dot" aria-hidden="true"></span>今日新记录</span>
+            </div>
+
+            <div class="duration-block">
+              <div class="field-label-row">
+                <label class="field-label" for="durationInput">运动时长</label>
+                <span class="field-hint">必填 · 1–1440 分钟</span>
+              </div>
+              <div class="duration-control">
+                <button class="round-step" type="button" data-step="-5" aria-label="减少 5 分钟">
+                  <svg class="icon" aria-hidden="true"><use href="#i-minus"></use></svg>
+                </button>
+                <div class="duration-field">
+                  <input id="durationInput" type="number" min="1" max="1440" step="1" inputmode="numeric" value="35" aria-describedby="durationReadout durationError">
+                  <span class="unit">分钟</span>
+                </div>
+                <button class="round-step" type="button" data-step="5" aria-label="增加 5 分钟">
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+                </button>
+              </div>
+              <p class="duration-readout" id="durationReadout">35 分钟</p>
+              <div class="range-wrap">
+                <label class="sr-only" for="durationRange">拖动选择运动时长</label>
+                <input id="durationRange" type="range" min="1" max="240" step="1" value="35">
+              </div>
+              <div class="presets" aria-label="常用时长">
+                <button class="preset" type="button" data-preset="15">15 分钟</button>
+                <button class="preset" type="button" data-preset="30">30 分钟</button>
+                <button class="preset" type="button" data-preset="45" aria-pressed="true">45 分钟</button>
+                <button class="preset" type="button" data-preset="60">1 小时</button>
+                <button class="preset" type="button" data-preset="90">1.5 小时</button>
+              </div>
+              <div class="field-error" id="durationError" role="alert" hidden>
+                <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+                <span>请输入 1–1440 之间的整数分钟。</span>
+              </div>
+            </div>
+
+            <div class="intensity-block">
+              <div class="field-label-row">
+                <span class="field-label" id="intensityLabel">运动强度</span>
+                <span class="field-hint">选一个最接近体感的</span>
+              </div>
+              <div class="intensity-options" id="intensityOptions" role="radiogroup" aria-labelledby="intensityLabel">
+                <button class="intensity-option" type="button" role="radio" aria-checked="false" data-intensity="low">
+                  <span class="intensity-name">低强度</span>
+                  <span class="intensity-desc">轻松 · 可以聊天</span>
+                </button>
+                <button class="intensity-option" type="button" role="radio" aria-checked="true" data-intensity="medium">
+                  <span class="intensity-name">中等强度</span>
+                  <span class="intensity-desc">舒适 · 微微出汗</span>
+                </button>
+                <button class="intensity-option" type="button" role="radio" aria-checked="false" data-intensity="high">
+                  <span class="intensity-name">高强度</span>
+                  <span class="intensity-desc">挑战 · 呼吸加快</span>
+                </button>
+              </div>
+              <p class="form-note">记录只用于回看自己的节奏，不构成训练建议。如有伤病或不适，请咨询专业人士。</p>
+            </div>
+          </div>
+        </section>
+
+
+      </div>
+
+      <div class="stack">
+        <section class="card recent-card" aria-labelledby="recent-title">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">最近记录</p>
+                <h2 class="section-title" id="recent-title">身体走过的路</h2>
+                <p class="section-sub">近 90 天只保留类型、时长与强度。</p>
+              </div>
+              <span class="section-note" id="recentCount">4 条</span>
+            </div>
+
+            <div class="filter-row" id="filterRow" role="group" aria-label="按运动类型筛选最近记录">
+              <button class="filter-chip" type="button" data-filter="all" aria-pressed="true">全部</button>
+              <button class="filter-chip" type="button" data-filter="yoga" aria-pressed="false">瑜伽</button>
+              <button class="filter-chip" type="button" data-filter="ride" aria-pressed="false">骑行</button>
+              <button class="filter-chip" type="button" data-filter="run" aria-pressed="false">跑步</button>
+            </div>
+
+            <ul class="record-list" id="recordList" aria-live="polite"></ul>
+
+            <div class="recent-footer">
+              <span>本周合计 <strong id="recentWeekTotal">80 分钟</strong></span>
+              <span>最多显示最近 30 条</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="insight-strip" aria-label="运动记录说明">
+          <span class="insight-icon" aria-hidden="true"><svg class="icon"><use href="#i-spark"></use></svg></span>
+          <div class="insight-copy">
+            <strong>这周已经动过 2 天</strong>
+            <span>比“连续打卡”更重要的是可持续。没有记录的日子，也会留在轨迹里。</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="page-foot">原型说明：周摘要、类型占比与最近记录均从已有的类型、时长、强度派生；没有新增业务字段。</p>
+  </main>
+</div>
+
+<div class="save-dock" role="region" aria-label="保存运动记录">
+  <div class="save-copy">
+    <strong id="saveTitle">跑步 · 35 分钟</strong>
+    <span id="saveMeta">中等强度 · 保存后更新本周摘要</span>
+  </div>
+  <button class="save-button" id="saveButton" type="button">
+    <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+    <span>保存这次运动</span>
+  </button>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+  <span id="toastText"></span>
+</div><script>
+(() => {
+  'use strict';
+
+  // 原型使用固定日期，保证 11 月 16 日至 22 日这一周的演示结果稳定。
+  const TODAY = '2026-11-19';
+  const WEEK_START = '2026-11-16';
+  const WEEK_END = '2026-11-22';
+  const WEEK_DAYS = [
+    { date: '2026-11-16', label: '一', long: '周一' },
+    { date: '2026-11-17', label: '二', long: '周二' },
+    { date: '2026-11-18', label: '三', long: '周三' },
+    { date: '2026-11-19', label: '四', long: '周四' },
+    { date: '2026-11-20', label: '五', long: '周五' },
+    { date: '2026-11-21', label: '六', long: '周六' },
+    { date: '2026-11-22', label: '日', long: '周日' }
+  ];
+
+  const SPORTS = {
+    yoga: { name: '瑜伽', icon: 'i-yoga', tone: '舒展' },
+    ride: { name: '骑行', icon: 'i-ride', tone: '远行' },
+    run: { name: '跑步', icon: 'i-run', tone: '向前' }
+  };
+
+  const INTENSITIES = {
+    low: '低强度',
+    medium: '中等强度',
+    high: '高强度'
+  };
+
+  const state = {
+    sport: 'run',
+    duration: '35',
+    intensity: 'medium',
+    filter: 'all',
+    records: [
+      { id: 'r-01', date: '2026-11-19', dateLabel: '今天', dateMeta: '11/19', time: '07:20', sport: 'yoga', minutes: 45, intensity: 'low' },
+      { id: 'r-02', date: '2026-11-17', dateLabel: '周二', dateMeta: '11/17', time: '18:40', sport: 'run', minutes: 35, intensity: 'high' },
+      { id: 'r-03', date: '2026-11-15', dateLabel: '周日', dateMeta: '11/15', time: '09:10', sport: 'ride', minutes: 75, intensity: 'medium' },
+      { id: 'r-04', date: '2026-11-14', dateLabel: '周六', dateMeta: '11/14', time: '16:25', sport: 'yoga', minutes: 20, intensity: 'low' }
+    ]
+  };
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const durationInput = $('#durationInput');
+  const durationRange = $('#durationRange');
+  const durationReadout = $('#durationReadout');
+  const durationError = $('#durationError');
+  const saveButton = $('#saveButton');
+  const toast = $('#toast');
+  let toastTimer = 0;
+
+  function iconMarkup(id) {
+    return '<svg class="icon" aria-hidden="true"><use href="#' + id + '"></use></svg>';
+  }
+
+  function formatMinutes(value) {
+    const minutes = Number(value);
+    if (!Number.isFinite(minutes) || minutes <= 0) return '0 分钟';
+    if (minutes < 60) return minutes + ' 分钟';
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? hours + ' 小时' : hours + ' 小时 ' + rest + ' 分';
+  }
+
+  function validDuration() {
+    const value = Number(state.duration);
+    return Number.isInteger(value) && value >= 1 && value <= 1440;
+  }
+
+  function weekRecords() {
+    return state.records.filter(record => record.date >= WEEK_START && record.date <= WEEK_END);
+  }
+
+  function weeklyTypeStats() {
+    const stats = {
+      yoga: { count: 0, minutes: 0 },
+      ride: { count: 0, minutes: 0 },
+      run: { count: 0, minutes: 0 }
+    };
+    weekRecords().forEach(record => {
+      if (!stats[record.sport]) return;
+      stats[record.sport].count += 1;
+      stats[record.sport].minutes += Number(record.minutes) || 0;
+    });
+    return stats;
+  }
+
+  function renderWeek() {
+    const records = weekRecords();
+    const total = records.reduce((sum, record) => sum + (Number(record.minutes) || 0), 0);
+    const activeDays = new Set(records.map(record => record.date)).size;
+    const stats = weeklyTypeStats();
+    const topSport = Object.keys(stats).sort((a, b) => stats[b].minutes - stats[a].minutes)[0];
+    const latest = state.records.slice().sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.time.localeCompare(a.time);
+    })[0];
+
+    $('#weekMinutes').textContent = String(total);
+    $('#weekCount').textContent = String(records.length);
+    $('#weekDays').textContent = String(activeDays);
+    $('#weekAverage').textContent = records.length ? String(Math.round(total / records.length)) : '—';
+    $('#weekTopSport').textContent = stats[topSport] && stats[topSport].minutes > 0 ? SPORTS[topSport].name : '—';
+    $('#weekLast').textContent = latest ? (latest.date === TODAY ? '今天' : latest.dateLabel) : '—';
+    $('#recentWeekTotal').textContent = formatMinutes(total);
+    $('#gapStatus').innerHTML = '<span class="pulse" aria-hidden="true"></span>' +
+      (records.some(record => record.date === TODAY) ? '今天动过' : '本周还没记录');
+
+    const dayTotals = WEEK_DAYS.map(day => {
+      const minutes = records
+        .filter(record => record.date === day.date)
+        .reduce((sum, record) => sum + (Number(record.minutes) || 0), 0);
+      return { ...day, minutes };
+    });
+    const maxValue = Math.max(60, ...dayTotals.map(day => day.minutes));
+    const chart = $('#weekChart');
+    chart.innerHTML = dayTotals.map(day => {
+      const height = day.minutes === 0 ? 5 : Math.max(9, Math.round((day.minutes / maxValue) * 78));
+      const classes = [
+        'day-col',
+        day.date === TODAY ? 'is-today' : '',
+        day.date > TODAY ? 'is-future' : ''
+      ].filter(Boolean).join(' ');
+      return '<div class="' + classes + '">' +
+        '<span class="day-value">' + (day.minutes > 0 ? day.minutes : '·') + '</span>' +
+        '<span class="bar-track" aria-hidden="true"><span class="bar-fill" style="height:' + height + 'px"></span></span>' +
+        '<span class="day-label">' + day.label + '</span>' +
+        '</div>';
+    }).join('');
+    chart.setAttribute('aria-label', '本周运动分钟数：' + dayTotals.map(day => day.long + (day.minutes > 0 ? day.minutes + '分钟' : '无记录')).join('，'));
+
+    const legend = [];
+    if (stats.yoga.minutes > 0) legend.push('<span class="legend-item"><span class="legend-dot" aria-hidden="true"></span>瑜伽 ' + stats.yoga.minutes + ' 分</span>');
+    if (stats.ride.minutes > 0) legend.push('<span class="legend-item"><span class="legend-dot ride" aria-hidden="true"></span>骑行 ' + stats.ride.minutes + ' 分</span>');
+    if (stats.run.minutes > 0) legend.push('<span class="legend-item"><span class="legend-dot run" aria-hidden="true"></span>跑步 ' + stats.run.minutes + ' 分</span>');
+    $('#weekLegend').innerHTML = legend.length ? legend.join('') : '<span class="legend-item">本周还没有运动记录</span>';
+
+    const insightTitle = $('.insight-copy strong');
+    const insightCopy = $('.insight-copy span');
+    if (insightTitle && insightCopy) {
+      insightTitle.textContent = activeDays > 0 ? '这周已经动过 ' + activeDays + ' 天' : '这一周还没有开始';
+      insightCopy.textContent = activeDays > 0
+        ? '比“连续打卡”更重要的是可持续。没有记录的日子，也会留在轨迹里。'
+        : '从一次短一点的散步式运动开始，也比等待完整计划更容易坚持。';
+    }
+  }
+
+  function renderSportPicker() {
+    const stats = weeklyTypeStats();
+    const picker = $('#sportPicker');
+    picker.innerHTML = Object.keys(SPORTS).map(key => {
+      const sport = SPORTS[key];
+      const item = stats[key];
+      const meta = item.count > 0 ? '本周 ' + item.count + ' 次 · ' + item.minutes + ' 分' : '本周还没记录';
+      return '<button class="sport-option" type="button" data-sport="' + key + '" aria-pressed="' + (state.sport === key) + '">' +
+        '<span class="sport-icon-box">' + iconMarkup(sport.icon) + '</span>' +
+        '<span class="sport-copy"><span class="sport-name">' + sport.name + '</span><span class="sport-meta">' + meta + '</span></span>' +
+        '</button>';
+    }).join('');
+  }
+
+  function renderRecordList() {
+    const filtered = state.filter === 'all'
+      ? state.records
+      : state.records.filter(record => record.sport === state.filter);
+    const list = $('#recordList');
+    $('#recentCount').textContent = filtered.length + ' 条';
+
+    if (!filtered.length) {
+      list.innerHTML = '<li class="empty-state">这个类型还没有记录。回到上方选一个类型，再保存一次。</li>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(record => {
+      const sport = SPORTS[record.sport];
+      if (!sport) return '';
+      return '<li class="record-item" aria-label="' + record.dateLabel + record.time + '，' + sport.name + '，' + formatMinutes(record.minutes) + '，' + INTENSITIES[record.intensity] + '">' +
+        '<span class="record-date"><strong>' + record.dateLabel + '</strong><span>' + record.dateMeta + '</span></span>' +
+        '<span class="record-main">' +
+          '<span class="record-icon">' + iconMarkup(sport.icon) + '</span>' +
+          '<span class="record-copy"><span class="record-title"><strong>' + sport.name + '</strong><span class="intensity-badge">' + INTENSITIES[record.intensity] + '</span></span>' +
+          '<span class="record-sub">' + record.time + ' · 记录于 LifeTrack</span></span>' +
+        '</span>' +
+        '<span class="record-duration">' + formatMinutes(record.minutes) + '</span>' +
+        '</li>';
+    }).join('');
+  }
+
+  function renderFilter() {
+    $$('.filter-chip').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.filter === state.filter));
+    });
+  }
+
+  function updateDurationUI(options = {}) {
+    const { syncInput = false, syncRange = true } = options;
+    const numeric = Number(state.duration);
+    const valid = validDuration();
+    if (syncInput) durationInput.value = state.duration;
+    if (syncRange && valid) durationRange.value = String(Math.min(240, numeric));
+    durationReadout.textContent = valid ? formatMinutes(numeric) : '请输入有效时长';
+    durationError.hidden = valid;
+    durationInput.setAttribute('aria-invalid', String(!valid));
+    $$('.preset').forEach(button => {
+      button.setAttribute('aria-pressed', String(valid && Number(button.dataset.preset) === numeric));
+    });
+    updateSaveState();
+  }
+
+  function updateSaveState() {
+    const valid = validDuration() && Boolean(SPORTS[state.sport]);
+    saveButton.disabled = !valid;
+    $('#saveTitle').textContent = SPORTS[state.sport].name + ' · ' + (valid ? formatMinutes(state.duration) : '时长待修正');
+    $('#saveMeta').textContent = valid
+      ? INTENSITIES[state.intensity] + ' · 保存后更新本周摘要'
+      : '请输入 1–1440 分钟后再保存';
+  }
+
+  function setDuration(value, syncInput = true) {
+    const numeric = Math.min(1440, Math.max(1, Math.round(Number(value) || 1)));
+    state.duration = String(numeric);
+    updateDurationUI({ syncInput, syncRange: true });
+  }
+
+  function setSport(sport) {
+    if (!SPORTS[sport]) return;
+    state.sport = sport;
+    renderSportPicker();
+    updateSaveState();
+  }
+
+  function setIntensity(intensity) {
+    if (!INTENSITIES[intensity]) return;
+    state.intensity = intensity;
+    $$('.intensity-option').forEach(button => {
+      button.setAttribute('aria-checked', String(button.dataset.intensity === intensity));
+    });
+    updateSaveState();
+  }
+
+  function showToast(message) {
+    $('#toastText').textContent = message;
+    toast.classList.add('is-visible');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 2600);
+  }
+
+  function saveRecord() {
+    if (!validDuration()) {
+      durationInput.focus();
+      return;
+    }
+    const sport = SPORTS[state.sport];
+    state.records.unshift({
+      id: 'r-' + Date.now(),
+      date: TODAY,
+      dateLabel: '今天',
+      dateMeta: '11/19',
+      time: '刚刚',
+      sport: state.sport,
+      minutes: Number(state.duration),
+      intensity: state.intensity
+    });
+    state.filter = 'all';
+    renderWeek();
+    renderSportPicker();
+    renderFilter();
+    renderRecordList();
+    updateSaveState();
+    showToast('已保存：' + sport.name + ' · ' + formatMinutes(state.duration) + ' · ' + INTENSITIES[state.intensity]);
+  }
+
+  function updateThemeControl() {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    $('#themeToggle').setAttribute('aria-pressed', String(dark));
+    $('#themeToggleLabel').textContent = dark ? '浅色' : '深色';
+    $('#themeIcon use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
+  }
+
+  function updateTypeControl() {
+    const large = document.documentElement.dataset.type === 'large';
+    $('#typeToggle').setAttribute('aria-pressed', String(large));
+    $('#typeToggleLabel').textContent = large ? '字号 200%' : '字号 100%';
+  }
+
+  document.addEventListener('click', event => {
+    const sportButton = event.target.closest('[data-sport]');
+    if (sportButton) {
+      setSport(sportButton.dataset.sport);
+      return;
+    }
+
+    const stepButton = event.target.closest('[data-step]');
+    if (stepButton) {
+      const current = validDuration() ? Number(state.duration) : 0;
+      setDuration(current + Number(stepButton.dataset.step));
+      return;
+    }
+
+    const presetButton = event.target.closest('[data-preset]');
+    if (presetButton) {
+      setDuration(presetButton.dataset.preset);
+      return;
+    }
+
+    const intensityButton = event.target.closest('[data-intensity]');
+    if (intensityButton) {
+      setIntensity(intensityButton.dataset.intensity);
+      return;
+    }
+
+    const filterButton = event.target.closest('[data-filter]');
+    if (filterButton) {
+      state.filter = filterButton.dataset.filter;
+      renderFilter();
+      renderRecordList();
+    }
+  });
+
+  durationInput.addEventListener('input', () => {
+    state.duration = durationInput.value.trim();
+    updateDurationUI({ syncInput: false, syncRange: true });
+  });
+
+  durationInput.addEventListener('blur', () => {
+    if (validDuration()) setDuration(state.duration);
+  });
+
+  durationRange.addEventListener('input', () => {
+    setDuration(durationRange.value);
+  });
+
+  saveButton.addEventListener('click', saveRecord);
+
+  $('#typeToggle').addEventListener('click', () => {
+    document.documentElement.dataset.type =
+      document.documentElement.dataset.type === 'large' ? 'normal' : 'large';
+    updateTypeControl();
+  });
+
+  $('#themeToggle').addEventListener('click', () => {
+    document.documentElement.dataset.theme =
+      document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    updateThemeControl();
+  });
+
+  // 初次渲染：切类型卡、周摘要、最近列表与固定保存区保持同一份状态。
+  renderWeek();
+  renderSportPicker();
+  renderFilter();
+  renderRecordList();
+  renderWeek();
+  setIntensity(state.intensity);
+  updateDurationUI({ syncInput: true, syncRange: true });
+  updateThemeControl();
+  updateTypeControl();
+})();
+</script>
+</body>
+</html>

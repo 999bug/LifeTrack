@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>记一杯咖啡 · LifeTrack 原型</title>
+<style>
+  :root {
+    color-scheme: light;
+    --stage: #e8e6de;
+    --stage-ink: #2b2520;
+    --stage-muted: #71685f;
+    --screen: #f8f6f0;
+    --surface: #fffdf9;
+    --surface-2: #f1ede5;
+    --surface-3: #e8e1d6;
+    --ink: #2b211c;
+    --muted: #7a6e65;
+    --faint: #a2978c;
+    --line: #e4ddd3;
+    --line-strong: #cfc4b7;
+    --espresso: #2f211b;
+    --espresso-2: #3e2b22;
+    --coffee: #95653d;
+    --coffee-soft: #ead8c0;
+    --crema: #ddb77e;
+    --cream: #f7ead8;
+    --leaf: #476b51;
+    --leaf-soft: #dce8dd;
+    --danger: #a85044;
+    --shadow: 0 26px 70px rgba(42, 31, 24, .22);
+    --focus: 0 0 0 3px rgba(71, 107, 81, .3);
+    --radius-xl: 28px;
+    --radius-lg: 22px;
+    --radius-md: 16px;
+    --radius-sm: 12px;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --stage: #111611;
+    --stage-ink: #f2ede5;
+    --stage-muted: #a6b0a7;
+    --screen: #121713;
+    --surface: #1b211b;
+    --surface-2: #232a23;
+    --surface-3: #2c342c;
+    --ink: #f1ece4;
+    --muted: #b7b0a7;
+    --faint: #8d877f;
+    --line: #343b34;
+    --line-strong: #4b554b;
+    --espresso: #251a16;
+    --espresso-2: #35261f;
+    --coffee: #d0a06d;
+    --coffee-soft: #49382c;
+    --crema: #e2bd83;
+    --cream: #f4e1c7;
+    --leaf: #a4cfad;
+    --leaf-soft: #2b3d2e;
+    --danger: #e19a90;
+    --shadow: 0 30px 80px rgba(0, 0, 0, .45);
+    --focus: 0 0 0 3px rgba(164, 207, 173, .3);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(circle at 12% 14%, rgba(158, 111, 69, .12), transparent 28rem),
+      radial-gradient(circle at 84% 82%, rgba(71, 107, 81, .12), transparent 30rem),
+      var(--stage);
+    color: var(--stage-ink);
+    font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background .25s ease, color .25s ease;
+  }
+  button, input, textarea { font: inherit; }
+  button { color: inherit; }
+  button, summary { -webkit-tap-highlight-color: transparent; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+  }
+  .stage {
+    width: min(1440px, 100%);
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: 40px clamp(24px, 5vw, 76px);
+    display: grid;
+    place-items: center;
+  }
+  .stage-layout {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(360px, 600px) 414px;
+    gap: clamp(54px, 8vw, 126px);
+    align-items: center;
+    justify-content: center;
+  }
+  .intro { max-width: 560px; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--stage-muted);
+  }
+  .eyebrow::before {
+    width: 28px;
+    height: 1px;
+    background: currentColor;
+    content: "";
+    opacity: .55;
+  }
+  .intro h1 {
+    margin: 20px 0 18px;
+    font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+    font-size: clamp(46px, 5.2vw, 76px);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -.045em;
+  }
+  .intro h1 em { color: var(--coffee); font-style: normal; }
+  .intro-lead {
+    max-width: 520px;
+    margin: 0;
+    color: var(--stage-muted);
+    font-size: 16px;
+    line-height: 1.8;
+  }
+  .principles {
+    display: grid;
+    gap: 15px;
+    margin: 34px 0 30px;
+    padding: 0;
+    list-style: none;
+  }
+  .principles li {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .principle-index {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(149, 101, 61, .32);
+    border-radius: 50%;
+    color: var(--coffee);
+    font-family: "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .principles strong {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 14px;
+    font-weight: 750;
+  }
+  .principles span:not(.principle-index) {
+    display: block;
+    color: var(--stage-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .design-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 18px;
+    padding-top: 24px;
+    border-top: 1px solid color-mix(in srgb, var(--stage-muted) 20%, transparent);
+  }
+  .swatches { display: flex; gap: 7px; }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--stage);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(100, 84, 71, .18);
+  }
+  .theme-toggle {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: auto;
+    padding: 4px;
+    border: 1px solid rgba(122, 110, 101, .24);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--stage) 75%, transparent);
+  }
+  .theme-toggle button {
+    min-height: 32px;
+    padding: 0 13px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--stage-muted);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .theme-toggle button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--stage-ink);
+    box-shadow: 0 3px 12px rgba(45, 33, 26, .12);
+  }
+  .device-shell {
+    width: 414px;
+    height: 884px;
+    padding: 10px;
+    border-radius: 46px;
+    background: linear-gradient(145deg, #221c18, #0e0c0a);
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .device-shell::after {
+    position: absolute;
+    inset: 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 35px;
+    pointer-events: none;
+    content: "";
+  }
+  .screen {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    border-radius: 36px;
+    background: var(--screen);
+    color: var(--ink);
+    transition: background .25s ease, color .25s ease;
+  }
+  .app-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding-bottom: 112px;
+  }
+  .app-scroll::-webkit-scrollbar { display: none; }
+  .status-bar {
+    height: 30px;
+    padding: 9px 22px 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .02em;
+  }
+  .status-icons { display: flex; align-items: center; gap: 6px; }
+  .signal { display: flex; align-items: end; gap: 2px; height: 11px; }
+  .signal i { display: block; width: 2px; border-radius: 1px; background: currentColor; }
+  .signal i:nth-child(1) { height: 4px; }
+  .signal i:nth-child(2) { height: 6px; }
+  .signal i:nth-child(3) { height: 8px; }
+  .signal i:nth-child(4) { height: 10px; }
+  .battery { width: 18px; height: 9px; border: 1.4px solid currentColor; border-radius: 3px; position: relative; }
+  .battery::after { position: absolute; right: -3px; top: 2px; width: 2px; height: 3px; border-radius: 0 1px 1px 0; background: currentColor; content: ""; }
+  .battery::before { position: absolute; inset: 2px; border-radius: 1px; background: currentColor; content: ""; }
+  .app-header {
+    height: 62px;
+    padding: 2px 18px 6px;
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .icon-button {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .icon-button:hover { background: var(--surface-2); }
+  .app-title { font-size: 17px; font-weight: 720; letter-spacing: -.02em; }
+  .time-chip {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .content { padding: 8px 18px 0; }
+  .hero-ticket {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding: 19px 18px 17px;
+    border-radius: var(--radius-xl);
+    background:
+      radial-gradient(circle at 87% 22%, rgba(221, 183, 126, .15), transparent 30%),
+      linear-gradient(135deg, var(--espresso), var(--espresso-2));
+    color: var(--cream);
+    box-shadow: 0 18px 35px rgba(47, 33, 27, .2);
+  }
+  .hero-ticket::before {
+    position: absolute;
+    z-index: -1;
+    width: 210px;
+    height: 210px;
+    top: -102px;
+    right: -68px;
+    border: 1px solid rgba(244, 225, 199, .11);
+    border-radius: 50%;
+    box-shadow: 0 0 0 19px rgba(244, 225, 199, .035), 0 0 0 38px rgba(244, 225, 199, .025);
+    content: "";
+  }
+  .hero-ticket::after {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 65px;
+    border-top: 1px dashed rgba(244, 225, 199, .2);
+    content: "";
+  }
+  .ticket-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: rgba(244, 225, 199, .64);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+  .ticket-no { font-variant-numeric: tabular-nums; letter-spacing: .1em; }
+  .ticket-main {
+    min-height: 112px;
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 15px;
+    align-items: center;
+  }
+  .cup-art { width: 92px; height: 92px; display: grid; place-items: center; position: relative; }
+  .cup-art::before { position: absolute; inset: 3px; border: 1px solid rgba(244, 225, 199, .18); border-radius: 50%; content: ""; }
+  .cup-art svg { width: 67px; height: 67px; }
+  .hero-copy { min-width: 0; position: relative; z-index: 1; }
+  .roast-label { display: block; margin-bottom: 3px; color: var(--crema); font-size: 10px; font-weight: 750; letter-spacing: .16em; }
+  .hero-copy h2 {
+    margin: 0 0 8px;
+    overflow: hidden;
+    font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+    font-size: clamp(30px, 8vw, 38px);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -.045em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hero-meta { margin: 0; color: rgba(244, 225, 199, .74); font-size: 12px; line-height: 1.55; }
+  .ticket-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 13px; }
+  .stat { min-width: 0; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+  .stat + .stat { padding-left: 12px; border-left: 1px solid rgba(244, 225, 199, .13); }
+  .stat strong { font-family: "Iowan Old Style", "Palatino Linotype", serif; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stat span { color: rgba(244, 225, 199, .56); font-size: 9px; font-weight: 650; }
+  .section { margin-top: 24px; }
+  .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+  .section-kicker { display: block; margin-bottom: 3px; color: var(--coffee); font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+  .section h3 { margin: 0; font-size: 17px; font-weight: 760; letter-spacing: -.025em; }
+  .text-button { padding: 7px 0 4px; border: 0; background: transparent; color: var(--coffee); font-size: 12px; font-weight: 750; cursor: pointer; }
+  .variety-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .variety-chip {
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 650;
+    transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease;
+  }
+  .variety-chip:hover { border-color: var(--coffee); transform: translateY(-1px); }
+  .variety-chip[aria-pressed="true"] { border-color: var(--espresso); background: var(--espresso); color: var(--cream); }
+  .variety-chip.custom { border-style: dashed; color: var(--coffee); }
+  .custom-entry { display: none; grid-template-columns: 1fr auto; gap: 8px; margin-top: 9px; }
+  .custom-entry.open { display: grid; }
+  .custom-entry input { min-width: 0; height: 42px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); }
+  .custom-entry button { padding: 0 16px; border: 0; border-radius: 12px; background: var(--coffee); color: #fffaf3; font-weight: 750; cursor: pointer; }
+  .preferences { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+  .pref-block { padding: 15px 15px 16px; }
+  .pref-block + .pref-block { border-top: 1px solid var(--line); }
+  .pref-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+  .pref-title { font-size: 13px; font-weight: 750; }
+  .pref-value { color: var(--muted); font-size: 11px; font-weight: 620; }
+  .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); }
+  .segmented.two { grid-template-columns: repeat(2, 1fr); }
+  .segmented button { min-height: 53px; padding: 7px 5px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); cursor: pointer; line-height: 1.15; }
+  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 9px rgba(51, 38, 29, .1); }
+  .segmented strong { display: block; font-size: 12px; font-weight: 750; }
+  .segmented small { display: block; margin-top: 4px; color: var(--faint); font-size: 9px; }
+  .segmented button[aria-pressed="true"] small { color: var(--coffee); }
+  .option-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .option-copy strong { display: block; font-size: 13px; font-weight: 750; }
+  .option-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+  .inline-segmented { flex: 0 0 auto; display: flex; gap: 3px; padding: 3px; border-radius: 11px; background: var(--surface-2); }
+  .inline-segmented button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; }
+  .inline-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 7px rgba(51,38,29,.08); }
+  .sugar-scale { padding: 3px 1px 0; }
+  .sugar-track { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .sugar-track::before { position: absolute; left: 9%; right: 9%; top: 11px; height: 1px; background: var(--line-strong); content: ""; }
+  .sugar-step { position: relative; z-index: 1; display: grid; justify-items: center; gap: 7px; padding: 0; border: 0; background: transparent; color: var(--faint); cursor: pointer; font-size: 9px; font-weight: 650; }
+  .sugar-dot { width: 22px; height: 22px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+  .sugar-dot::after { width: 5px; height: 5px; border-radius: 50%; background: var(--line-strong); content: ""; }
+  .sugar-step[aria-pressed="true"] { color: var(--ink); }
+  .sugar-step[aria-pressed="true"] .sugar-dot { border-color: var(--coffee); background: var(--coffee); box-shadow: 0 0 0 4px var(--coffee-soft); }
+  .sugar-step[aria-pressed="true"] .sugar-dot::after { background: #fffaf3; }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .switch-copy strong { display: block; font-size: 13px; font-weight: 750; }
+  .switch-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+  .switch { width: 46px; height: 27px; padding: 3px; border: 0; border-radius: 999px; background: var(--surface-3); cursor: pointer; transition: background .18s ease; }
+  .switch::after { display: block; width: 21px; height: 21px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 4px rgba(44, 33, 26, .2); content: ""; transition: transform .18s ease; }
+  .switch[aria-checked="true"] { background: var(--leaf); }
+  .switch[aria-checked="true"]::after { transform: translateX(19px); }
+  .info-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+  .info-card summary { min-height: 54px; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; cursor: pointer; }
+  .info-card summary::-webkit-details-marker { display: none; }
+  .summary-main { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+  .summary-main strong { font-size: 13px; font-weight: 750; }
+  .summary-main span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .chevron { flex: 0 0 auto; transition: transform .18s ease; }
+  .info-card[open] .chevron { transform: rotate(180deg); }
+  .info-body { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; padding: 0 15px 15px; }
+  .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 700; }
+  .field-input { height: 43px; display: flex; align-items: center; gap: 4px; padding: 0 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--screen); }
+  .field-input input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 15px; font-weight: 720; font-variant-numeric: tabular-nums; }
+  .field-input span { color: var(--muted); font-size: 9px; }
+  .note-box { width: 100%; min-height: 72px; padding: 12px 13px; resize: none; border: 1px solid var(--line); border-radius: 13px; outline: 0; background: var(--surface); color: var(--ink); font-size: 12px; line-height: 1.55; }
+  .note-box::placeholder { color: var(--faint); }
+  .save-bar { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; padding: 12px 18px max(16px, env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--screen) 19%, var(--screen) 100%); }
+  .save-inner { min-height: 66px; padding: 8px 8px 8px 15px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: 0 12px 32px rgba(44, 33, 26, .14); backdrop-filter: blur(18px); }
+  .save-summary { min-width: 0; }
+  .save-summary strong { display: block; overflow: hidden; font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+  .save-summary span { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+  .save-button { min-width: 128px; min-height: 48px; padding: 0 17px; border: 0; border-radius: 15px; background: var(--leaf); color: #fffdf8; display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 13px; font-weight: 800; box-shadow: 0 7px 18px rgba(71, 107, 81, .25); transition: transform .15s ease, filter .15s ease; }
+  .save-button:hover { filter: brightness(1.05); transform: translateY(-1px); }
+  .save-button:active { transform: translateY(0); }
+  html[data-theme="dark"] .save-button { color: #102014; box-shadow: 0 7px 18px rgba(0, 0, 0, .22); }
+  .toast { position: absolute; z-index: 20; left: 50%; bottom: 94px; max-width: calc(100% - 44px); padding: 11px 16px; border-radius: 999px; background: var(--espresso); color: var(--cream); box-shadow: 0 10px 30px rgba(35, 24, 18, .25); opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .2s ease, transform .2s ease; font-size: 11px; font-weight: 650; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 980px) {
+    .stage { padding: 30px 22px 46px; }
+    .stage-layout { grid-template-columns: 1fr; gap: 34px; justify-items: center; }
+    .intro { max-width: 660px; text-align: center; }
+    .intro h1 { font-size: clamp(42px, 10vw, 64px); }
+    .intro-lead { margin-inline: auto; }
+    .principles { max-width: 560px; margin-inline: auto; text-align: left; }
+    .design-footer { justify-content: center; }
+    .theme-toggle { margin-left: 0; }
+  }
+  @media (max-width: 520px) {
+    body { background: var(--screen); }
+    .stage { display: block; padding: 0; min-height: 100dvh; }
+    .stage-layout { display: block; }
+    .intro { display: none; }
+    .device-shell { width: 100vw; height: 100dvh; padding: 0; border-radius: 0; background: var(--screen); box-shadow: none; }
+    .device-shell::after { display: none; }
+    .screen { border-radius: 0; }
+    .status-bar { padding-top: max(9px, env(safe-area-inset-top)); height: max(34px, calc(env(safe-area-inset-top) + 25px)); }
+    .content { padding-inline: 16px; }
+    .save-bar { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="stage-layout">
+    <section class="intro" aria-labelledby="prototype-title">
+      <span class="eyebrow">LifeTrack · Coffee record</span>
+      <h1 id="prototype-title">把一杯咖啡，记成一张<em>点单笺</em>。</h1>
+      <p class="intro-lead">保留全部记录字段，但把首屏从“连续填写”改成“先看这杯，再做选择”。常用规格前置，风味偏好收进一张卡，份量与热量按需展开。</p>
+      <ol class="principles">
+        <li><span class="principle-index">01</span><div><strong>先确认喝什么</strong><span>品种多行展示，不再把选项藏进横向滚动；自定义品种就地新增。</span></div></li>
+        <li><span class="principle-index">02</span><div><strong>再用更少的点击定规格</strong><span>杯型、温度保持高优先级；浓度、糖度、奶油压缩到偏好区。</span></div></li>
+        <li><span class="principle-index">03</span><div><strong>边选边看到这杯的样子</strong><span>顶部杯贴实时汇总名称、规格、毫升和热量，保存前不再需要回看整张表。</span></div></li>
+      </ol>
+      <div class="design-footer" aria-label="设计说明">
+        <div class="swatches" aria-label="配色：浓缩咖啡、咖啡棕、奶油、林间绿">
+          <span class="swatch" style="background:#2f211b" title="浓缩咖啡"></span>
+          <span class="swatch" style="background:#95653d" title="咖啡棕"></span>
+          <span class="swatch" style="background:#ddb77e" title="奶油色"></span>
+          <span class="swatch" style="background:#476b51" title="林间绿"></span>
+        </div>
+        <div class="theme-toggle" aria-label="预览主题">
+          <button type="button" data-theme-choice="light" aria-pressed="true">浅色</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+    </section>
+    <div class="device-shell">
+      <section class="screen" aria-label="记录咖啡页面交互原型">
+        <div class="status-bar" aria-hidden="true">
+          <span>14:20</span>
+          <span class="status-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span style="font-size:9px;font-weight:800">5G</span><span class="battery"></span></span>
+        </div>
+        <div class="app-scroll" id="appScroll">
+          <header class="app-header">
+            <button class="icon-button" type="button" id="closeButton" aria-label="关闭">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+            <div class="app-title">记一杯咖啡</div>
+            <button class="time-chip" type="button" id="timeButton" aria-label="修改时间">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.25" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.6v4.8l3.2 1.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              今天 14:20
+            </button>
+          </header>
+          <div class="content">
+            <article class="hero-ticket" aria-label="当前咖啡摘要">
+              <div class="ticket-top"><span>今日咖啡 · 第 1 杯</span><span class="ticket-no">NO. 1119</span></div>
+              <div class="ticket-main">
+                <div class="cup-art" aria-hidden="true">
+                  <svg viewBox="0 0 80 80" fill="none">
+                    <path d="M24 26.5h34l-3.9 32.2a6 6 0 0 1-6 5.3H33.9a6 6 0 0 1-6-5.3L24 26.5Z" stroke="#F4E1C7" stroke-width="2.2"/>
+                    <path d="M57 32.5h3.2a8.8 8.8 0 0 1 0 17.6H56" stroke="#F4E1C7" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M27 37.4h28" stroke="#DDB77E" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M34 16.5c-3.1 3.1 3.1 4.8 0 7.9M45 14.5c-3.1 3.1 3.1 4.8 0 7.9" stroke="#DDB77E" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
+                  </svg>
+                </div>
+                <div class="hero-copy"><span class="roast-label">TODAY'S ORDER</span><h2 id="heroTitle">橙C美式</h2><p class="hero-meta" id="heroMeta">大杯 · 冰 · 不另外加糖</p></div>
+              </div>
+              <div class="ticket-stats" aria-label="咖啡数据">
+                <div class="stat"><strong id="caloriesStat">95</strong><span>KCAL</span></div>
+                <div class="stat"><strong id="amountStat">450</strong><span>ML</span></div>
+                <div class="stat"><strong id="shotsStat">1</strong><span>份浓缩</span></div>
+              </div>
+            </article>
+
+            <section class="section" aria-labelledby="variety-title">
+              <div class="section-heading"><div><span class="section-kicker">第一步</span><h3 id="variety-title">今天喝什么</h3></div><button class="text-button" type="button" id="customToggle">＋ 自定义</button></div>
+              <div class="variety-grid" id="varietyGrid">
+                <button class="variety-chip" type="button" data-variety="经典美式" data-calories="15" aria-pressed="false">经典美式</button>
+                <button class="variety-chip" type="button" data-variety="橙C美式" data-calories="95" aria-pressed="true">橙C美式</button>
+                <button class="variety-chip" type="button" data-variety="小黄油美式" data-calories="150" aria-pressed="false">小黄油美式</button>
+                <button class="variety-chip" type="button" data-variety="生椰拿铁" data-calories="190" aria-pressed="false">生椰拿铁</button>
+                <button class="variety-chip" type="button" data-variety="拿铁" data-calories="180" aria-pressed="false">拿铁</button>
+                <button class="variety-chip" type="button" data-variety="澳白" data-calories="130" aria-pressed="false">澳白</button>
+              </div>
+              <div class="custom-entry" id="customEntry"><input id="customInput" type="text" maxlength="40" placeholder="例如：桂花拿铁" aria-label="自定义品种名" /><button type="button" id="customAdd">添加</button></div>
+            </section>
+
+            <section class="section" aria-labelledby="preference-title">
+              <div class="section-heading"><div><span class="section-kicker">第二步</span><h3 id="preference-title">这杯怎么喝</h3></div></div>
+              <div class="preferences">
+                <div class="pref-block">
+                  <div class="pref-head"><span class="pref-title">杯型</span><span class="pref-value" id="sizeValue">大杯 · 450 ml</span></div>
+                  <div class="segmented" role="group" aria-label="杯型">
+                    <button type="button" data-size="medium" data-ml="350" aria-pressed="false"><strong>中杯</strong><small>350 ml</small></button>
+                    <button type="button" data-size="large" data-ml="450" aria-pressed="true"><strong>大杯</strong><small>450 ml</small></button>
+                    <button type="button" data-size="xlarge" data-ml="596" aria-pressed="false"><strong>超大杯</strong><small>596 ml · +¥3</small></button>
+                  </div>
+                </div>
+                <div class="pref-block">
+                  <div class="pref-head"><span class="pref-title">温度</span><span class="pref-value" id="tempValue">冰</span></div>
+                  <div class="segmented two" role="group" aria-label="温度">
+                    <button type="button" data-temp="ice" aria-pressed="true"><strong>冰</strong><small>清爽</small></button>
+                    <button type="button" data-temp="hot" aria-pressed="false"><strong>热</strong><small>暖香</small></button>
+                  </div>
+                </div>
+                <div class="pref-block">
+                  <div class="pref-head"><span class="pref-title">咖啡豆</span><span class="pref-value" id="beansValue">意式拼配</span></div>
+                  <div class="segmented two" role="group" aria-label="咖啡豆">
+                    <button type="button" data-beans="espresso" aria-pressed="true"><strong>意式拼配</strong><small>坚果 · 香醇</small></button>
+                    <button type="button" data-beans="dark" aria-pressed="false"><strong>深烘拼配</strong><small>黑巧 · 浓郁</small></button>
+                  </div>
+                </div>
+                <div class="pref-block">
+                  <div class="option-line">
+                    <div class="option-copy"><strong>浓度</strong><small>加浓会多一份浓缩</small></div>
+                    <div class="inline-segmented" role="group" aria-label="浓度">
+                      <button type="button" data-concentration="normal" aria-pressed="true">标准</button>
+                      <button type="button" data-concentration="extra" aria-pressed="false">加浓 +¥3</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="pref-block">
+                  <div class="pref-head"><span class="pref-title">糖度</span><span class="pref-value" id="sugarValue">不另外加糖</span></div>
+                  <div class="sugar-scale" role="group" aria-label="糖度">
+                    <div class="sugar-track">
+                      <button class="sugar-step" type="button" data-sugar="standard" aria-pressed="false"><span class="sugar-dot"></span><span>标准</span></button>
+                      <button class="sugar-step" type="button" data-sugar="less" aria-pressed="false"><span class="sugar-dot"></span><span>少甜</span></button>
+                      <button class="sugar-step" type="button" data-sugar="lighter" aria-pressed="false"><span class="sugar-dot"></span><span>少少甜</span></button>
+                      <button class="sugar-step" type="button" data-sugar="micro" aria-pressed="false"><span class="sugar-dot"></span><span>微甜</span></button>
+                      <button class="sugar-step" type="button" data-sugar="none" aria-pressed="true"><span class="sugar-dot"></span><span>不加糖</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="pref-block">
+                  <div class="switch-row"><div class="switch-copy"><strong>奶油</strong><small id="creamValue">不加奶油</small></div><button class="switch" type="button" id="creamSwitch" role="switch" aria-checked="false" aria-label="奶油"></button></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" aria-label="份量与热量">
+              <details class="info-card">
+                <summary>
+                  <span class="summary-main"><strong>份量与热量</strong><span id="detailSummary">450 ml · 95 kcal · 自动带出</span></span>
+                  <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 9.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </summary>
+                <div class="info-body">
+                  <div class="field"><label for="amountInput">份量</label><div class="field-input"><input id="amountInput" type="number" inputmode="numeric" min="1" max="2000" value="450" /><span>ml</span></div></div>
+                  <div class="field"><label for="caloriesInput">热量</label><div class="field-input"><input id="caloriesInput" type="number" inputmode="numeric" min="0" max="3000" value="95" /><span>kcal</span></div></div>
+                </div>
+              </details>
+            </section>
+
+            <section class="section" aria-labelledby="note-title">
+              <div class="section-heading"><div><span class="section-kicker">可选</span><h3 id="note-title">留一句备注</h3></div></div>
+              <textarea class="note-box" id="note" maxlength="200" placeholder="比如：午后提神，搭配了一块可颂"></textarea>
+            </section>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <div class="save-inner">
+            <div class="save-summary"><strong id="saveTitle">橙C美式</strong><span id="saveMeta">大杯 · 冰 · 不另外加糖</span></div>
+            <button class="save-button" type="button" id="saveButton">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5.5 12.5 4.2 4.1 8.8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              保存这杯
+            </button>
+          </div>
+        </div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+  const state = {
+    variety: '橙C美式',
+    calories: 95,
+    caloriesManuallyEdited: false,
+    amount: 450,
+    size: 'large',
+    sizeMl: 450,
+    temp: 'ice',
+    beans: 'espresso',
+    concentration: 'normal',
+    sugar: 'none',
+    cream: false
+  };
+  const labels = {
+    size: { medium: '中杯', large: '大杯', xlarge: '超大杯' },
+    temp: { ice: '冰', hot: '热' },
+    beans: { espresso: '意式拼配', dark: '深烘拼配' },
+    concentration: { normal: '标准浓度', extra: '加浓 1 份' },
+    sugar: { standard: '标准甜', less: '少甜', lighter: '少少甜', micro: '微甜', none: '不另外加糖' }
+  };
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const varietyGrid = $('#varietyGrid');
+  const customEntry = $('#customEntry');
+  const toast = $('#toast');
+  let toastTimer;
+
+  function setPressed(selector, activeValue, attribute) {
+    $$(selector).forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset[attribute] === activeValue));
+    });
+  }
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+  function update() {
+    const meta = `${labels.size[state.size]} · ${labels.temp[state.temp]} · ${labels.sugar[state.sugar]}`;
+    $('#heroTitle').textContent = state.variety;
+    $('#heroMeta').textContent = meta;
+    $('#saveTitle').textContent = state.variety;
+    $('#saveMeta').textContent = meta;
+    $('#caloriesStat').textContent = state.calories === '' ? '—' : state.calories;
+    $('#amountStat').textContent = state.amount;
+    $('#shotsStat').textContent = state.concentration === 'extra' ? '2' : '1';
+    $('#sizeValue').textContent = `${labels.size[state.size]} · ${state.sizeMl} ml`;
+    $('#tempValue').textContent = labels.temp[state.temp];
+    $('#beansValue').textContent = labels.beans[state.beans];
+    $('#sugarValue').textContent = labels.sugar[state.sugar];
+    $('#creamValue').textContent = state.cream ? '加奶油' : '不加奶油';
+    $('#detailSummary').textContent = state.calories === '' ? `${state.amount} ml · 热量待填 · 可选` : `${state.amount} ml · ${state.calories} kcal · 自动带出`;
+    $('#amountInput').value = state.amount;
+    $('#caloriesInput').value = state.calories;
+  }
+  varietyGrid.addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-variety]');
+    if (!chip) return;
+    state.variety = chip.dataset.variety;
+    $$('[data-variety]', varietyGrid).forEach((button) => button.setAttribute('aria-pressed', String(button === chip)));
+    if (!state.caloriesManuallyEdited) state.calories = chip.dataset.calories ? Number(chip.dataset.calories) : '';
+    update();
+  });
+  $('#customToggle').addEventListener('click', () => {
+    customEntry.classList.toggle('open');
+    if (customEntry.classList.contains('open')) $('#customInput').focus();
+  });
+  $('#customAdd').addEventListener('click', addCustomVariety);
+  $('#customInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') addCustomVariety(); });
+  function addCustomVariety() {
+    const input = $('#customInput');
+    const value = input.value.trim();
+    if (!value) { input.focus(); return; }
+    const existing = $$('[data-variety]', varietyGrid).find((button) => button.dataset.variety === value);
+    const chip = existing || document.createElement('button');
+    if (!existing) {
+      chip.className = 'variety-chip';
+      chip.type = 'button';
+      chip.dataset.variety = value;
+      chip.textContent = value;
+      varietyGrid.appendChild(chip);
+    }
+    chip.click();
+    input.value = '';
+    customEntry.classList.remove('open');
+    showToast('已添加自定义品种');
+  }
+  $$('[data-size]').forEach((button) => button.addEventListener('click', () => {
+    state.size = button.dataset.size;
+    state.sizeMl = Number(button.dataset.ml);
+    state.amount = state.sizeMl;
+    setPressed('[data-size]', state.size, 'size');
+    update();
+  }));
+  $$('[data-temp]').forEach((button) => button.addEventListener('click', () => {
+    state.temp = button.dataset.temp;
+    setPressed('[data-temp]', state.temp, 'temp');
+    update();
+  }));
+  $$('[data-beans]').forEach((button) => button.addEventListener('click', () => {
+    state.beans = button.dataset.beans;
+    setPressed('[data-beans]', state.beans, 'beans');
+    update();
+  }));
+  $$('[data-concentration]').forEach((button) => button.addEventListener('click', () => {
+    state.concentration = button.dataset.concentration;
+    setPressed('[data-concentration]', state.concentration, 'concentration');
+    update();
+  }));
+  $$('[data-sugar]').forEach((button) => button.addEventListener('click', () => {
+    state.sugar = button.dataset.sugar;
+    setPressed('[data-sugar]', state.sugar, 'sugar');
+    update();
+  }));
+  $('#creamSwitch').addEventListener('click', () => {
+    state.cream = !state.cream;
+    $('#creamSwitch').setAttribute('aria-checked', String(state.cream));
+    update();
+  });
+  $('#amountInput').addEventListener('input', (event) => {
+    state.amount = Math.max(1, Math.min(2000, Number(event.target.value) || 1));
+    update();
+  });
+  $('#caloriesInput').addEventListener('input', (event) => {
+    const value = event.target.value.trim();
+    state.calories = value === '' ? '' : Math.max(0, Math.min(3000, Number(value) || 0));
+    state.caloriesManuallyEdited = true;
+    update();
+  });
+  $('#saveButton').addEventListener('click', () => showToast(`已保存：${state.variety} · ${labels.size[state.size]} · ${state.amount} ml`));
+  $('#closeButton').addEventListener('click', () => showToast('原型预览：关闭不会丢失当前选择'));
+  $('#timeButton').addEventListener('click', () => showToast('原型预览：这里可打开日期与时间选择器'));
+  $$('[data-theme-choice]').forEach((button) => button.addEventListener('click', () => {
+    document.documentElement.dataset.theme = button.dataset.themeChoice;
+    $$('[data-theme-choice]').forEach((choice) => choice.setAttribute('aria-pressed', String(choice === button)));
+  }));
+  update();
+</script>
+</body>
+</html>

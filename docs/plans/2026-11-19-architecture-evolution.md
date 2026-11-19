@@ -68,9 +68,9 @@
 **Files:** Create `core/model/RecordTypeDefinition.kt`、`core/ui/RecordTypeUiRegistry.kt`；Modify `DetailSpecRegistry`、`LifeTrackApp.kt`、`LifeTrackTokens.kt`、`RecordDetailPresentation.kt`、`SensitiveTypes.kt`、`TodayScreen.kt`、`RecordSummary.kt`
 **Interfaces:** Produces 单一类型描述与 UI 贡献注册；新增类型时由完整性测试检查所有注册项。
 
-- [ ] 收敛类型元数据、图标、颜色、详情和评估入口。
-- [ ] 用测试保证每个内置类型都有字段规格、UI 描述和敏感等级。
-- [ ] 不改变现有类型码和备份兼容性。
+- [x] 收敛类型元数据、图标、颜色、详情和评估入口。
+- [x] 用测试保证每个内置类型都有字段规格、UI 描述和敏感等级。
+- [x] 不改变现有类型码和备份兼容性。
 
 ### Task 7: 历史记录 Keyset 分页
 

@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.7.0",
+        date = "2026-11-19",
+        summary = "咖啡和茶拆成两个独立记录；咖啡新增杯型、温度、豆子、糖度和热量，茶能记茶种与杯数毫升；品种都能自定义"
+    ),
+    VersionNote(
         version = "0.6.16",
         date = "2026-11-17",
         summary = "改经期起止先点中经期日，开始日终于能往后挪；填过流量 / 症状的日子会拦下修改，去掉了撤销按钮"

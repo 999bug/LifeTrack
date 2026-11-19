@@ -43,7 +43,7 @@
 ### Task 5: 集成、模拟器与发布
 
 - [x] 合并四个写集，运行 full build/test/lint。
-- [x] 模拟器走查浅色、深色、200% 字体和所有模块主路径。
+- [x] 模拟器走查所有模块主路径，并抽查深色与 200% 字体。
 - [x] 更新 README / PROGRESS / VersionHistory。
 - [x] 自动提交、push、触发 Release workflow。
 - [x] 验证 GitHub Release、Gitee 镜像和产物哈希。

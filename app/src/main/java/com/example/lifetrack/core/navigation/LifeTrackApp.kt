@@ -22,22 +22,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
+
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+import com.example.lifetrack.core.model.PoopFields
+
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
-import com.example.lifetrack.core.model.RecordDetail
+
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.core.model.toEntity
+import com.example.lifetrack.core.model.toPoopRecord
 import com.example.lifetrack.feature.coffee.CoffeeEditorDialog
 import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
@@ -63,22 +65,18 @@ import com.example.lifetrack.feature.tea.TeaEditorDialog
 import com.example.lifetrack.feature.water.WaterEditorDialog
 
 private data class Destination(
-    val route: String,
+    val route: Any,
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
 
 private val destinations = listOf(
-    Destination("today", "今天", Icons.Filled.Home),
-    Destination("history", "历史", Icons.Filled.CalendarMonth),
-    Destination("statistics", "统计", Icons.Filled.BarChart),
-    Destination("settings", "设置", Icons.Filled.Settings)
+    Destination(TodayRoute, "今天", Icons.Filled.Home),
+    Destination(HistoryRoute, "历史", Icons.Filled.CalendarMonth),
+    Destination(StatisticsRoute, "统计", Icons.Filled.BarChart),
+    Destination(SettingsRoute, "设置", Icons.Filled.Settings)
 )
 
-private fun BackupRecord.toPoopRelation() = PoopRecordRelation(
-    event = event,
-    detail = (detail as? RecordDetail.Poop)?.toEntity(event.id)
-)
 
 @Composable
 fun LifeTrackApp(
@@ -93,9 +91,9 @@ fun LifeTrackApp(
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
+    val currentDestination = backStackEntry?.destination
     var editorVisible by remember { mutableStateOf(false) }
-    var editorTypeCode by remember { mutableStateOf(DEFAULT_POOP_TYPE.code) }
+    var editorTypeCode by remember { mutableStateOf(PoopFields.TYPE_CODE) }
     /** 运动编辑器预选类型：子应用点「瑜伽」时带过来，其他入口为 null。 */
     var editorSport by remember { mutableStateOf<String?>(null) }
     var editingRecord by remember { mutableStateOf<BackupRecord?>(null) }
@@ -118,11 +116,11 @@ fun LifeTrackApp(
     Scaffold(
         bottomBar = {
             // 记录项目是设置下的子页面，隐藏底部导航，避免「看似平级」的误解
-            if (destinations.any { it.route == currentRoute }) {
+            if (currentDestination != null && destinations.any { currentDestination.hasRoute(it.route::class) }) {
                 NavigationBar {
                     destinations.forEach { destination ->
                         NavigationBarItem(
-                            selected = currentRoute == destination.route,
+                            selected = currentDestination.hasRoute(destination.route::class),
                             onClick = {
                                 navController.navigate(destination.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
@@ -136,7 +134,7 @@ fun LifeTrackApp(
                             // P1：选中态不能只让图标 / 胶囊变色，文字也要同步高亮，
                             // 否则灰字在深底色上看起来像未选中。
                             label = {
-                                val selected = currentRoute == destination.route
+                                val selected = currentDestination.hasRoute(destination.route::class)
                                 Text(
                                     text = destination.label,
                                     color = if (selected) {
@@ -156,30 +154,30 @@ fun LifeTrackApp(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "today",
+            startDestination = TodayRoute,
             modifier = androidx.compose.ui.Modifier.padding(innerPadding)
         ) {
-            composable("today") {
+            composable<TodayRoute> {
                 TodayScreen(
                     viewModel = todayViewModel,
                     periodViewModel = periodViewModel,
                     onQuickRecord = todayViewModel::quickRecord,
                     onWaterQuick = todayViewModel::quickWaterRecord,
-                    onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
+                    onDetailedRecord = { openEditor(PoopFields.TYPE_CODE, null) },
                     onWaterRecord = { openEditor(WaterFields.TYPE_CODE, null) },
                     onCoffeeRecord = { openEditor(CoffeeFields.TYPE_CODE, null) },
                     onTeaRecord = { openEditor(TeaFields.TYPE_CODE, null) },
                     onSportRecord = { openEditor(SportFields.TYPE_CODE, null) },
-                    onOpenSport = { navController.navigate("sport") },
-                    onOpenPeriod = { navController.navigate("cycle") },
-                    onOpenSettings = { navController.navigate("settings") },
+                    onOpenSport = { navController.navigate(SportRoute) },
+                    onOpenPeriod = { navController.navigate(CycleRoute) },
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
                     onShowDetail = { detailRecord = it },
                     onEdit = { openEditor(it.event.typeCode, it) },
                     onDelete = { pendingDeleteId = it },
                     onEndPoop = todayViewModel::endPoopRecord
                 )
             }
-            composable("history") {
+            composable<HistoryRoute> {
                 HistoryScreen(
                     viewModel = historyViewModel,
                     onShowDetail = { detailRecord = it },
@@ -187,28 +185,28 @@ fun LifeTrackApp(
                     onDelete = { pendingDeleteId = it }
                 )
             }
-            composable("statistics") { StatisticsScreen(viewModel = statisticsViewModel) }
-            composable("settings") {
+            composable<StatisticsRoute> { StatisticsScreen(viewModel = statisticsViewModel) }
+            composable<SettingsRoute> {
                 SettingsScreen(
                     viewModel = viewModel,
                     appLockViewModel = appLockViewModel,
                     updateViewModel = updateViewModel,
-                    onOpenModules = { navController.navigate("modules") }
+                    onOpenModules = { navController.navigate(ModulesRoute) }
                 )
             }
-            composable("modules") {
+            composable<ModulesRoute> {
                 ModuleManagementScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable("cycle") {
+            composable<CycleRoute> {
                 PeriodScreen(
                     viewModel = periodViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable("sport") {
+            composable<SportRoute> {
                 SportScreen(
                     viewModel = sportViewModel,
                     onBack = { navController.popBackStack() },
@@ -277,7 +275,7 @@ fun LifeTrackApp(
                 }
             )
             else -> PoopEditorDialog(
-                record = editingRecord?.toPoopRelation(),
+                record = editingRecord?.toPoopRecord(),
                 onDismiss = { editorVisible = false },
                 onSave = { draft ->
                     todayViewModel.saveRecord(editingRecord?.event?.id, draft)

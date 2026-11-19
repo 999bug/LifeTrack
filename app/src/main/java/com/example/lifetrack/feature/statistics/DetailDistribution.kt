@@ -1,6 +1,6 @@
 package com.example.lifetrack.feature.statistics
 
-import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.domain.model.StatDetail
 
 /**
  * 形态分布。每个字段独立用自己的「已填写条数」作分母：
@@ -29,7 +29,7 @@ data class DetailDistribution(
             filledUrgency + filledAbdominal + filledIncomplete > 0
 
     companion object {
-        fun from(details: List<StatDetailProjection>, totalRecords: Int): DetailDistribution {
+        fun from(details: List<StatDetail>, totalRecords: Int): DetailDistribution {
             val bristol = IntArray(7)
             val amount = IntArray(3)
             val effort = IntArray(3)

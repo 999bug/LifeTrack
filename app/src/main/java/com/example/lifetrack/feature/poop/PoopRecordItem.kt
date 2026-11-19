@@ -30,8 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+
+import com.example.lifetrack.domain.model.PoopRecord
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
 import java.time.Instant
@@ -43,12 +43,12 @@ private val poopItemTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 /** 首页 / 历史中的排便记录卡：暖棕识别色、关键字段摘要，编辑与删除保持独立点击区。 */
 @Composable
 fun PoopRecordItem(
-    record: PoopRecordRelation,
+    record: PoopRecord,
     onShowDetail: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val accent = LifeTrackTokens.ModuleColors.of(DEFAULT_POOP_TYPE.code)
+    val accent = LifeTrackTokens.ModuleColors.of(PoopFields.TYPE_CODE)
     val detail = record.detail
     val timeLabel = runCatching {
         Instant.ofEpochMilli(record.event.occurredAtEpochMillis)

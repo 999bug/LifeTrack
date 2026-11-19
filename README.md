@@ -1,6 +1,6 @@
 # 生活记（LifeTrack）Android 工程骨架
 
-> 最新已发布：0.7.1（2026-11-19，versionCode 24）· 统一七类记录页面的模块配色、全屏录入与大字号体验 · 文档核对日期：2026-11-19 · 许可证：MIT
+> 最新已发布：0.7.2（2026-11-19，versionCode 25）· 修正咖啡名称并稳定历史记录分页 · 文档核对日期：2026-11-19 · 许可证：MIT
 
 「生活记」是一个 Local First 的个人生活与身体状态记录 App。当前实现排便、饮水、咖啡、茶、运动、亲密关系、月经七类事件：排便走专用 `poop_detail` 表，其余六类走通用 `event_detail` 表；数据层按「通用事件 + 可选详情」组织，新增类型只需注册类型与字段规格，不必再升 Room 版本。亲密关系与月经为高敏感模块，**默认停用**，需在「设置 → 记录项目」主动开启；月经另提供一个隐藏底导的经期子应用（日历选日 + 逐行填写）。
 
@@ -11,11 +11,11 @@
 
 - 每个 Release 附 `LifeTrack-<版本名>-release.apk` 与同名 `.sha256` 校验文件；两端是同一份 CI 产物，签名一致。
 - 正式签名包，Android 8.0（API 26）及以上可直接安装；系统可能要求允许「安装未知应用」。
-- 最新已发布版本 `0.7.1`（versionCode 24，2026-11-19）；校验示例：`Get-FileHash .\LifeTrack-0.7.1-release.apk -Algorithm SHA256`。
+- 最新已发布版本 `0.7.2`（versionCode 25，2026-11-19）；校验示例：`Get-FileHash .\LifeTrack-0.7.2-release.apk -Algorithm SHA256`。
 - 应用内检查更新以 Gitee 为唯一分发源：只有 APK 与 `.sha256` 两份附件都同步完成、且下载地址预检通过后才提示「可下载」。同步窗口期内只显示「安装包同步中」并按 30s → 1m → 2m → 5m 自动退避重试，不会误报可更新，也不会回退到 GitHub 下载（避免国内用户去下境外包）。Gitee 完全不可用时仅用 GitHub 提供版本信息，需手动前往发布页。
 - **发版无需手填版本号**：在 Actions 手动触发 `Release APK`，CI 从最高 tag 自动推 patch+1、从 gradle 推 `versionCode+1`，构建成功后把版本改动提交回 `main`、打 tag 并同步 Gitee。想跳小版本时才在 `version` 输入框手填（如 `v0.7.0`）。详见 [发布与签名指南](docs/release-guide.md) §2。
 
-> 本 README 描述 `main` 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。已发布的 0.7.1 在 0.7.0 的咖啡 / 茶拆分基础上，统一了七类记录页面的模块配色、全屏录入骨架和大字号布局。
+> 本 README 描述 `main` 分支的当前状态；已发布 APK 的功能可能落后于下文「当前已实现」列表，以下载到的 Release 说明为准。已发布的 0.7.2 修正咖啡模块旧名称，并把历史记录改为固定页大小、基于时间和 ID 的游标分页。
 
 Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `allowBackup="false"`，应用内提供 JSON 备份导出 / 恢复（设置页「数据与备份」，默认折叠）；**升级时不要卸载旧版本**——卸载会永久丢失本地记录。发版与密钥管理见 [发布与签名指南](docs/release-guide.md)。
 
@@ -26,7 +26,7 @@ Release 包用固定 keystore 签名，后续版本可覆盖安装。本项目 `
 - 快速打卡：点击后立即记录当前时刻。
 - 详细记录：原生日期与时间选择器、布里斯托 1–7 型、排便量、费力程度、便意急迫感、腹部不适、排不净感、用时和备注；详情字段均可空。编辑器已抽出通用「事件壳」（日期 / 时间 / 时区 / 备注 / 选择器），各记录类型只需提供详情插槽。
 - 排便用时：第一次记录只记开始时间（= 事件时刻），再次进入这条记录（或今日列表里点「结束」）时把当前时间记为结束时间，用时自动算出；超过 60 分钟判为本次用时无效——记录本身保留、用时留空，可手动填写 1–60 分钟。自动计时与手填值互斥：手填时不再写结束时间。
-- 历史：默认最近 30 天，可向前分页加载更早记录；**列表按类型分派展示全部模块**（排便、饮水、咖啡、茶、运动、亲密关系、月经），支持按日期范围筛选并一键清除，按记录发生时保存的本地日期分组，支持编辑和删除；另有月历视图，格子内显示当天出现过的类型图标（去重后最多 3 个，今天实心高亮），点按任意日期从底部弹出当天全部记录，无记录日显示空态说明。
+- 历史：默认最近 30 天，可向前分页加载更早记录；列表按固定 100 条/页的 `(发生时间, ID)` 游标加载，同毫秒记录不会漏页或重复；**列表按类型分派展示全部模块**（排便、饮水、咖啡、茶、运动、亲密关系、月经），支持按日期范围筛选并一键清除，按记录发生时保存的本地日期分组，支持编辑和删除；另有月历视图，格子内显示当天出现过的类型图标（去重后最多 3 个，今天实心高亮），点按任意日期从底部弹出当天全部记录，无记录日显示空态说明。
 - 记录详情：今天页与历史页的记录卡片整行可点击，弹出只读底部弹窗，按类型展示完整信息（发生时间与本地日期 / 时区、备注、各类型专属详情字段、创建 / 更新时间与记录 ID）；未填写的字段显式显示「未记录」，卡片原有的编辑 / 删除按钮不变。字段文案由 `RecordDetailPresentation` 统一生成并配单测，时间沿用记录自身的 zoneId；200% 字体下键值行自动上下堆叠。
 - 统计：周 / 月 / 年三档切换，可上下翻页查看历史周期；**顶部可按类型筛选（全部 / 各模块），默认全部类型**，与首页、历史、月历同一口径；包含总次数与环比、日均（年视图为月均）、单日最高、最长连续、常见 2 小时时段，图表为自绘 Canvas。新增时段分布（24 根逐小时柱，高亮常见 2 小时窗口）与形态分布（布里斯托、排便量、费力程度、身体感受），跟随当前周期统计；**形态分布只在「排便」口径下展示**，避免与其他类型总数串分母。详情字段可空，按各字段「已填写条数」分别计分母，未填写不计入也不画 0 型柱。
 - 首页次数卡：显示今日总次数，并按已启用模块给出各自次数，不再只数排便。
@@ -139,9 +139,9 @@ Windows 使用 `gradlew.bat`。
 说明：`gradle/wrapper/` 内包含官方 `gradle-wrapper.jar`，`gradlew` 是官方脚本，不再依赖自制的下载引导脚本。本机实测（2026-11-09，Windows 11 + JDK 21）：
 
 - `./gradlew :app:assembleDebug` 通过，产物 `app/build/outputs/apk/debug/LifeTrack-0.6.0-debug.apk`（约 30 MB）。APK 命名规则为 `LifeTrack-<versionName>-<buildType>.apk`，由 `androidComponents.onVariants` 设置。
-- `./gradlew :app:testDebugUnitTest` 通过。2026-11-09 基线 151 项：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。2026-11-10 A10 实测 **29 个类 / 204 项 / 0 失败**（新增 `IntimacyFieldsTest` 4、`BackupIntimacyDetailTest` 6，`DetailSpecTest` +1、`RecordDetailPresentationTest` +2，以及 C 包新增用例）。2026-11-12 A9 实测 **336 项 / 0 失败**（新增 `MenstruationFieldsTest` 9、`PeriodMonthTest` 7、`PeriodDayFormTest` 13、`MenstrualCycleTest` 16、`PeriodFillTest` 9、`BackupMenstruationDetailTest` 12，共 66 项）。
+- `./gradlew :app:testDebugUnitTest` 通过。2026-11-09 基线 151 项：`RecordTimeMapperTest` 3、`StatsAggregatorTest` 14、`BackupCodecTest` 14、`BackupCodecV2Test` 13、`BackupWaterDetailTest` 6、`BackupCoffeeDetailTest` 7、`BackupSportDetailTest` 5、`DetailSpecTest` 11、`PickerDateMapperTest` 5、`CalendarMonthTest` 6、`RecordDetailCodecTest` 5、`CoffeeFieldsTest` 5、`SportFieldsTest` 3、`DetailDistributionTest` 6、`ModuleOrderingTest` 5、`GitHubReleaseCheckerTest` 7、`RecordDetailPresentationTest` 11、`ReleasePayloadParserTest` 6、`ReleaseFetcherTest` 6、`ApkFileValidatorTest` 3、`PassphraseEnvelopeTest` 6、`SqliteFileHeaderTest` 4。2026-11-10 A10 实测 **29 个类 / 204 项 / 0 失败**（新增 `IntimacyFieldsTest` 4、`BackupIntimacyDetailTest` 6，`DetailSpecTest` +1、`RecordDetailPresentationTest` +2，以及 C 包新增用例）。2026-11-12 A9 实测 **336 项 / 0 失败**（新增 `MenstruationFieldsTest` 9、`PeriodMonthTest` 7、`PeriodDayFormTest` 13、`MenstrualCycleTest` 16、`PeriodFillTest` 9、`BackupMenstruationDetailTest` 12，共 66 项）。2026-11-19 架构演进后实测 **59 个测试类 / 421 项 / 0 失败**，新增 ViewModel 状态流、类型 UI 注册表与分页状态测试。
 - `./gradlew :app:lintDebug` 通过（无 error，仅版本提示类 warning），已接入 CI 与发布流水线。
-- `./gradlew :app:connectedDebugAndroidTest` 通过，共 14 个用例（`LocalDatabaseTest` 3 + `MigrationTest` 2 + `DatabaseKeyStoreTest` 5 + `DatabaseEncryptionTest` 4）：1→2 真实迁移、按类型过滤查询、通用详情读写与级联删除、Keystore 封装/篡改/密钥缺失、明文 v1/v2 库加密搬迁、中断恢复与错误口令拒绝。
+- `./gradlew :app:connectedDebugAndroidTest` 通过，共 21 个用例（`LocalDatabaseTest` 5 + `MigrationTest` 4 + `DatabaseEncryptionTest` 4 + `DatabaseKeyStoreTest` 5 + `MainScreensComposeTest` 3）：在原有迁移、加密和过滤查询之外，新增同毫秒 Keyset 分页以及今日、历史、统计三个 Compose 主路径。
 
 未验证项：仪器测试目前只在模拟器（API 37）跑过，真机仪器测试尚未执行；真机「卸载重装丢数据」验证仍待补。真机安装、应用内检查更新、0.4.0 → 0.5.0 覆盖安装，以及 **0.5.0 → 0.6.0 加密版覆盖安装与首次启动迁移**均已由用户 2026-11-10 确认通过；模拟器上用 0.4.0 明文库（含未落盘 WAL）做的加密覆盖安装迁移也已实测通过。
 

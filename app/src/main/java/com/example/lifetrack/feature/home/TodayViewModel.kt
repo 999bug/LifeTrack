@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.lifetrack.core.ui.ActionFeedback
 import com.example.lifetrack.core.ui.launchAction
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
@@ -13,7 +13,8 @@ import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
-import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.domain.repository.RecordRepository
+import com.example.lifetrack.domain.repository.TypeCatalogRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -32,7 +33,8 @@ private const val QUICK_WATER_AMOUNT_ML = 250
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TodayViewModel(
-    private val repository: TrackRepository,
+    private val recordRepository: RecordRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
     val actionFeedback = ActionFeedback()
@@ -40,7 +42,7 @@ class TodayViewModel(
 
     val today: StateFlow<LocalDate> = todaySource.today
 
-    val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
+    val trackTypes: StateFlow<List<TrackType>> = typeCatalogRepository.observeTrackTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     fun refreshToday() {
         todaySource.refresh()
@@ -54,18 +56,18 @@ class TodayViewModel(
             }
         }
         viewModelScope.launch {
-            repository.ensureDefaultTypes()
-            repository.migrateLegacyTeaRecords()
+            typeCatalogRepository.ensureDefaultTypes()
+            typeCatalogRepository.migrateLegacyTeaRecords()
         }
     }
     val todayRecords: StateFlow<List<BackupRecord>> = today
-        .flatMapLatest { repository.observeRecordsForDate(it.toString()) }
+        .flatMapLatest { recordRepository.observeRecordsForDate(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun quickRecord() {
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val zone = ZoneId.systemDefault()
-            repository.addPoopRecord(
+            recordRepository.addPoopRecord(
                 PoopRecordDraft(
                     occurredAtEpochMillis = Instant.now().toEpochMilli(),
                     zoneId = zone.id
@@ -81,8 +83,8 @@ class TodayViewModel(
      * 需要改份量时走卡片上的「详细」。
      */
     fun quickWaterRecord() {
-        viewModelScope.launch {
-            repository.addRecord(
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
+            recordRepository.addRecord(
                 RecordDraft(
                     typeCode = WaterFields.TYPE_CODE,
                     occurredAtEpochMillis = Instant.now().toEpochMilli(),
@@ -114,13 +116,13 @@ class TodayViewModel(
     fun endPoopRecord(record: BackupRecord) {
         val detail = record.detail as? RecordDetail.Poop
         if (detail?.durationMinutes != null) return
-        viewModelScope.launch {
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
             val timing = PoopFields.resolve(
                 startEpochMillis = record.event.occurredAtEpochMillis,
                 endedAtEpochMillis = System.currentTimeMillis(),
                 manualMinutes = ""
             )
-            repository.updatePoopRecord(
+            recordRepository.updatePoopRecord(
                 eventId = record.event.id,
                 draft = PoopRecordDraft(
                     occurredAtEpochMillis = record.event.occurredAtEpochMillis,
@@ -145,18 +147,18 @@ class TodayViewModel(
     }
 
     fun saveRecord(eventId: String?, draft: PoopRecordDraft) {
-        viewModelScope.launch {
-            if (eventId == null) repository.addPoopRecord(draft)
-            else repository.updatePoopRecord(eventId, draft)
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
+            if (eventId == null) recordRepository.addPoopRecord(draft)
+            else recordRepository.updatePoopRecord(eventId, draft)
             refreshToday()
         }
     }
 
     /** 新类型（饮水等）走通用详情表；排便仍走上面的强类型路径。 */
     fun saveGenericRecord(eventId: String?, draft: RecordDraft) {
-        viewModelScope.launch {
-            if (eventId == null) repository.addRecord(draft)
-            else repository.updateRecord(eventId, draft)
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
+            if (eventId == null) recordRepository.addRecord(draft)
+            else recordRepository.updateRecord(eventId, draft)
             refreshToday()
         }
     }
@@ -167,15 +169,16 @@ class TodayViewModel(
      * 全空时落 `detail = null` 的仅标记事件，与恢复路径一致。
      */
     fun deleteRecord(eventId: String) {
-        viewModelScope.launch {
-            repository.deletePoopRecord(eventId)
+        viewModelScope.launchAction(actionFeedback, "操作失败") {
+            recordRepository.deletePoopRecord(eventId)
             refreshToday()
         }
     }
 
 
     class Factory(
-        private val repository: TrackRepository,
+        private val recordRepository: RecordRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
         private val todaySource: TodaySource
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -183,7 +186,7 @@ class TodayViewModel(
             if (!modelClass.isAssignableFrom(TodayViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return TodayViewModel(repository, todaySource) as T
+            return TodayViewModel(recordRepository, typeCatalogRepository, todaySource) as T
         }
     }
 }

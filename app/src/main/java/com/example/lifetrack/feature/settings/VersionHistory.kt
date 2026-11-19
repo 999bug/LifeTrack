@@ -33,7 +33,7 @@ internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
         version = "0.7.2",
         date = "2026-11-19",
-        summary = "修正咖啡模块在首页和记录列表仍显示旧名称「咖啡 / 茶」的问题，现在统一显示为「咖啡」"
+        summary = "修正咖啡模块旧名称；历史记录改为固定页游标加载，同毫秒记录不再漏页或重复，超长历史也能稳定继续加载"
     ),
     VersionNote(
         version = "0.7.1",

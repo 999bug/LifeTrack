@@ -31,7 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.feature.settings.SettingsViewModel
 
 /**
@@ -107,7 +107,7 @@ fun ModuleManagementScreen(
 
 @Composable
 private fun ModuleRow(
-    type: TrackTypeEntity,
+    type: TrackType,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     stacked: Boolean,
@@ -145,7 +145,7 @@ private fun ModuleRow(
 
 /** 整行只点开关会很难点中，这里让开关本身保持 48dp 语义区域，并提供明确的状态朗读。 */
 @Composable
-private fun ModuleSwitch(type: TrackTypeEntity, onToggle: (String, Boolean) -> Unit) {
+private fun ModuleSwitch(type: TrackType, onToggle: (String, Boolean) -> Unit) {
     Switch(
         checked = type.enabled,
         onCheckedChange = { onToggle(type.code, it) },
@@ -159,7 +159,7 @@ private fun ModuleSwitch(type: TrackTypeEntity, onToggle: (String, Boolean) -> U
 }
 
 @Composable
-private fun ModuleLabel(type: TrackTypeEntity, modifier: Modifier = Modifier) {
+private fun ModuleLabel(type: TrackType, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(text = type.name, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -173,7 +173,7 @@ private fun ModuleLabel(type: TrackTypeEntity, modifier: Modifier = Modifier) {
 /** 上下移按钮保持 48dp 触摸目标；禁用时仍占位，避免行高跳动。 */
 @Composable
 private fun MoveButtons(
-    type: TrackTypeEntity,
+    type: TrackType,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMove: (String, Int) -> Unit

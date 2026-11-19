@@ -1,8 +1,8 @@
 package com.example.lifetrack.feature.statistics
 
-import com.example.lifetrack.core.database.model.DailyCountProjection
-import com.example.lifetrack.core.database.model.EventTimestamp
-import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.domain.model.DailyCount
+import com.example.lifetrack.domain.model.EventTimestamp
+import com.example.lifetrack.domain.model.StatDetail
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.StatsWindow
 import java.time.Instant
@@ -59,10 +59,10 @@ object StatsAggregator {
     fun build(
         window: StatsWindow,
         today: LocalDate,
-        dailyCounts: List<DailyCountProjection>,
+        dailyCounts: List<DailyCount>,
         timestamps: List<EventTimestamp>,
         zoneFallback: ZoneId = ZoneId.systemDefault(),
-        details: List<StatDetailProjection> = emptyList()
+        details: List<StatDetail> = emptyList()
     ): PeriodStats {
         val countByDate = HashMap<String, Int>(dailyCounts.size)
         for (row in dailyCounts) countByDate[row.localDate] = row.count

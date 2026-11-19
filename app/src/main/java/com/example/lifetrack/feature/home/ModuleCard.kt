@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.ui.LifeTrackTokens
 
 /**
@@ -58,7 +58,7 @@ import com.example.lifetrack.core.ui.LifeTrackTokens
  */
 @Composable
 internal fun ModuleCard(
-    type: TrackTypeEntity,
+    type: TrackType,
     count: Int,
     summary: String?,
     actionLabel: String,
@@ -168,7 +168,7 @@ internal fun ModuleCard(
 }
 
 @Composable
-private fun ModuleIcon(type: TrackTypeEntity, accent: androidx.compose.ui.graphics.Color) {
+private fun ModuleIcon(type: TrackType, accent: androidx.compose.ui.graphics.Color) {
     Box(
         modifier = Modifier
             .size(34.dp)
@@ -186,7 +186,7 @@ private fun ModuleIcon(type: TrackTypeEntity, accent: androidx.compose.ui.graphi
 }
 
 @Composable
-private fun ModuleName(type: TrackTypeEntity) {
+private fun ModuleName(type: TrackType) {
     Text(
         text = type.name,
         style = MaterialTheme.typography.titleSmall,

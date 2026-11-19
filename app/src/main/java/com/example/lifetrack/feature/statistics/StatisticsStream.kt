@@ -1,9 +1,9 @@
 package com.example.lifetrack.feature.statistics
 
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
-import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.domain.repository.StatisticsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -20,7 +20,7 @@ import java.time.LocalDate
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun observeStatistics(
-    repository: TrackRepository,
+    repository: StatisticsRepository,
     today: Flow<LocalDate>,
     offsets: Flow<Map<StatsPeriod, Int>>,
     typeFilter: Flow<String?>
@@ -34,7 +34,7 @@ internal fun observeStatistics(
         val rangeStart = windows.values.minOf { it.previous.start }.toString()
         val rangeEnd = windows.values.maxOf { it.lastDate }.toString()
         // 形态分布只在排便口径下查，避免与其他类型的总数串口径。
-        val details = if (typeCode == DEFAULT_POOP_TYPE.code) {
+        val details = if (typeCode == PoopFields.TYPE_CODE) {
             repository.observeStatDetails(rangeStart, rangeEnd)
         } else {
             flowOf(emptyList())

@@ -40,7 +40,9 @@ class MainActivity : ComponentActivity() {
                     // 应用锁只负责「进正文前验证」，与窗口标志无关。
                     val mainViewModel: SettingsViewModel = viewModel(
                         factory = SettingsViewModel.Factory(
-                            repository = container.trackRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
+                            backupRepository = container.backupRepository,
+                            maintenanceRepository = container.maintenanceRepository,
                             settingsRepository = container.settingsRepository,
                             todaySource = container.todaySource
                         )
@@ -56,32 +58,38 @@ class MainActivity : ComponentActivity() {
                     )
                     val periodViewModel: PeriodViewModel = viewModel(
                         factory = PeriodViewModel.Factory(
-                            repository = container.trackRepository,
+                            recordRepository = container.recordRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
                             settingsRepository = container.settingsRepository,
                             todaySource = container.todaySource
                         )
                     )
                     val todayViewModel: TodayViewModel = viewModel(
                         factory = TodayViewModel.Factory(
-                            repository = container.trackRepository,
+                            recordRepository = container.recordRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
                             todaySource = container.todaySource
                         )
                     )
                     val historyViewModel: HistoryViewModel = viewModel(
                         factory = HistoryViewModel.Factory(
-                            repository = container.trackRepository,
+                            recordRepository = container.recordRepository,
+                            statisticsRepository = container.statisticsRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
                             todaySource = container.todaySource
                         )
                     )
                     val statisticsViewModel: StatisticsViewModel = viewModel(
                         factory = StatisticsViewModel.Factory(
-                            repository = container.trackRepository,
+                            statisticsRepository = container.statisticsRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
                             todaySource = container.todaySource
                         )
                     )
                     val sportViewModel: SportViewModel = viewModel(
                         factory = SportViewModel.Factory(
-                            repository = container.trackRepository,
+                            recordRepository = container.recordRepository,
+                            typeCatalogRepository = container.typeCatalogRepository,
                             todaySource = container.todaySource
                         )
                     )

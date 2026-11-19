@@ -68,6 +68,7 @@ fun HistoryScreen(
     onDelete: (String) -> Unit
 ) {
     val records by viewModel.historyRecords.collectAsStateWithLifecycle()
+    val canLoadEarlier by viewModel.canLoadEarlier.collectAsStateWithLifecycle()
     val today by viewModel.today.collectAsStateWithLifecycle()
     val query by viewModel.historyQuery.collectAsStateWithLifecycle()
     val calendar by viewModel.calendar.collectAsStateWithLifecycle()
@@ -128,7 +129,7 @@ fun HistoryScreen(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${formatRange(query)} · 共 ${records.size} 条",
+                    text = "${formatRange(query)} · 已显示 ${records.size} 条",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f)
@@ -165,12 +166,12 @@ fun HistoryScreen(
                 )
             }
         }
-        if (!query.filtered && !calendarMode) {
+        if (canLoadEarlier && !calendarMode) {
             item {
                 TextButton(
                     onClick = viewModel::loadEarlierHistory,
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("加载更早 30 天") }
+                ) { Text(if (query.filtered) "加载更多" else "加载更早 30 天") }
             }
         }
     }

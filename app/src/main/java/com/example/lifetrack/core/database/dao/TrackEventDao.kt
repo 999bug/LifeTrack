@@ -81,17 +81,25 @@ interface TrackEventDao {
         typeCode: String?
     ): Flow<List<EventWithDetails>>
 
+    /**
+     * Keyset 分页：同毫秒记录用 id 作为第二排序键，游标条件必须与 ORDER BY 完全一致。
+     * Repository 会多取一条探测 hasMore，因此 DAO 始终只返回最多 limit + 1 行。
+     */
     @Transaction
     @Query(
         "SELECT * FROM track_event " +
             "WHERE (:typeCode IS NULL OR typeCode = :typeCode) " +
             "AND localDate BETWEEN :startDate AND :endDate " +
+            "AND (:cursorAt IS NULL OR occurredAtEpochMillis < :cursorAt " +
+            "OR (occurredAtEpochMillis = :cursorAt AND id < :cursorId)) " +
             "ORDER BY occurredAtEpochMillis DESC, id DESC LIMIT :limit"
     )
     fun observeHistoryPage(
         startDate: String,
         endDate: String,
         typeCode: String?,
+        cursorAt: Long?,
+        cursorId: String?,
         limit: Int
     ): Flow<List<EventWithDetails>>
     @Query(

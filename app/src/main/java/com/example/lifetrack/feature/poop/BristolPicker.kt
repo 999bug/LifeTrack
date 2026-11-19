@@ -1,5 +1,7 @@
 package com.example.lifetrack.feature.poop
 
+import com.example.lifetrack.core.model.PoopFields
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,7 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+
 import com.example.lifetrack.core.ui.LifeTrackTokens
 
 /**
@@ -59,7 +61,7 @@ fun BristolTypePicker(
 ) {
     val largeFont = LocalDensity.current.fontScale > 1.3f
     val columns = if (largeFont) 2 else 4
-    val artColor = LifeTrackTokens.ModuleColors.of(DEFAULT_POOP_TYPE.code)
+    val artColor = LifeTrackTokens.ModuleColors.of(PoopFields.TYPE_CODE)
     val selectedArtColor = MaterialTheme.colorScheme.onPrimaryContainer
     val outline = MaterialTheme.colorScheme.outlineVariant
     val hintColor = MaterialTheme.colorScheme.onSurfaceVariant

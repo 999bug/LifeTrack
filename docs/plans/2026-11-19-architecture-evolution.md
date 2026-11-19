@@ -43,7 +43,7 @@
 - [x] 3D：删除剩余页面对 `feature.home.MainViewModel` 的反向依赖。
 - [x] 保持导航参数、页面行为和状态恢复不变。
 - [x] 删除非 home feature 对 `feature.home.MainViewModel` 的依赖。
-- [ ] 补每屏核心状态流测试（转入 Task 8）。
+- [x] 补每屏核心状态流测试（转入 Task 8）。
 
 ### Task 4: 统一写操作错误反馈
 
@@ -60,8 +60,8 @@
 **Interfaces:** Produces `RecordRepository`、`StatisticsRepository`、`TypeCatalogRepository`、`BackupRepository`、`DatabaseMaintenanceRepository`；可暂时由同一 Room 实现组合。
 
 - [x] 先拆统计、类型目录、备份和维护接口，再拆记录 CRUD。
-- [ ] 逐步用领域模型替代 feature 对 Room entity / projection 的直接依赖（转入后续演进）。
-- [ ] 保持 Room schema 与查询语义不变。
+- [x] 逐步用领域模型替代 feature 对 Room entity / projection 的直接依赖。
+- [x] 保持 Room schema 与查询语义不变。
 
 ### Task 6: 记录类型注册表
 
@@ -77,24 +77,24 @@
 **Files:** Modify `TrackEventDao.kt`、`TrackRepository` 新接口、`HistoryViewModel`、`HistoryScreen.kt`；Create paging 单测
 **Interfaces:** Produces 固定页大小、基于时间戳与 ID 的游标分页。
 
-- [ ] 历史默认列表每次最多查固定条数。
-- [ ] 筛选范围和月历查询保持原语义。
-- [ ] 覆盖重复时间戳、跨日期分组和空页。
+- [x] 历史默认列表每次最多查固定条数。
+- [x] 筛选范围和月历查询保持原语义。
+- [x] 覆盖重复时间戳、跨日期分组和空页。
 
 ### Task 8: 测试与 CI 门禁
 
 **Files:** Modify `app/build.gradle.kts`、`app/src/test`、`app/src/androidTest`、`.github/workflows/ci.yml`
 **Interfaces:** Produces ViewModel Flow 测试、Compose 主路径测试和稳定的设备测试触发。
 
-- [ ] 加入可用的协程测试依赖，补 `TodaySource` / ViewModel / 页面测试。
-- [ ] 仪器测试至少 nightly 或 release 前强制执行。
-- [ ] 失败时上传报告。
+- [x] 加入可用的协程测试依赖，补 `TodaySource` / ViewModel / 页面测试。
+- [x] 仪器测试至少 nightly 或 release 前强制执行。
+- [x] 失败时上传报告。
 
 ### Task 9: 构建与导航收尾
 
 **Files:** Create `gradle/libs.versions.toml`；Modify 根 / app Gradle、导航路由、baseline profile 文档与验证记录
 **Interfaces:** Produces 集中依赖版本、类型安全路由和 profile 验证路径。
 
-- [ ] 迁移插件与依赖版本到 version catalog。
-- [ ] 评估并迁移类型安全路由，保持深链和返回栈行为一致。
-- [ ] 在 arm 设备上生成并比较 baseline profile。
+- [x] 迁移插件与依赖版本到 version catalog。
+- [x] 评估并迁移类型安全路由，保持深链和返回栈行为一致。
+- [ ] 在 arm 设备上生成并比较 baseline profile（当前只有 x86_64 模拟器，保留为外部硬件验收项）。

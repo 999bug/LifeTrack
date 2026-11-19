@@ -32,8 +32,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
@@ -345,7 +345,7 @@ fun TodayScreen(
  * 过期的记录不给「结束」入口——那时点一下只会得到「用时无效」，进编辑器手填更直接。
  */
 private fun BackupRecord.isEndablePoop(): Boolean {
-    if (event.typeCode != DEFAULT_POOP_TYPE.code) return false
+    if (event.typeCode != PoopFields.TYPE_CODE) return false
     val detail = detail as? RecordDetail.Poop
     if (detail?.durationMinutes != null) return false
     val elapsed = System.currentTimeMillis() - event.occurredAtEpochMillis
@@ -393,11 +393,11 @@ private fun IntimacyEntryCard(count: Int, onClick: () -> Unit) {
 }
 
 /** 有合理默认值、可以直接落一条记录的模块。 */
-private val TrackTypeEntity.isQuickAction: Boolean
-    get() = code == DEFAULT_POOP_TYPE.code || code == WaterFields.TYPE_CODE
+private val TrackType.isQuickAction: Boolean
+    get() = code == PoopFields.TYPE_CODE || code == WaterFields.TYPE_CODE
 
 /** 动作槽文案：快捷记录型保留「详细」入口，其余直接写清楚这一下会记什么。 */
-private fun moduleActionLabel(type: TrackTypeEntity, quickAction: Boolean): String = when {
+private fun moduleActionLabel(type: TrackType, quickAction: Boolean): String = when {
     quickAction -> "详细"
     type.code == CoffeeFields.TYPE_CODE -> "记一杯"
     type.code == TeaFields.TYPE_CODE -> "记一杯"
@@ -406,7 +406,7 @@ private fun moduleActionLabel(type: TrackTypeEntity, quickAction: Boolean): Stri
 }
 
 private fun moduleAction(
-    type: TrackTypeEntity,
+    type: TrackType,
     onQuickRecord: () -> Unit,
     onWaterQuick: () -> Unit,
     onWaterRecord: () -> Unit,
@@ -414,7 +414,7 @@ private fun moduleAction(
     onTeaRecord: () -> Unit,
     onSportRecord: () -> Unit
 ): () -> Unit = when (type.code) {
-    DEFAULT_POOP_TYPE.code -> onQuickRecord
+    PoopFields.TYPE_CODE -> onQuickRecord
     WaterFields.TYPE_CODE -> onWaterQuick
     CoffeeFields.TYPE_CODE -> onCoffeeRecord
     TeaFields.TYPE_CODE -> onTeaRecord
@@ -423,14 +423,14 @@ private fun moduleAction(
 }
 
 private fun moduleDetail(
-    type: TrackTypeEntity,
+    type: TrackType,
     onDetailedRecord: () -> Unit,
     onWaterRecord: () -> Unit,
     onCoffeeRecord: () -> Unit,
     onTeaRecord: () -> Unit,
     onSportRecord: () -> Unit
 ): () -> Unit = when (type.code) {
-    DEFAULT_POOP_TYPE.code -> onDetailedRecord
+    PoopFields.TYPE_CODE -> onDetailedRecord
     WaterFields.TYPE_CODE -> onWaterRecord
     CoffeeFields.TYPE_CODE -> onCoffeeRecord
     TeaFields.TYPE_CODE -> onTeaRecord
@@ -445,7 +445,7 @@ private fun moduleDetail(
  * 只汇总 ml 口径：用户把单位切成「杯」时不做换算，宁可少显示一个数字，
  * 也不给出一个凭猜测折算出来的总量。
  */
-private fun moduleSummary(records: List<BackupRecord>, type: TrackTypeEntity): String? {
+private fun moduleSummary(records: List<BackupRecord>, type: TrackType): String? {
     val amountKey = when (type.code) {
         WaterFields.TYPE_CODE -> WaterFields.AMOUNT
         CoffeeFields.TYPE_CODE -> CoffeeFields.AMOUNT

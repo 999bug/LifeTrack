@@ -72,8 +72,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+
+import com.example.lifetrack.domain.model.PoopRecord
 import com.example.lifetrack.core.model.PickerDateMapper
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
@@ -97,11 +97,11 @@ private val poopTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.CHIN
  */
 @Composable
 fun PoopEditorDialog(
-    record: PoopRecordRelation?,
+    record: PoopRecord?,
     onDismiss: () -> Unit,
     onSave: (PoopRecordDraft) -> Unit
 ) {
-    val accent = LifeTrackTokens.ModuleColors.of(DEFAULT_POOP_TYPE.code)
+    val accent = LifeTrackTokens.ModuleColors.of(PoopFields.TYPE_CODE)
     val zone = remember(record) {
         runCatching { ZoneId.of(record?.event?.zoneId ?: ZoneId.systemDefault().id) }
             .getOrDefault(ZoneId.systemDefault())

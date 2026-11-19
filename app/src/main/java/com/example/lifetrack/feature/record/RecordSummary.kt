@@ -1,12 +1,13 @@
 package com.example.lifetrack.feature.record
 
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
 import com.example.lifetrack.core.model.MenstruationFields
 import com.example.lifetrack.core.model.PoopFields
 import com.example.lifetrack.core.model.RecordDetail
+import com.example.lifetrack.core.model.RecordTypeRegistry
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
@@ -37,12 +38,12 @@ object RecordSummary {
 
     /** 优先用用户自定义的模块名，缺省时回落到内置名，最后才显示类型码。 */
     fun typeName(typeCode: String, names: Map<String, String>): String =
-        names[typeCode] ?: DEFAULT_NAMES[typeCode] ?: typeCode
+        names[typeCode] ?: RecordTypeRegistry.builtIn[typeCode]?.label ?: typeCode
 
     fun detail(record: BackupRecord): String {
         val note = record.event.note
         return when (record.event.typeCode) {
-            DEFAULT_POOP_TYPE.code -> {
+            PoopFields.TYPE_CODE -> {
                 val detail = record.detail as? RecordDetail.Poop
                 buildList {
                     detail?.bristolType?.let { add("布里斯托 $it 型") }
@@ -107,13 +108,5 @@ object RecordSummary {
     private fun genericFields(record: BackupRecord): Map<String, String> =
         (record.detail as? RecordDetail.Generic)?.fields.orEmpty()
 
-    private val DEFAULT_NAMES = mapOf(
-        "poop" to "排便",
-        WaterFields.TYPE_CODE to "饮水",
-        CoffeeFields.TYPE_CODE to "咖啡",
-        TeaFields.TYPE_CODE to "茶",
-        SportFields.TYPE_CODE to "运动",
-        IntimacyFields.TYPE_CODE to "亲密关系",
-        MenstruationFields.TYPE_CODE to "月经"
-    )
+
 }

@@ -1,10 +1,11 @@
 package com.example.lifetrack.core.database
 
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.core.model.PoopFields
 
 /** 首次启动与恢复备份时都要保证存在的内置类型。 */
 val DEFAULT_POOP_TYPE = TrackTypeEntity(
-    code = "poop",
+    code = PoopFields.TYPE_CODE,
     name = "排便",
     iconKey = "poop",
     category = "body",

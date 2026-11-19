@@ -1,6 +1,6 @@
 package com.example.lifetrack.feature.statistics
 
-import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.domain.model.StatDetail
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -15,7 +15,7 @@ class DetailDistributionTest {
         urgency: Int? = null,
         abdominal: Int? = null,
         incomplete: Int? = null
-    ) = StatDetailProjection(
+    ) = StatDetail(
         localDate = "2026-11-09",
         bristolType = bristol,
         amountCode = amount,

@@ -1,13 +1,13 @@
 package com.example.lifetrack.core.model
 
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
 class ModuleOrderingTest {
 
-    private fun type(code: String, order: Int, enabled: Boolean = true) = TrackTypeEntity(
+    private fun type(code: String, order: Int, enabled: Boolean = true) = TrackType(
         code = code,
         name = code,
         iconKey = code,

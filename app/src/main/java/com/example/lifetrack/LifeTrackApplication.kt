@@ -11,6 +11,11 @@ import com.example.lifetrack.core.security.DatabaseKeyStore
 import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.core.update.UpdateRepository
 import com.example.lifetrack.data.repository.RoomTrackRepository
+import com.example.lifetrack.domain.repository.BackupRepository
+import com.example.lifetrack.domain.repository.DatabaseMaintenanceRepository
+import com.example.lifetrack.domain.repository.RecordRepository
+import com.example.lifetrack.domain.repository.StatisticsRepository
+import com.example.lifetrack.domain.repository.TypeCatalogRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,7 +72,12 @@ class AppContainer(private val application: Application) {
             ?: error("database is unavailable")
 
     val todaySource = TodaySource()
-    val trackRepository by lazy { RoomTrackRepository(database) }
+    private val roomRepository by lazy { RoomTrackRepository(database) }
+    val recordRepository: RecordRepository get() = roomRepository
+    val statisticsRepository: StatisticsRepository get() = roomRepository
+    val typeCatalogRepository: TypeCatalogRepository get() = roomRepository
+    val backupRepository: BackupRepository get() = roomRepository
+    val maintenanceRepository: DatabaseMaintenanceRepository get() = roomRepository
     val settingsRepository = SettingsRepository(application)
     val updateRepository = UpdateRepository(application, settingsRepository)
 

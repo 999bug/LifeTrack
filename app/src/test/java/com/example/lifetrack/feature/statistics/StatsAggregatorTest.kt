@@ -1,8 +1,8 @@
 package com.example.lifetrack.feature.statistics
 
-import com.example.lifetrack.core.database.model.DailyCountProjection
-import com.example.lifetrack.core.database.model.EventTimestamp
-import com.example.lifetrack.core.database.model.StatDetailProjection
+import com.example.lifetrack.domain.model.DailyCount
+import com.example.lifetrack.domain.model.EventTimestamp
+import com.example.lifetrack.domain.model.StatDetail
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.model.statsWindow
 import java.time.Instant
@@ -68,10 +68,10 @@ class StatsAggregatorTest {
     fun `week aggregation fills gaps and counts streak`() {
         val window = statsWindow(StatsPeriod.WEEK, 0, today)
         val counts = listOf(
-            DailyCountProjection("2026-11-09", 2),
-            DailyCountProjection("2026-11-10", 1),
-            DailyCountProjection("2026-11-12", 3),
-            DailyCountProjection("2026-11-06", 1)
+            DailyCount("2026-11-09", 2),
+            DailyCount("2026-11-10", 1),
+            DailyCount("2026-11-12", 3),
+            DailyCount("2026-11-06", 1)
         )
 
         val stats = StatsAggregator.build(window, today, counts, emptyList())
@@ -102,9 +102,9 @@ class StatsAggregatorTest {
     fun `year bars aggregate by month`() {
         val window = statsWindow(StatsPeriod.YEAR, 0, today)
         val counts = listOf(
-            DailyCountProjection("2026-01-02", 2),
-            DailyCountProjection("2026-01-03", 1),
-            DailyCountProjection("2026-03-05", 4)
+            DailyCount("2026-01-02", 2),
+            DailyCount("2026-01-03", 1),
+            DailyCount("2026-03-05", 4)
         )
 
         val stats = StatsAggregator.build(window, today, counts, emptyList())
@@ -185,10 +185,10 @@ class StatsAggregatorTest {
     @Test
     fun `detail distribution is scoped to the current window`() {
         val window = statsWindow(StatsPeriod.WEEK, 0, today)
-        val counts = listOf(DailyCountProjection("2026-11-09", 1))
+        val counts = listOf(DailyCount("2026-11-09", 1))
         val details = listOf(
-            StatDetailProjection("2026-11-09", 4, 2, 1, 1, 0, 0),
-            StatDetailProjection("2026-11-02", 5, 1, 2, 0, 1, 1)
+            StatDetail("2026-11-09", 4, 2, 1, 1, 0, 0),
+            StatDetail("2026-11-02", 5, 1, 2, 0, 1, 1)
         )
 
         val stats = StatsAggregator.build(
@@ -210,7 +210,7 @@ class StatsAggregatorTest {
     @Test
     fun `quick records without details still expose a zero filled distribution`() {
         val window = statsWindow(StatsPeriod.WEEK, 0, today)
-        val counts = listOf(DailyCountProjection("2026-11-09", 3))
+        val counts = listOf(DailyCount("2026-11-09", 3))
 
         val stats = StatsAggregator.build(window, today, counts, emptyList())
 

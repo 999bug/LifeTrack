@@ -1,6 +1,6 @@
 package com.example.lifetrack.core.model
 
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 
 /**
  * 记录项目排序：把指定 code 在按 sortOrder 排好的列表里移动一位，
@@ -10,7 +10,7 @@ import com.example.lifetrack.core.database.entity.TrackTypeEntity
 object ModuleOrdering {
 
     /** [offset] 为 -1 上移、+1 下移；越界或找不到 code 时原样返回。 */
-    fun move(types: List<TrackTypeEntity>, code: String, offset: Int): List<TrackTypeEntity> {
+    fun move(types: List<TrackType>, code: String, offset: Int): List<TrackType> {
         if (offset == 0) return types
         val ordered = types.sortedBy { it.sortOrder }
         val from = ordered.indexOfFirst { it.code == code }

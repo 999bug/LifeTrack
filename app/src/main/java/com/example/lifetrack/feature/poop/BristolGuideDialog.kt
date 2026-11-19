@@ -1,5 +1,7 @@
 package com.example.lifetrack.feature.poop
 
+import com.example.lifetrack.core.model.PoopFields
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
+
 import com.example.lifetrack.core.ui.LifeTrackTokens
 
 /**
@@ -27,7 +29,7 @@ import com.example.lifetrack.core.ui.LifeTrackTokens
  */
 @Composable
 fun BristolGuideDialog(onDismiss: () -> Unit) {
-    val artColor = LifeTrackTokens.ModuleColors.of(DEFAULT_POOP_TYPE.code)
+    val artColor = LifeTrackTokens.ModuleColors.of(PoopFields.TYPE_CODE)
     val creaseColor = MaterialTheme.colorScheme.surfaceContainerLow
 
     AlertDialog(

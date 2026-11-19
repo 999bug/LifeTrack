@@ -3,10 +3,11 @@ package com.example.lifetrack.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.core.time.TodaySource
-import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.domain.repository.StatisticsRepository
+import com.example.lifetrack.domain.repository.TypeCatalogRepository
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.emptyStatistics
 import com.example.lifetrack.feature.statistics.observeStatistics
@@ -23,12 +24,13 @@ import kotlinx.coroutines.flow.update
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatisticsViewModel(
-    private val repository: TrackRepository,
+    private val statisticsRepository: StatisticsRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
     val today: StateFlow<LocalDate> = todaySource.today
 
-    val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
+    val trackTypes: StateFlow<List<TrackType>> = typeCatalogRepository.observeTrackTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val statsTypeFilter = MutableStateFlow<String?>(null)
     val statsScope: StateFlow<String?> = statsTypeFilter.asStateFlow()
@@ -43,7 +45,7 @@ class StatisticsViewModel(
      * 类型筛选为空表示全部类型；形态分布只在排便口径下查询，避免与其他类型的总数串口径。
      */
     val statistics: StateFlow<Map<StatsPeriod, PeriodStats>> =
-        observeStatistics(repository, today, statsOffsets, statsTypeFilter)
+        observeStatistics(statisticsRepository, today, statsOffsets, statsTypeFilter)
             // 这里对 4 个周期做全窗口聚合（StatsAggregator.build），不加 flowOn 时
             // 它跑在 stateIn 的收集上下文，也就是 viewModelScope 默认的 Main；
             // 每写入一条记录 Room 都会重发一次，数据攒到几千条就会在主线程掉帧。
@@ -68,7 +70,8 @@ class StatisticsViewModel(
 
 
     class Factory(
-        private val repository: TrackRepository,
+        private val statisticsRepository: StatisticsRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
         private val todaySource: TodaySource
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -76,7 +79,7 @@ class StatisticsViewModel(
             if (!modelClass.isAssignableFrom(StatisticsViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return StatisticsViewModel(repository, todaySource) as T
+            return StatisticsViewModel(statisticsRepository, typeCatalogRepository, todaySource) as T
         }
     }
 }

@@ -10,21 +10,20 @@
 
 | 状态 | 事项 | 依赖 / 阻塞 | 下一步 |
 | --- | --- | --- | --- |
-| 🔄 | 架构演进总计划：先修日期一致性，再抽备份状态机、拆 ViewModel、收敛仓储与类型注册、补 paging 和测试门禁 | 方案与 9 个子任务见 `docs/specs/2026-11-19-architecture-evolution-design.md`、`docs/plans/2026-11-19-architecture-evolution.md` | 按 Task 1 → 9 顺序逐个实现、逐个提交并更新本表 |
-| ✅ | Task 1：统一“今天”业务日期源 | 已完成 `TodaySource`、前台/跨午夜刷新和五个页面统一消费 | 已提交 `3d57415` |
-| ✅ | Task 2：抽出备份状态机 | 已完成 `BackupController`、错误映射、失败节流和设置页接入；单测 411 项、lint、构建通过 | 已提交 `5c50a6b` |
-| ✅ | Task 7：历史有界分页 | 历史查询改为 100 条步长的有界查询 | 剩余 Task 8–9 |
-| 🟡 | B3 TalkBack 实机朗读复核 | 需要真机 + 读屏 | 依次走 首页 → 历史 → 统计 → 设置，确认分段选中态、月历格、分布卡汇总句 |
-| 🟡 | B7 真机「卸载重装丢数据」验证 | 需要真机 | 装 0.6.5 → 记录 → 卸载重装 → 确认数据丢失（预期丢失，验的是 README 表述是否准确） |
-| 🟡 | 运动子应用真机走查 | 需要真机 | 点类型卡预选 → 保存后概览 / 今日记录同步 → 深色 / 200% / 360dp；口径见 `docs/sport-subapp-design.md` §7 |
-| 🟡 | B8 / C8 厂商 ROM 迁移走查 | 需要真机 | 与 B7 合并执行，重点看厂商 ROM 的设备迁移是否带走业务库 |
-| 🟡 | R11 CI 仪器测试任务未实跑 | `reactivecircus/android-emulator-runner` + KVM 链路 | 手动 dispatch 或给 PR 打 `run-instrumented` 标签；本地 `connectedDebugAndroidTest` 已全绿 |
-| 🔵 | A9 月经 E2 / E3 | E1 已于 2026-11-12 交付 | 体重 / 体温、自定义症状、完整报告（E2）；通知提醒、备孕 / 怀孕模式（E3），见 `docs/menstruation-module-design.md` |
-| 🔵 | 备份流程抽 `BackupController` | 无 | 把 `SettingsScreen` 里导出 / 恢复 / 换口令的 30 多个 state 与 4 套 launcher 抽成 state holder |
-| 🔵 | 按屏拆 ViewModel | 需先引入 `TodayProvider` 之类的共享日期源 | `todayDate` 同时驱动首页 / 历史 / 月历 / 统计，各自维护会跨天不一致，先抽共享源再拆 |
-
-| 🔵 | baseline profile 真机生成 | 需要 arm 设备 | 按 `docs/baseline-profile.md` §4 用 Macrobenchmark 生成，会整体替换手写版 |
-| 🔵 | 0.6.6 发版前补 changelog | — | `VersionHistory.kt` 首条补 0.6.6，否则 CI 会按设计在构建前拦下 |
+| 🔄 | 架构演进总计划（Task 1–9） | 代码任务已完成；正在执行统一全量测试与正式发版 | 全量 JVM / lint / 构建 / 仪器测试通过后推送并触发 Release |
+| ✅ | Task 1：统一“今天”业务日期源 | `TodaySource`、前台/跨午夜刷新和五个页面统一消费 | `3d57415` |
+| ✅ | Task 2：抽出备份状态机 | `BackupController`、错误映射、失败节流和设置页接入 | `5c50a6b` |
+| ✅ | Task 3：拆分 `MainViewModel` | 八个页面级 ViewModel；跨午夜、保存失败、筛选、统计状态流测试已补齐 | 本架构分支 |
+| ✅ | Task 4：统一写操作反馈 | 保存、编辑、删除、排序、品种与备份恢复均走统一失败反馈 | 本架构分支 |
+| ✅ | Task 5：仓储与领域边界 | ViewModel 构造参数收窄；feature 主代码不再直接导入 `core.database.*` | 本架构分支 |
+| ✅ | Task 6：记录类型注册表 | 类型元数据、字段规格、图标、颜色和敏感等级均有完整性测试 | 本架构分支 |
+| ✅ | Task 7：历史 Keyset 分页 | 固定 100 条/页，`(occurredAtEpochMillis, id)` 游标；同毫秒与跨日期有仪器测试 | 本架构分支 |
+| ✅ | Task 8：测试与 CI 门禁 | ViewModel、Compose、DAO 分页测试；nightly 仪器测试与失败报告上传 | 本架构分支 |
+| ✅ | Task 9：构建与导航收尾 | version catalog、类型安全导航完成；全量导航与返回栈验证随发布前测试执行 | 本架构分支 |
+| 🟡 | baseline profile 真机生成 | 当前仅连接 x86_64 模拟器，无法按要求在 arm 设备生成 | 保留为硬件验收项，不用模拟器结果代替 |
+| 🟡 | B3 TalkBack 实机朗读复核 | 需要真机 + 读屏 | 首页 → 历史 → 统计 → 设置逐页复核 |
+| 🟡 | B7 / B8 / C8 真机走查 | 需要厂商真机 | 卸载重装、ROM 迁移与备份恢复合并执行 |
+| 🔵 | A9 月经 E2 / E3 | E1 已于 2026-11-12 交付 | 体重 / 体温、自定义症状、完整报告；通知与备孕 / 怀孕模式 |
 
 
 图例：🟡 需要设备 / 外部条件，🔵 待排期的改进，⛔ 明确挂起。

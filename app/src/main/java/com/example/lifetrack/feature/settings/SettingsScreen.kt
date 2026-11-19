@@ -75,7 +75,7 @@ import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupIo
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.AppLockTimeout
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.TeaFields
@@ -1135,7 +1135,7 @@ private fun MoreSection(
  */
 @Composable
 private fun PrimarySection(
-    trackTypes: List<TrackTypeEntity>,
+    trackTypes: List<TrackType>,
     themeMode: ThemeMode,
     onOpenModules: () -> Unit,
     onOpenVarieties: () -> Unit,

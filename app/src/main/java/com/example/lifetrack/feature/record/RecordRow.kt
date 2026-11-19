@@ -1,5 +1,7 @@
 package com.example.lifetrack.feature.record
 
+import com.example.lifetrack.core.model.PoopFields
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,8 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.model.PoopRecordRelation
+
+
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CoffeeFields
 import com.example.lifetrack.core.model.IntimacyFields
@@ -26,7 +28,7 @@ import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
-import com.example.lifetrack.core.model.toEntity
+import com.example.lifetrack.core.model.toPoopRecord
 import com.example.lifetrack.feature.coffee.CoffeeRecordItem
 import com.example.lifetrack.feature.intimacy.IntimacyRecordItem
 import com.example.lifetrack.feature.menstruation.MenstruationRecordItem
@@ -53,11 +55,8 @@ fun RecordRow(
     onDelete: () -> Unit
 ) {
     when (record.event.typeCode) {
-        DEFAULT_POOP_TYPE.code -> PoopRecordItem(
-            record = PoopRecordRelation(
-                event = record.event,
-                detail = (record.detail as? RecordDetail.Poop)?.toEntity(record.event.id)
-            ),
+        PoopFields.TYPE_CODE -> PoopRecordItem(
+            record = record.toPoopRecord(),
             onShowDetail = onShowDetail,
             onEdit = onEdit,
             onDelete = onDelete

@@ -1,6 +1,6 @@
 package com.example.lifetrack.feature.history
 
-import com.example.lifetrack.core.database.model.DailyTypeCountProjection
+import com.example.lifetrack.domain.model.DailyTypeCount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,7 +8,7 @@ import org.junit.Test
 class DayCalendarDataTest {
 
     private fun row(date: String, type: String, count: Int, firstAt: Long) =
-        DailyTypeCountProjection(localDate = date, typeCode = type, count = count, firstAt = firstAt)
+        DailyTypeCount(localDate = date, typeCode = type, count = count, firstAt = firstAt)
 
     @Test
     fun `types are grouped by date and keep first-seen order`() {

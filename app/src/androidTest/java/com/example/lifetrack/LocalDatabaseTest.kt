@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -102,6 +103,42 @@ class LocalDatabaseTest {
         assertEquals(1, poopStamps.size)
     }
 
+    /** Task 7：同毫秒记录也必须由 (occurredAt, id) 游标完整分页，不重复、不漏数。 */
+    @Test
+    fun keysetHistoryPaginationHandlesDuplicateTimestampsAndCrossesDates() = runBlocking {
+        database.trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)
+        val now = System.currentTimeMillis()
+        database.trackEventDao().insertEvents(
+            listOf(
+                TrackEventEntity("e-c", "poop", 3_000L, "2026-11-19", "Asia/Tokyo", "", now, now),
+                TrackEventEntity("e-b", "poop", 2_000L, "2026-11-19", "Asia/Tokyo", "", now, now),
+                TrackEventEntity("e-a", "poop", 2_000L, "2026-11-19", "Asia/Tokyo", "", now, now),
+                TrackEventEntity("e-old", "poop", 1_000L, "2026-11-18", "Asia/Tokyo", "", now, now)
+            )
+        )
+        val repository = com.example.lifetrack.data.repository.RoomTrackRepository(database)
+
+        val first = repository.observeHistoryPage(
+            startDate = "2026-11-18",
+            endDate = "2026-11-19",
+            typeCode = null,
+            cursor = null,
+            limit = 2
+        ).first()
+        assertEquals(listOf("e-c", "e-b"), first.records.map { it.event.id })
+        assertTrue(first.hasMore)
+
+        val second = repository.observeHistoryPage(
+            startDate = "2026-11-18",
+            endDate = "2026-11-19",
+            typeCode = null,
+            cursor = first.nextCursor,
+            limit = 2
+        ).first()
+        assertEquals(listOf("e-a", "e-old"), second.records.map { it.event.id })
+        assertFalse(second.hasMore)
+        assertEquals(4, (first.records + second.records).map { it.event.id }.toSet().size)
+    }
     /** A12：通用详情写入后能按事件读回，外键级联删除不留孤儿行。 */
     @Test
     fun genericDetailRoundTripsAndCascades() = runBlocking {

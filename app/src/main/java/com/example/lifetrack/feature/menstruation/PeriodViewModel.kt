@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.lifetrack.core.ui.ActionFeedback
 import com.example.lifetrack.core.ui.launchAction
 import com.example.lifetrack.core.datastore.SettingsRepository
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.CycleCalculator
 import com.example.lifetrack.core.model.CycleSnapshot
@@ -20,7 +20,8 @@ import com.example.lifetrack.core.model.PeriodStartEdit
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.domain.model.RecordDraft
-import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.domain.repository.RecordRepository
+import com.example.lifetrack.domain.repository.TypeCatalogRepository
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -45,7 +46,8 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeriodViewModel(
-    private val repository: TrackRepository,
+    private val recordRepository: RecordRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
     private val settingsRepository: SettingsRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
@@ -54,12 +56,12 @@ class PeriodViewModel(
 
     val today: StateFlow<LocalDate> = todaySource.today
 
-    val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
+    val trackTypes: StateFlow<List<TrackType>> = typeCatalogRepository.observeTrackTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     /** 经期子应用：宽区间取月经记录，供周期推算、日历染色与简报；派生数据一律不落库。 */
     val periodRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { today ->
-            repository.observeRecordsInRange(
+            recordRepository.observeRecordsInRange(
                 today.minusYears(3).toString(),
                 today.toString(),
                 typeCode = MenstruationFields.TYPE_CODE
@@ -73,7 +75,7 @@ class PeriodViewModel(
      */
     val intimacyRecords: StateFlow<List<BackupRecord>> = today
         .flatMapLatest { today ->
-            repository.observeRecordsInRange(
+            recordRepository.observeRecordsInRange(
                 today.minusYears(3).toString(),
                 today.toString(),
                 typeCode = IntimacyFields.TYPE_CODE
@@ -148,7 +150,7 @@ class PeriodViewModel(
         viewModelScope.launchAction(actionFeedback, "操作失败") {
             periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
-                    val existing = repository.observeRecordsInRange(
+                    val existing = recordRepository.observeRecordsInRange(
                         date.toString(), date.toString(), MenstruationFields.TYPE_CODE
                     ).first().firstOrNull()
                     val zone = runCatching {
@@ -167,8 +169,8 @@ class PeriodViewModel(
                             RecordDetail.Generic(MenstruationFields.TYPE_CODE, fields)
                         }
                     )
-                    if (existing == null) repository.addRecord(draft)
-                    else repository.updateRecord(existing.event.id, draft)
+                    if (existing == null) recordRepository.addRecord(draft)
+                    else recordRepository.updateRecord(existing.event.id, draft)
                 }
                 todaySource.refresh()
             }
@@ -187,15 +189,15 @@ class PeriodViewModel(
             val message = periodWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
                     val today = todaySource.currentDate()
-                    val existing = repository.observeRecordsInRange(
+                    val existing = recordRepository.observeRecordsInRange(
                         date.toString(), date.toString(), MenstruationFields.TYPE_CODE
                     ).first().firstOrNull()
-                    if (existing == null) repository.addRecord(periodMarkDraft(date))
+                    if (existing == null) recordRepository.addRecord(periodMarkDraft(date))
 
                     // 前一天已经记过（用户先逐日补了几天才点「来了」）时，进行中起点取当天所在
                     // 连续段的段首，保证状态条「第 N 天」、日历染色与点「走了」时补齐的起点一致；
                     // 段首与今天无关时（孤立记录 / 断段），才用选中的这一天。
-                    val recentDates = repository.observeRecordsInRange(
+                    val recentDates = recordRepository.observeRecordsInRange(
                         today.minusYears(3).toString(), today.toString(), MenstruationFields.TYPE_CODE
                     ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
                     val segmentStart = CycleCalculator.segmentsOf(recentDates, today)
@@ -243,14 +245,14 @@ class PeriodViewModel(
                             "结束日不能早于开始日（${cnDate(previousOngoingStart)}）"
                         } else {
                             val dates = PeriodOngoing.closingDates(previousOngoingStart, date)
-                            val records = repository.observeRecordsInRange(
+                            val records = recordRepository.observeRecordsInRange(
                                 previousOngoingStart.toString(), today.toString(), MenstruationFields.TYPE_CODE
                             ).first()
                             val recorded = records.mapNotNullTo(mutableSetOf()) {
                                 parseDateOrNull(it.event.localDate)
                             }
                             dates.filterNot { it in recorded }
-                                .forEach { repository.addRecord(periodMarkDraft(it)) }
+                                .forEach { recordRepository.addRecord(periodMarkDraft(it)) }
                             // 结束日之后由「自动延续」写下的仅标记日子撤掉；填过内容的一天原样保留。
                             val trailing = records.filter { record ->
                                 val day = parseDateOrNull(record.event.localDate)
@@ -258,7 +260,7 @@ class PeriodViewModel(
                             }
                             val trimmable = trailing.filter { isMarkOnly(it) }
                             val keptTrailing = trailing.size - trimmable.size
-                            trimmable.forEach { repository.deletePoopRecord(it.event.id) }
+                            trimmable.forEach { recordRepository.deletePoopRecord(it.event.id) }
                             val removed = trimmable.size
                             settingsRepository.setOngoingPeriodStart(null)
                             buildString {
@@ -268,7 +270,7 @@ class PeriodViewModel(
                             }
                         }
                     } else {
-                        val records = repository.observeRecordsInRange(
+                        val records = recordRepository.observeRecordsInRange(
                             date.minusYears(3).toString(), date.toString(), MenstruationFields.TYPE_CODE
                         ).first()
                         val dates = records.mapNotNullTo(mutableSetOf()) {
@@ -278,7 +280,7 @@ class PeriodViewModel(
                             is PeriodFill.Plan.TooFar ->
                                 "间隔超过 ${PeriodFill.MAX_GAP_DAYS} 天，请逐日确认后再补齐"
                             is PeriodFill.Plan.Fill -> {
-                                plan.dates.forEach { repository.addRecord(periodMarkDraft(it)) }
+                                plan.dates.forEach { recordRepository.addRecord(periodMarkDraft(it)) }
                                 "已标记结束，并补齐 ${plan.dates.size} 天（已有记录不覆盖）"
                             }
                         }
@@ -300,11 +302,11 @@ class PeriodViewModel(
         if (start.isAfter(today)) return
         periodWriteMutex.withLock {
             withContext(Dispatchers.IO) {
-                val recorded = repository.observeRecordsInRange(
+                val recorded = recordRepository.observeRecordsInRange(
                     start.toString(), today.toString(), MenstruationFields.TYPE_CODE
                 ).first().mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
                 PeriodOngoing.pendingWrites(start, recorded, today)
-                    .forEach { repository.addRecord(periodMarkDraft(it)) }
+                    .forEach { recordRepository.addRecord(periodMarkDraft(it)) }
             }
         }
     }
@@ -333,7 +335,7 @@ class PeriodViewModel(
                     val today = todaySource.currentDate()
                     if (date.isAfter(today)) return@withContext "开始日期不能晚于今天"
                     val previousOngoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
-                    val records = repository.observeRecordsInRange(
+                    val records = recordRepository.observeRecordsInRange(
                         today.minusYears(3).toString(), today.toString(), MenstruationFields.TYPE_CODE
                     ).first()
                     val recorded = records.mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
@@ -363,7 +365,7 @@ class PeriodViewModel(
 
                     val byDate = records.associateBy { parseDateOrNull(it.event.localDate) }
                     plan.dropDates.forEach { day ->
-                        byDate[day]?.let { repository.deletePoopRecord(it.event.id) }
+                        byDate[day]?.let { recordRepository.deletePoopRecord(it.event.id) }
                     }
                     // 进行中的段要把起点一起挪，否则 syncOngoingPeriod 会按旧起点把撤掉的日子补回来。
                     if (previousOngoing != null) {
@@ -399,7 +401,7 @@ class PeriodViewModel(
                     val today = todaySource.currentDate()
                     if (date.isAfter(today)) return@withContext "结束日期不能晚于今天"
                     val previousOngoing = settingsRepository.ongoingPeriodStart.first()?.let(::parseDateOrNull)
-                    val records = repository.observeRecordsInRange(
+                    val records = recordRepository.observeRecordsInRange(
                         today.minusYears(3).toString(), today.toString(), MenstruationFields.TYPE_CODE
                     ).first()
                     val recorded = records.mapNotNullTo(mutableSetOf()) { parseDateOrNull(it.event.localDate) }
@@ -419,7 +421,7 @@ class PeriodViewModel(
                     }
 
                     val plan = PeriodEndEdit.plan(segment.start, segment.end, date, recorded)
-                    plan.fillDates.forEach { repository.addRecord(periodMarkDraft(it)) }
+                    plan.fillDates.forEach { recordRepository.addRecord(periodMarkDraft(it)) }
 
                     val trimSet = plan.trimDates.toHashSet()
                     val trimmable = mutableListOf<BackupRecord>()
@@ -429,7 +431,7 @@ class PeriodViewModel(
                         if (day !in trimSet) return@forEach
                         if (isMarkOnly(record)) trimmable += record else kept++
                     }
-                    trimmable.forEach { record -> repository.deletePoopRecord(record.event.id) }
+                    trimmable.forEach { record -> recordRepository.deletePoopRecord(record.event.id) }
 
                     settingsRepository.setOngoingPeriodStart(null)
                     buildString {
@@ -449,15 +451,15 @@ class PeriodViewModel(
 
     fun saveGenericRecord(eventId: String?, draft: RecordDraft) {
         viewModelScope.launchAction(actionFeedback, "操作失败") {
-            if (eventId == null) repository.addRecord(draft)
-            else repository.updateRecord(eventId, draft)
+            if (eventId == null) recordRepository.addRecord(draft)
+            else recordRepository.updateRecord(eventId, draft)
             todaySource.refresh()
         }
     }
 
     fun deleteRecord(eventId: String) {
         viewModelScope.launchAction(actionFeedback, "操作失败") {
-            repository.deletePoopRecord(eventId)
+            recordRepository.deletePoopRecord(eventId)
             todaySource.refresh()
         }
     }
@@ -484,7 +486,8 @@ class PeriodViewModel(
 
 
     class Factory(
-        private val repository: TrackRepository,
+        private val recordRepository: RecordRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
         private val settingsRepository: SettingsRepository,
         private val todaySource: TodaySource
     ) : ViewModelProvider.Factory {
@@ -493,7 +496,7 @@ class PeriodViewModel(
             if (!modelClass.isAssignableFrom(PeriodViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return PeriodViewModel(repository, settingsRepository, todaySource) as T
+            return PeriodViewModel(recordRepository, typeCatalogRepository, settingsRepository, todaySource) as T
         }
     }
 }

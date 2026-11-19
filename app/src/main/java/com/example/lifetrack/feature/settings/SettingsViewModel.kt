@@ -9,7 +9,7 @@ import com.example.lifetrack.core.backup.BackupCodec
 import com.example.lifetrack.core.backup.BackupDecodeResult
 import com.example.lifetrack.core.backup.BackupPayload
 import com.example.lifetrack.core.backup.BackupReencryptResult
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.datastore.SettingsRepository
 import com.example.lifetrack.core.model.CalendarMonth
@@ -33,7 +33,9 @@ import com.example.lifetrack.core.model.PeriodStartEdit
 import com.example.lifetrack.core.time.TodaySource
 import com.example.lifetrack.domain.model.PoopRecordDraft
 import com.example.lifetrack.domain.model.RecordDraft
-import com.example.lifetrack.domain.repository.TrackRepository
+import com.example.lifetrack.domain.repository.BackupRepository
+import com.example.lifetrack.domain.repository.DatabaseMaintenanceRepository
+import com.example.lifetrack.domain.repository.TypeCatalogRepository
 import com.example.lifetrack.feature.history.DayCalendarData
 import com.example.lifetrack.feature.statistics.PeriodStats
 import com.example.lifetrack.feature.statistics.emptyStatistics
@@ -72,7 +74,9 @@ private const val QUICK_WATER_AMOUNT_ML = 250
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModel(
-    private val repository: TrackRepository,
+    private val typeCatalogRepository: TypeCatalogRepository,
+    private val backupRepository: BackupRepository,
+    private val maintenanceRepository: DatabaseMaintenanceRepository,
     private val settingsRepository: SettingsRepository,
     private val todaySource: TodaySource
 ) : ViewModel() {
@@ -84,7 +88,7 @@ class SettingsViewModel(
     val today: StateFlow<LocalDate> = todaySource.today
 
     /** 记录项目（启用状态 + 排序）。首次进入时补齐内置类型，之后由 Room Flow 驱动。 */
-    val trackTypes: StateFlow<List<TrackTypeEntity>> = repository.observeTrackTypes()
+    val trackTypes: StateFlow<List<TrackType>> = typeCatalogRepository.observeTrackTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
@@ -114,19 +118,19 @@ class SettingsViewModel(
 
 
     fun setTypeEnabled(code: String, enabled: Boolean) {
-        viewModelScope.launchAction(actionFeedback, "操作失败") { repository.setTypeEnabled(code, enabled) }
+        viewModelScope.launchAction(actionFeedback, "操作失败") { typeCatalogRepository.setTypeEnabled(code, enabled) }
     }
 
     fun moveType(code: String, offset: Int) {
         val current = trackTypes.value
         val reordered = ModuleOrdering.move(current, code, offset)
         if (reordered != current) {
-            viewModelScope.launchAction(actionFeedback, "操作失败") { repository.reorderTypes(reordered) }
+            viewModelScope.launchAction(actionFeedback, "操作失败") { typeCatalogRepository.reorderTypes(reordered) }
         }
     }
 
     suspend fun buildBackupJson(passphrase: CharArray? = null): String = withContext(Dispatchers.IO) {
-        val payload = repository.readBackup()
+        val payload = backupRepository.readBackup()
         if (passphrase == null) {
             BackupCodec.encode(payload.types, payload.events)
         } else {
@@ -152,7 +156,7 @@ class SettingsViewModel(
     }
 
     suspend fun restoreBackup(payload: BackupPayload) {
-        withContext(Dispatchers.IO) { repository.restoreBackup(payload) }
+        withContext(Dispatchers.IO) { backupRepository.restoreBackup(payload) }
         // 恢复是整体替换：旧的「进行中起点」可能指向已不存在的数据，直接清掉，
         // 让用户在新数据上自己决定要不要重新点「大姨妈来了」。
         settingsRepository.setOngoingPeriodStart(null)
@@ -160,7 +164,7 @@ class SettingsViewModel(
     }
 
     suspend fun countAllRecords(): Int = withContext(Dispatchers.IO) {
-        repository.countAllRecords()
+        backupRepository.countAllRecords()
     }
 
     /** 「整理数据库」的状态。只在设置页数据区使用，是一次性维护动作。 */
@@ -178,14 +182,14 @@ class SettingsViewModel(
 
     /** 当前数据库文件大小；读不到时返回 0，UI 显示「—」。 */
     suspend fun databaseSizeBytes(): Long =
-        runCatching { repository.databaseSizeBytes() }.getOrDefault(0L)
+        runCatching { maintenanceRepository.databaseSizeBytes() }.getOrDefault(0L)
 
     fun compactDatabase() {
         if (_compactState.value is CompactState.Running) return
         viewModelScope.launchAction(actionFeedback, "操作失败") {
             _compactState.value = CompactState.Running
-            val before = runCatching { repository.databaseSizeBytes() }.getOrDefault(0L)
-            runCatching { repository.compactDatabase() }
+            val before = runCatching { maintenanceRepository.databaseSizeBytes() }.getOrDefault(0L)
+            runCatching { maintenanceRepository.compactDatabase() }
                 .onSuccess { after -> _compactState.value = CompactState.Done(before, after) }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
@@ -199,7 +203,9 @@ class SettingsViewModel(
     }
 
     class Factory(
-        private val repository: TrackRepository,
+        private val typeCatalogRepository: TypeCatalogRepository,
+    private val backupRepository: BackupRepository,
+    private val maintenanceRepository: DatabaseMaintenanceRepository,
         private val settingsRepository: SettingsRepository,
         private val todaySource: TodaySource
     ) : ViewModelProvider.Factory {
@@ -208,7 +214,7 @@ class SettingsViewModel(
             if (!modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
-            return SettingsViewModel(repository, settingsRepository, todaySource) as T
+            return SettingsViewModel(typeCatalogRepository, backupRepository, maintenanceRepository, settingsRepository, todaySource) as T
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.example.lifetrack.feature.history
 
-import com.example.lifetrack.core.database.model.DailyTypeCountProjection
+import com.example.lifetrack.domain.model.DailyTypeCount
 
 /**
  * 月历格子的「当天记了什么」摘要。
@@ -17,7 +17,7 @@ object DayCalendarData {
      * 折叠成「日期 → 当天出现过的类型码（去重、按首次出现排序）」。
      * 同一天同一类型的多条记录只保留一份，因为格子表达的是「记了哪几类」而不是「各几次」。
      */
-    fun typesByDate(rows: List<DailyTypeCountProjection>): Map<String, List<String>> =
+    fun typesByDate(rows: List<DailyTypeCount>): Map<String, List<String>> =
         rows.groupBy(keySelector = { it.localDate }, valueTransform = { it.typeCode })
             .mapValues { (_, codes) -> codes.distinct() }
 

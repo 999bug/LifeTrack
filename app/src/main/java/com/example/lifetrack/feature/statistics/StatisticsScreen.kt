@@ -1,5 +1,7 @@
 package com.example.lifetrack.feature.statistics
 
+import com.example.lifetrack.core.model.PoopFields
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -69,8 +71,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.lifetrack.core.database.DEFAULT_POOP_TYPE
-import com.example.lifetrack.core.database.entity.TrackTypeEntity
+
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.core.model.StatsPeriod
 import com.example.lifetrack.feature.home.StatisticsViewModel
 import java.time.LocalDate
@@ -90,7 +92,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
     val current = statsByPeriod[period]
     val colors = rememberStatsColors()
     // 形态分布只描述排便详情；其他口径（含全部类型）不展示，避免分母与字段错位。
-    val showDistribution = statsScope == DEFAULT_POOP_TYPE.code
+    val showDistribution = statsScope == PoopFields.TYPE_CODE
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -142,7 +144,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TypeFilterRow(
-    types: List<TrackTypeEntity>,
+    types: List<TrackType>,
     selected: String?,
     onSelect: (String?) -> Unit
 ) {

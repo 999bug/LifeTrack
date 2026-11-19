@@ -9,12 +9,8 @@ import com.example.lifetrack.core.database.entity.EventDetailEntity
 import com.example.lifetrack.core.database.entity.PoopDetailEntity
 import com.example.lifetrack.core.database.entity.TrackEventEntity
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.core.database.model.DailyCountProjection
-import com.example.lifetrack.core.database.model.DailyTypeCountProjection
-import com.example.lifetrack.core.database.model.EventTimestamp
+
 import com.example.lifetrack.core.database.model.EventWithDetails
-import com.example.lifetrack.core.database.model.PoopRecordRelation
-import com.example.lifetrack.core.database.model.StatDetailProjection
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.model.CoffeeFields
@@ -24,7 +20,14 @@ import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.TeaMigration
 import com.example.lifetrack.core.model.toEntity
 import com.example.lifetrack.core.model.toRecordDetail
+import com.example.lifetrack.domain.model.DailyCount
+import com.example.lifetrack.domain.model.DailyTypeCount
+import com.example.lifetrack.domain.model.EventTimestamp
+import com.example.lifetrack.domain.model.HistoryPage
 import com.example.lifetrack.domain.model.PoopRecordDraft
+import com.example.lifetrack.domain.model.RecordCursor
+import com.example.lifetrack.domain.model.StatDetail
+import com.example.lifetrack.domain.model.TrackType
 import com.example.lifetrack.domain.model.RecordDraft
 import com.example.lifetrack.domain.repository.TrackRepository
 import kotlinx.coroutines.Dispatchers
@@ -38,9 +41,6 @@ class RoomTrackRepository(
     private val database: AppDatabase
 ) : TrackRepository {
     private val dao = database.trackEventDao()
-
-    override fun observePoopRecordsForDate(localDate: String): Flow<List<PoopRecordRelation>> =
-        dao.observePoopRecordsForDate(localDate)
 
     override fun observeRecordsForDate(localDate: String): Flow<List<BackupRecord>> =
         dao.observeRecordsForDate(localDate).map { rows -> rows.map { it.toBackupRecord() } }
@@ -58,35 +58,68 @@ class RoomTrackRepository(
         startDate: String,
         endDate: String,
         typeCode: String?,
+        cursor: RecordCursor?,
         limit: Int
-    ): Flow<List<BackupRecord>> =
-        dao.observeHistoryPage(startDate, endDate, typeCode, limit).map { rows ->
-            rows.map { it.toBackupRecord() }
+    ): Flow<HistoryPage> =
+        dao.observeHistoryPage(
+            startDate = startDate,
+            endDate = endDate,
+            typeCode = typeCode,
+            cursorAt = cursor?.occurredAtEpochMillis,
+            cursorId = cursor?.id,
+            limit = limit + 1
+        ).map { rows ->
+            val pageRows = rows.take(limit)
+            HistoryPage(
+                records = pageRows.map { it.toBackupRecord() },
+                nextCursor = pageRows.lastOrNull()?.event?.let { event ->
+                    RecordCursor(event.occurredAtEpochMillis, event.id)
+                },
+                hasMore = rows.size > limit
+            )
         }
     override fun observeDailyCounts(
         startDate: String,
         endDate: String,
         typeCode: String?
-    ): Flow<List<DailyCountProjection>> = dao.observeDailyCounts(startDate, endDate, typeCode)
+    ): Flow<List<DailyCount>> = dao.observeDailyCounts(startDate, endDate, typeCode)
+        .map { rows -> rows.map { DailyCount(it.localDate, it.count) } }
 
     override fun observeDailyTypeCounts(
         startDate: String,
         endDate: String
-    ): Flow<List<DailyTypeCountProjection>> = dao.observeDailyTypeCounts(startDate, endDate)
+    ): Flow<List<DailyTypeCount>> = dao.observeDailyTypeCounts(startDate, endDate)
+        .map { rows ->
+            rows.map { DailyTypeCount(it.localDate, it.typeCode, it.count, it.firstAt) }
+        }
 
     override fun observeEventTimestamps(
         startDate: String,
         endDate: String,
         typeCode: String?
     ): Flow<List<EventTimestamp>> = dao.observeEventTimestamps(startDate, endDate, typeCode)
+        .map { rows -> rows.map { EventTimestamp(it.occurredAtEpochMillis, it.zoneId) } }
 
     override fun observeStatDetails(
         startDate: String,
         endDate: String
-    ): Flow<List<StatDetailProjection>> = dao.observeStatDetails(startDate, endDate)
+    ): Flow<List<StatDetail>> = dao.observeStatDetails(startDate, endDate)
+        .map { rows ->
+            rows.map {
+                StatDetail(
+                    localDate = it.localDate,
+                    bristolType = it.bristolType,
+                    amountCode = it.amountCode,
+                    effortCode = it.effortCode,
+                    urgency = it.urgency,
+                    abdominalDiscomfort = it.abdominalDiscomfort,
+                    incompleteEvacuation = it.incompleteEvacuation
+                )
+            }
+        }
 
-    override fun observeTrackTypes(): Flow<List<TrackTypeEntity>> =
-        database.trackTypeDao().observeAll()
+    override fun observeTrackTypes(): Flow<List<TrackType>> =
+        database.trackTypeDao().observeAll().map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun ensureDefaultTypes() {
         val typeDao = database.trackTypeDao()
@@ -136,8 +169,8 @@ class RoomTrackRepository(
         database.trackTypeDao().setEnabled(code, enabled)
     }
 
-    override suspend fun reorderTypes(types: List<TrackTypeEntity>) {
-        database.withTransaction { database.trackTypeDao().updateAll(types) }
+    override suspend fun reorderTypes(types: List<TrackType>) {
+        database.withTransaction { database.trackTypeDao().updateAll(types.map { it.toEntity() }) }
     }
 
     override suspend fun addPoopRecord(draft: PoopRecordDraft): String {
@@ -307,6 +340,28 @@ class RoomTrackRepository(
     private fun typeFor(code: String): TrackTypeEntity =
         DEFAULT_TYPES.firstOrNull { it.code == code }
             ?: TrackTypeEntity(code, code, code, "other", "EVENT", true, 999, 1)
+
+    private fun TrackTypeEntity.toDomain(): TrackType = TrackType(
+        code = code,
+        name = name,
+        iconKey = iconKey,
+        category = category,
+        trackingMode = trackingMode,
+        enabled = enabled,
+        sortOrder = sortOrder,
+        schemaVersion = schemaVersion
+    )
+
+    private fun TrackType.toEntity(): TrackTypeEntity = TrackTypeEntity(
+        code = code,
+        name = name,
+        iconKey = iconKey,
+        category = category,
+        trackingMode = trackingMode,
+        enabled = enabled,
+        sortOrder = sortOrder,
+        schemaVersion = schemaVersion
+    )
 
     private fun EventWithDetails.toBackupRecord(): BackupRecord {
         val detail: RecordDetail? = when {

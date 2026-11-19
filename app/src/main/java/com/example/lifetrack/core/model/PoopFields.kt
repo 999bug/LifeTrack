@@ -16,6 +16,8 @@ package com.example.lifetrack.core.model
  */
 object PoopFields {
 
+    const val TYPE_CODE = "poop"
+
     /** 自动用时上限：超过一小时不再判定为一次有效记录。 */
     const val MAX_DURATION_MINUTES = 60
 

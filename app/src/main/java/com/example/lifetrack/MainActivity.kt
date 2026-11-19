@@ -15,6 +15,7 @@ import com.example.lifetrack.core.ui.LifeTrackTheme
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.lock.AppLockGate
 import com.example.lifetrack.feature.lock.AppLockViewModel
+import com.example.lifetrack.feature.menstruation.PeriodViewModel
 import com.example.lifetrack.feature.settings.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
@@ -49,6 +50,13 @@ class MainActivity : ComponentActivity() {
                     val updateViewModel: UpdateViewModel = viewModel(
                         factory = UpdateViewModel.Factory(container.updateRepository)
                     )
+                    val periodViewModel: PeriodViewModel = viewModel(
+                        factory = PeriodViewModel.Factory(
+                            repository = container.trackRepository,
+                            settingsRepository = container.settingsRepository,
+                            todaySource = container.todaySource
+                        )
+                    )
                     val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
                     val appLocked by appLockViewModel.appLocked.collectAsStateWithLifecycle()
                     // 「跟随系统」在这里解析成实际的明暗，主题切换只影响本次组合，不需要重建 Activity。
@@ -62,7 +70,8 @@ class MainActivity : ComponentActivity() {
                             LifeTrackApp(
                                 viewModel = mainViewModel,
                                 appLockViewModel = appLockViewModel,
-                                updateViewModel = updateViewModel
+                                updateViewModel = updateViewModel,
+                                periodViewModel = periodViewModel
                             )
                         }
                     }

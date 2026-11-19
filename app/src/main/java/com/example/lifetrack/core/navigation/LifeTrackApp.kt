@@ -43,6 +43,7 @@ import com.example.lifetrack.feature.history.HistoryScreen
 import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
 import com.example.lifetrack.feature.menstruation.MenstruationEditorDialog
 import com.example.lifetrack.feature.menstruation.PeriodScreen
+import com.example.lifetrack.feature.menstruation.PeriodViewModel
 import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.home.TodayScreen
 import com.example.lifetrack.feature.lock.AppLockViewModel
@@ -79,7 +80,8 @@ private fun BackupRecord.toPoopRelation() = PoopRecordRelation(
 fun LifeTrackApp(
     viewModel: MainViewModel,
     appLockViewModel: AppLockViewModel,
-    updateViewModel: UpdateViewModel
+    updateViewModel: UpdateViewModel,
+    periodViewModel: PeriodViewModel
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -152,6 +154,7 @@ fun LifeTrackApp(
             composable("today") {
                 TodayScreen(
                     viewModel = viewModel,
+                    periodViewModel = periodViewModel,
                     onQuickRecord = viewModel::quickRecord,
                     onWaterQuick = viewModel::quickWaterRecord,
                     onDetailedRecord = { openEditor(DEFAULT_POOP_TYPE.code, null) },
@@ -193,7 +196,7 @@ fun LifeTrackApp(
             }
             composable("cycle") {
                 PeriodScreen(
-                    viewModel = viewModel,
+                    viewModel = periodViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }

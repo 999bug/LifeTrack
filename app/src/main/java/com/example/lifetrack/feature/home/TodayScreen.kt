@@ -44,6 +44,7 @@ import com.example.lifetrack.core.model.SportFields
 import com.example.lifetrack.core.model.TeaFields
 import com.example.lifetrack.core.model.WaterFields
 import com.example.lifetrack.core.ui.LifeTrackTokens
+import com.example.lifetrack.feature.menstruation.PeriodViewModel
 import com.example.lifetrack.feature.record.RecordSummary
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -67,6 +68,7 @@ private val todayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE",
 @Composable
 fun TodayScreen(
     viewModel: MainViewModel,
+    periodViewModel: PeriodViewModel,
     onQuickRecord: () -> Unit,
     onWaterQuick: () -> Unit,
     onDetailedRecord: () -> Unit,
@@ -85,10 +87,10 @@ fun TodayScreen(
     val records by viewModel.todayRecords.collectAsStateWithLifecycle()
     val today by viewModel.today.collectAsStateWithLifecycle()
     val trackTypes by viewModel.trackTypes.collectAsStateWithLifecycle()
-    val snapshot by viewModel.cycleSnapshot.collectAsStateWithLifecycle()
-    val ongoingStart by viewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
-    val cycleDays by viewModel.cycleLengthDays.collectAsStateWithLifecycle()
-    val periodDays by viewModel.periodLengthDays.collectAsStateWithLifecycle()
+    val snapshot by periodViewModel.cycleSnapshot.collectAsStateWithLifecycle()
+    val ongoingStart by periodViewModel.ongoingPeriodStart.collectAsStateWithLifecycle()
+    val cycleDays by periodViewModel.cycleLengthDays.collectAsStateWithLifecycle()
+    val periodDays by periodViewModel.periodLengthDays.collectAsStateWithLifecycle()
 
     val enabledTypes = trackTypes.filter { it.enabled }
     // 月经与亲密关系都是子应用内的记录，不再占首页网格位（见 PeriodScreen）。

@@ -92,7 +92,7 @@ private const val MAX_MONTH_OFFSET = 6
  */
 @Composable
 fun PeriodScreen(
-    viewModel: MainViewModel,
+    viewModel: PeriodViewModel,
     onBack: () -> Unit
 ) {
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()

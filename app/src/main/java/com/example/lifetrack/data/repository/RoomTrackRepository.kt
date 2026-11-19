@@ -80,7 +80,15 @@ class RoomTrackRepository(
         database.trackTypeDao().observeAll()
 
     override suspend fun ensureDefaultTypes() {
-        database.trackTypeDao().insertIgnoreAll(DEFAULT_TYPES)
+        val typeDao = database.trackTypeDao()
+        typeDao.insertIgnoreAll(DEFAULT_TYPES)
+        // v0.7.1 及更早的既有库仍可能保存旧名；只替换这一条展示名，保留启用与排序。
+        val coffeeType = DEFAULT_TYPES.first { it.code == CoffeeFields.TYPE_CODE }
+        typeDao.renameIfCurrentName(
+            code = CoffeeFields.TYPE_CODE,
+            legacyName = "咖啡 / 茶",
+            newName = coffeeType.name
+        )
     }
 
     override suspend fun migrateLegacyTeaRecords(): Int {

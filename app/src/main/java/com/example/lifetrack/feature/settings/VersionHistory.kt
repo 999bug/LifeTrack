@@ -31,6 +31,11 @@ internal data class VersionNote(
 
 internal val versionHistory: List<VersionNote> = listOf(
     VersionNote(
+        version = "0.7.2",
+        date = "2026-11-19",
+        summary = "修正咖啡模块在首页和记录列表仍显示旧名称「咖啡 / 茶」的问题，现在统一显示为「咖啡」"
+    ),
+    VersionNote(
         version = "0.7.1",
         date = "2026-11-19",
         summary = "统一咖啡、饮水、茶、运动、排便、经期和亲密关系的记录页视觉；咖啡改为全屏点单体验，各模块拥有更清晰的配色、快捷选项和大字号布局"

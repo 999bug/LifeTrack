@@ -16,6 +16,10 @@ interface TrackTypeDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnoreAll(types: List<TrackTypeEntity>)
 
+    /** 只修正旧版遗留的展示名，不触碰 code、启用状态或排序。 */
+    @Query("UPDATE track_type SET name = :newName WHERE code = :code AND name = :legacyName")
+    suspend fun renameIfCurrentName(code: String, legacyName: String, newName: String): Int
+
     @Query("SELECT * FROM track_type ORDER BY sortOrder ASC")
     suspend fun getAll(): List<TrackTypeEntity>
 

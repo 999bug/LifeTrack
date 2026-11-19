@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +46,20 @@ class LocalDatabaseTest {
         val records = database.trackEventDao().observePoopRecordsForDate("2026-11-06").first()
         assertEquals(1, records.size)
         assertEquals(4, records.single().detail?.bristolType)
+    }
+
+    @Test
+    fun legacyCoffeeTypeNameIsNormalizedWithoutChangingSettings() = runBlocking {
+        database.trackTypeDao().insertIgnore(
+            TrackTypeEntity("coffee", "咖啡 / 茶", "coffee", "drink", "EVENT", false, 77, 1)
+        )
+
+        com.example.lifetrack.data.repository.RoomTrackRepository(database).ensureDefaultTypes()
+
+        val coffee = database.trackTypeDao().getAll().single { it.code == "coffee" }
+        assertEquals("咖啡", coffee.name)
+        assertFalse(coffee.enabled)
+        assertEquals(77, coffee.sortOrder)
     }
 
     /** A11：历史 / 月历 / 统计共用的按类型过滤查询，null 表示全部类型。 */

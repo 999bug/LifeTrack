@@ -29,7 +29,6 @@ import com.example.lifetrack.core.update.PendingReason
 import com.example.lifetrack.core.update.ReleaseInfo
 import com.example.lifetrack.core.update.ReleaseOrigin
 import com.example.lifetrack.core.update.UpdateRepository
-import com.example.lifetrack.feature.home.MainViewModel
 
 private const val GITEE_RELEASES = "https://gitee.com/saul999/LifeTrack/releases"
 private const val GITHUB_RELEASES = "https://github.com/999bug/LifeTrack/releases"

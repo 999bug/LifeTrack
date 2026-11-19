@@ -33,7 +33,7 @@ import java.time.temporal.ChronoUnit
  *
  * 为什么要有它：点「大姨妈来了」之后每天自动延续，忘了点「大姨妈走了」就会一路记到今天，
  * 结束日只能往后跑、改不回来。这里把结束日做成可直接滚动的年 / 月 / 日三列，
- * 确定后由 [com.example.lifetrack.feature.home.MainViewModel.changePeriodEnd] 负责补写与撤销。
+ * 确定后由 [PeriodViewModel.changePeriodEnd] 负责补写与撤销。
  *
  * 交互约束：
  * - 只能选 `[earliest..latest]` 之间，即「本段首日」到今天（已结束的段只额外放宽

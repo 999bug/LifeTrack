@@ -83,7 +83,7 @@ import com.example.lifetrack.core.model.ThemeMode
 import com.example.lifetrack.core.security.PassphraseQuality
 import com.example.lifetrack.core.security.SensitiveTypes
 import com.example.lifetrack.core.update.UpdateRepository
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.settings.SettingsViewModel
 import com.example.lifetrack.feature.lock.AppLockViewModel
 import com.example.lifetrack.feature.lock.canUseAppLock
 import com.example.lifetrack.feature.settings.backup.BackupController
@@ -111,7 +111,7 @@ private val backupStampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
  */
 @Composable
 fun SettingsScreen(
-    viewModel: MainViewModel,
+    viewModel: SettingsViewModel,
     appLockViewModel: AppLockViewModel,
     updateViewModel: UpdateViewModel,
     onOpenModules: () -> Unit
@@ -377,7 +377,7 @@ fun SettingsScreen(
                 title = "整理数据库",
                 icon = Icons.Filled.Storage,
                 subtitle = compactSubtitle(compactState),
-                enabled = !busy && compactState !is MainViewModel.CompactState.Running,
+                enabled = !busy && compactState !is SettingsViewModel.CompactState.Running,
                 onClick = { viewModel.compactDatabase() }
             )
             if (busy || status != null) {
@@ -889,10 +889,10 @@ fun SettingsScreen(
 }
 
 /** 「整理数据库」行的副标题：把状态翻成一句用户能读懂的话。 */
-private fun compactSubtitle(state: MainViewModel.CompactState): String = when (state) {
-    MainViewModel.CompactState.Idle -> "回收本地数据占用的多余空间"
-    MainViewModel.CompactState.Running -> "正在整理，请勿离开…"
-    is MainViewModel.CompactState.Done -> {
+private fun compactSubtitle(state: SettingsViewModel.CompactState): String = when (state) {
+    SettingsViewModel.CompactState.Idle -> "回收本地数据占用的多余空间"
+    SettingsViewModel.CompactState.Running -> "正在整理，请勿离开…"
+    is SettingsViewModel.CompactState.Done -> {
         val saved = (state.beforeBytes - state.afterBytes).coerceAtLeast(0L)
         if (saved <= 0L) {
             "已整理 · ${formatBytes(state.afterBytes)}（无可回收空间）"
@@ -902,7 +902,7 @@ private fun compactSubtitle(state: MainViewModel.CompactState): String = when (s
         }
     }
 
-    is MainViewModel.CompactState.Failed -> "整理失败：${state.message}"
+    is SettingsViewModel.CompactState.Failed -> "整理失败：${state.message}"
 }
 
 private fun formatBytes(bytes: Long): String = when {

@@ -82,7 +82,7 @@ internal fun rememberPeriodPalette(): PeriodPalette {
  * [PeriodPhaseCard] 92dp 周期环、[PeriodCycleBandCard] 28 段连续色带、
  * [PeriodPrimaryActions] 单一 62dp 主行动 + 设为开始日 / 改结束日期、[PeriodInsightSection] 洞察折叠。
  *
- * 这里只负责呈现，状态与写入全部由 [PeriodScreen] / [com.example.lifetrack.feature.home.MainViewModel] 提供。
+ * 这里只负责呈现，状态与写入全部由 [PeriodScreen] / [PeriodViewModel] 提供。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

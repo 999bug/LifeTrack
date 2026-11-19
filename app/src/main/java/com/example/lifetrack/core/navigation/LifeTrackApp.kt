@@ -45,7 +45,7 @@ import com.example.lifetrack.feature.menstruation.MenstruationEditorDialog
 import com.example.lifetrack.feature.menstruation.PeriodScreen
 import com.example.lifetrack.feature.menstruation.PeriodViewModel
 import com.example.lifetrack.feature.home.HistoryViewModel
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.settings.SettingsViewModel
 import com.example.lifetrack.feature.home.StatisticsViewModel
 import com.example.lifetrack.feature.home.TodayViewModel
 import com.example.lifetrack.feature.home.TodayScreen
@@ -57,6 +57,7 @@ import com.example.lifetrack.feature.settings.SettingsScreen
 import com.example.lifetrack.feature.settings.UpdateViewModel
 import com.example.lifetrack.feature.sport.SportEditorDialog
 import com.example.lifetrack.feature.sport.SportScreen
+import com.example.lifetrack.feature.sport.SportViewModel
 import com.example.lifetrack.feature.statistics.StatisticsScreen
 import com.example.lifetrack.feature.tea.TeaEditorDialog
 import com.example.lifetrack.feature.water.WaterEditorDialog
@@ -81,13 +82,14 @@ private fun BackupRecord.toPoopRelation() = PoopRecordRelation(
 
 @Composable
 fun LifeTrackApp(
-    viewModel: MainViewModel,
+    viewModel: SettingsViewModel,
     appLockViewModel: AppLockViewModel,
     updateViewModel: UpdateViewModel,
     periodViewModel: PeriodViewModel,
     todayViewModel: TodayViewModel,
     historyViewModel: HistoryViewModel,
-    statisticsViewModel: StatisticsViewModel
+    statisticsViewModel: StatisticsViewModel,
+    sportViewModel: SportViewModel
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -208,7 +210,7 @@ fun LifeTrackApp(
             }
             composable("sport") {
                 SportScreen(
-                    viewModel = viewModel,
+                    viewModel = sportViewModel,
                     onBack = { navController.popBackStack() },
                     onRecord = { sport -> openEditor(SportFields.TYPE_CODE, null, sport) },
                     onShowDetail = { detailRecord = it },

@@ -15,7 +15,7 @@ import java.time.LocalDate
  * 统计页的数据流：把「当前日期 + 各周期偏移 + 类型筛选」解析成四个周期窗口，
  * 合并三路查询（按天计数 / 时刻 / 详情）后聚合出每个周期的 [PeriodStats]。
  *
- * 从 MainViewModel 里提出来单独成函数，是为了能脱离 ViewModel 直接验窗口与聚合口径；
+ * 从 StatisticsViewModel 里提出来单独成函数，是为了能脱离 ViewModel 直接验窗口与聚合口径；
  * 调度（flowOn）与状态收口（stateIn）仍由调用方决定。
  */
 @OptIn(ExperimentalCoroutinesApi::class)

@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.database.entity.TrackTypeEntity
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.settings.SettingsViewModel
 
 /**
  * 记录项目管理：从设置页拆出来的独立页面。
@@ -40,7 +40,7 @@ import com.example.lifetrack.feature.home.MainViewModel
  */
 @Composable
 fun ModuleManagementScreen(
-    viewModel: MainViewModel,
+    viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
     val types by viewModel.trackTypes.collectAsStateWithLifecycle()

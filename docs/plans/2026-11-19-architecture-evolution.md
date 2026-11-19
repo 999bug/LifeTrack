@@ -40,10 +40,10 @@
 - [x] 3A：拆出 `AppLockViewModel` 与 `UpdateViewModel`，共享 `AppContainer` 的 `TodaySource`，设置页和启动链完成接线。
 - [x] 3B：拆出 `PeriodViewModel`，迁移经期流、周期快照与写入逻辑。
 - [x] 3C：拆出首页、历史、统计 ViewModel。
-- [ ] 3D：删除剩余页面对 `feature.home.MainViewModel` 的反向依赖。
-- [ ] 保持导航参数、页面行为和状态恢复不变。
-- [ ] 删除非 home feature 对 `feature.home.MainViewModel` 的依赖。
-- [ ] 补每屏核心状态流测试。
+- [x] 3D：删除剩余页面对 `feature.home.MainViewModel` 的反向依赖。
+- [x] 保持导航参数、页面行为和状态恢复不变。
+- [x] 删除非 home feature 对 `feature.home.MainViewModel` 的依赖。
+- [ ] 补每屏核心状态流测试（转入 Task 8）。
 
 ### Task 4: 统一写操作错误反馈
 

@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lifetrack.core.model.BackupRecord
 import com.example.lifetrack.core.model.SportFields
-import com.example.lifetrack.feature.home.MainViewModel
+import com.example.lifetrack.feature.sport.SportViewModel
 
 /** 列表最多一次画 30 条，再多引导去「历史」页；避免长列表把首屏滚动深度拖到几屏之外。 */
 private const val VISIBLE_LIMIT = 30
@@ -55,7 +55,7 @@ private const val VISIBLE_LIMIT = 30
  */
 @Composable
 fun SportScreen(
-    viewModel: MainViewModel,
+    viewModel: SportViewModel,
     onBack: () -> Unit,
     onRecord: (String) -> Unit,
     onShowDetail: (BackupRecord) -> Unit,

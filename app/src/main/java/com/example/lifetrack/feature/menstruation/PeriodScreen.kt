@@ -65,7 +65,6 @@ import com.example.lifetrack.core.model.PeriodOngoing
 import com.example.lifetrack.core.model.Phase
 import com.example.lifetrack.core.model.RecordDetail
 import com.example.lifetrack.core.ui.LifeTrackTokens
-import com.example.lifetrack.feature.home.MainViewModel
 import com.example.lifetrack.feature.intimacy.IntimacyDaySection
 import com.example.lifetrack.feature.intimacy.IntimacyEditorDialog
 import com.example.lifetrack.feature.statistics.CardShape
@@ -85,7 +84,7 @@ private const val MAX_MONTH_OFFSET = 6
  *
  * 从「日历 + 表单」升级为「看得见的周期」：92dp 周期环 → 28 段连续色带 → 日历 →
  * 单一 62dp 主行动（未开始 / 经期中 / 已结束三态）→ 逐行填写 → 周期洞察折叠。
- * 所有派生数字来自 [MainViewModel.cycleSnapshot]，不落库、不产出健康结论。
+ * 所有派生数字来自 [PeriodViewModel.cycleSnapshot]，不落库、不产出健康结论。
  *
  * 旧版「大姨妈来了」在经期中被设成 disabled 灰块，FlowRow 里两键错位；
  * 现在只剩一个主按钮，撤销与改开始日期作为次级动作，任何时候布局都对齐。
